@@ -9,45 +9,239 @@
   --accent-b: #65f0b5;
   --accent-ink: #10140e;
 }
-:root[data-accent="aurora"] { --accent-a: #47e9ff; --accent-b: #8e7cff; --accent-ink: #091217; }
-:root[data-accent="ember"] { --accent-a: #ffd15c; --accent-b: #ff7b67; --accent-ink: #181006; }
-:root[data-accent="amethyst"] { --accent-a: #bd8cff; --accent-b: #ff79bd; --accent-ink: #150b18; }
-:root[data-accent="glacier"] { --accent-a: #72a7ff; --accent-b: #78f0ec; --accent-ink: #08111b; }
+:root[data-accent="aurora"] {
+  --accent-a: #47e9ff;
+  --accent-b: #8e7cff;
+  --accent-ink: #091217;
+}
+:root[data-accent="ember"] {
+  --accent-a: #ffd15c;
+  --accent-b: #ff7b67;
+  --accent-ink: #181006;
+}
+:root[data-accent="amethyst"] {
+  --accent-a: #bd8cff;
+  --accent-b: #ff79bd;
+  --accent-ink: #150b18;
+}
+:root[data-accent="glacier"] {
+  --accent-a: #72a7ff;
+  --accent-b: #78f0ec;
+  --accent-ink: #08111b;
+}
 
-* { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: #454956 transparent; }
-*::-webkit-scrollbar { width: 9px; height: 9px; }
-*::-webkit-scrollbar-track, *::-webkit-scrollbar-corner { background: transparent; }
-*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: #454956; background-clip: padding-box; }
-*::-webkit-scrollbar-thumb:hover { background: #6f7e6b; background-clip: padding-box; }
-body { margin: 0; overflow: hidden; }
-button, input { font: inherit; }
-button { color: inherit; }
+* {
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: #454956 transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: #454956;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #6f7e6b;
+  background-clip: padding-box;
+}
+body {
+  margin: 0;
+  overflow: hidden;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  color: inherit;
+}
 
 /* Shared relationships that remain clearer than repeated arbitrary variants. */
-.primary-nav, .game-list { -webkit-app-region: no-drag; }
-.game-row, .installed-card, .ranking-row, .month-card { content-visibility: auto; contain-intrinsic-size: auto 72px; }
-.nav-item, .settings { display: flex; gap: 11px; align-items: center; border: 0; background: transparent; border-radius: 10px; padding: 11px 12px; color: #9b9da8; text-align: left; cursor: pointer; }
-h1 { margin: 14px 0 8px; font-size: clamp(40px, 5vw, 72px); font-weight: 800; line-height: 1; letter-spacing: -3px; }
-.achievements-heading, .achievements-heading > div { display: flex; align-items: center; }
-.savegames-heading, .savegames-heading > div, .save-versions-heading { display: flex; align-items: center; }
-.savegames-heading, .save-versions-heading { justify-content: space-between; gap: 20px; }
-.savegame-warning, .savegame-status { margin: 16px 0 0; border-radius: 10px; padding: 10px 12px; background: #f4bb5510; color: #e9bd70; font-size: 11px; }
-.ranking-name, .ranking-name strong, .ranking-name small, .ranking-time strong, .ranking-time small { display: block; min-width: 0; }
-.ludusavi-results > button, .ludusavi-selected { display: flex; align-items: center; justify-content: space-between; width: 100%; border: 0; border-radius: 8px; padding: 9px 10px; background: transparent; color: #b8bbc4; text-align: left; }
-footer { display: flex; justify-content: space-between; align-items: center; padding: 0 36px; color: #585b66; font-size: 11px; }
+.primary-nav,
+.game-list {
+  -webkit-app-region: no-drag;
+}
+.game-row,
+.installed-card,
+.ranking-row,
+.month-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 72px;
+}
+.nav-item,
+.settings {
+  display: flex;
+  gap: 11px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  padding: 11px 12px;
+  color: #9b9da8;
+  text-align: left;
+  cursor: pointer;
+}
+h1 {
+  margin: 14px 0 8px;
+  font-size: clamp(40px, 5vw, 72px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -3px;
+}
+.achievements-heading,
+.achievements-heading > div {
+  display: flex;
+  align-items: center;
+}
+.savegames-heading,
+.savegames-heading > div,
+.save-versions-heading {
+  display: flex;
+  align-items: center;
+}
+.savegames-heading,
+.save-versions-heading {
+  justify-content: space-between;
+  gap: 20px;
+}
+.savegame-warning,
+.savegame-status {
+  margin: 16px 0 0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f4bb5510;
+  color: #e9bd70;
+  font-size: 11px;
+}
+.ranking-name,
+.ranking-name strong,
+.ranking-name small,
+.ranking-time strong,
+.ranking-time small {
+  display: block;
+  min-width: 0;
+}
+.ludusavi-results > button,
+.ludusavi-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: transparent;
+  color: #b8bbc4;
+  text-align: left;
+}
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 36px;
+  color: #585b66;
+  font-size: 11px;
+}
 
-@keyframes running-pulse { 50% { opacity: .5; transform: scale(.78); } }
+@keyframes running-pulse {
+  50% {
+    opacity: 0.5;
+    transform: scale(0.78);
+  }
+}
 
 /* Accent themes only change highlights; all surfaces remain dark. */
-.game-row.running small, .eyebrow, .installed-art > b, .installed-card.running .installed-copy small,
-.achievements-heading > b, .metric-grid article > svg, .period-selector svg, .podium-cover > span,
-.podium-game > span, .ranking-cover, .annual-ranking-heading, .month-card > header > span, .month-cover,
-.settings-card-heading i.connected, .artwork-picker > svg, .ludusavi-results > button:hover, .modal-hint svg { color: var(--accent-a); }
-.installed-play, .save-sync-indicator.ok { background: var(--accent-a); }
-.installed-card.running::after, .section-icon, .savegame-status, .save-version-list em,
-.summary-period button.active, .summary-grid article > span { color: var(--accent-a); background: color-mix(in srgb, var(--accent-a) 9%, transparent); }
-.achievement-progress span, .ranking-progress i, .podium-game-1 .podium-cover b { background: linear-gradient(90deg, var(--accent-a), var(--accent-b)); }
+.game-row.running small,
+.eyebrow,
+.installed-art > b,
+.installed-card.running .installed-copy small,
+.achievements-heading > b,
+.metric-grid article > svg,
+.period-selector svg,
+.podium-cover > span,
+.podium-game > span,
+.ranking-cover,
+.annual-ranking-heading,
+.month-card > header > span,
+.month-cover,
+.settings-card-heading i.connected,
+.artwork-picker > svg,
+.ludusavi-results > button:hover,
+.modal-hint svg {
+  color: var(--accent-a);
+}
+.installed-play,
+.save-sync-indicator.ok {
+  background: var(--accent-a);
+}
+.installed-card.running::after,
+.section-icon,
+.savegame-status,
+.save-version-list em,
+.summary-period button.active,
+.summary-grid article > span {
+  color: var(--accent-a);
+  background: color-mix(in srgb, var(--accent-a) 9%, transparent);
+}
+.achievement-progress span,
+.ranking-progress i,
+.podium-game-1 .podium-cover b {
+  background: linear-gradient(90deg, var(--accent-a), var(--accent-b));
+}
 
-@media (max-width: 1050px) { .app-shell { grid-template-columns: 220px 1fr; } .hero-copy { width: 82%; padding: 42px; } .chart-layout { grid-template-columns: 1fr; gap: 28px; } .donut { width: 230px; } .metric-grid { grid-template-columns: minmax(220px, 320px); } .settings-form { grid-template-columns: 1fr; } .ranking-progress { display: none; } .ranking-row { grid-template-columns: 28px 38px minmax(120px, 1fr) 78px; } .months-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 850px) { .accent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-@media (max-width: 720px) { .suggestion-strip { grid-template-columns: repeat(3, 1fr); } .artwork-results { grid-template-columns: repeat(2, 1fr); } .summary-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1050px) {
+  .app-shell {
+    grid-template-columns: 220px 1fr;
+  }
+  .hero-copy {
+    width: 82%;
+    padding: 42px;
+  }
+  .chart-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+  .donut {
+    width: 230px;
+  }
+  .metric-grid {
+    grid-template-columns: minmax(220px, 320px);
+  }
+  .settings-form {
+    grid-template-columns: 1fr;
+  }
+  .ranking-progress {
+    display: none;
+  }
+  .ranking-row {
+    grid-template-columns: 28px 38px minmax(120px, 1fr) 78px;
+  }
+  .months-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 850px) {
+  .accent-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .suggestion-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .artwork-results {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}

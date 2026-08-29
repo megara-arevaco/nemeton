@@ -1,0 +1,21 @@
+{
+  "name": "nemeton",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.15.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild"
+    ]
+  },
+  "scripts": {
+    "dev": "corepack pnpm --filter @launcher/desktop dev",
+    "build": "corepack pnpm --filter @launcher/desktop build",
+    "dist:win": "corepack pnpm --filter @launcher/desktop dist:win",
+    "dist:win:installer": "corepack pnpm --filter @launcher/desktop dist:win:installer",
+    "dist:win:portable": "corepack pnpm --filter @launcher/desktop dist:win:portable",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test"
+  }
+}

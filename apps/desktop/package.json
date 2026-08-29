@@ -1,0 +1,75 @@
+{
+  "name": "@launcher/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "dist:win": "electron-vite build && electron-builder --win nsis portable",
+    "dist:win:installer": "electron-vite build && electron-builder --win nsis",
+    "dist:win:portable": "electron-vite build && electron-builder --win portable",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/main/**/*.test.ts"
+  },
+  "dependencies": {
+    "@launcher/core": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
+    "fflate": "^0.8.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.10",
+    "@types/react-dom": "^19.1.7",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^40.0.0",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^4.0.0",
+    "sass-embedded": "^1.93.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.8.3",
+    "vite": "^7.1.3"
+  },
+  "build": {
+    "appId": "io.nemeton.desktop",
+    "productName": "Nemeton",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "win": {
+      "icon": "resources/icon.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "Nemeton Setup ${version}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nemeton",
+      "uninstallDisplayName": "Nemeton",
+      "deleteAppDataOnUninstall": false
+    },
+    "portable": {
+      "artifactName": "Nemeton Portable ${version}.${ext}"
+    }
+  }
+}

@@ -1,10 +1,33 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { memo, StrictMode, useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { createRoot } from "react-dom/client";
-import { ArrowCounterClockwise, CalendarBlank, ChartDonut, Clock, FloppyDisk, FolderOpen, GameController, Gear, Image, ImageSquare, LockKey, MagnifyingGlass, Minus, Palette, PencilSimple, Play, Plus, Square, SteamLogo, Trash, Trophy, X } from "@phosphor-icons/react";
+import { ArrowCounterClockwise } from "@phosphor-icons/react/ArrowCounterClockwise";
+import { CalendarBlank } from "@phosphor-icons/react/CalendarBlank";
+import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
+import { Clock } from "@phosphor-icons/react/Clock";
+import { FloppyDisk } from "@phosphor-icons/react/FloppyDisk";
+import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
+import { GameController } from "@phosphor-icons/react/GameController";
+import { Gear } from "@phosphor-icons/react/Gear";
+import { Image } from "@phosphor-icons/react/Image";
+import { ImageSquare } from "@phosphor-icons/react/ImageSquare";
+import { LockKey } from "@phosphor-icons/react/LockKey";
+import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
+import { Minus } from "@phosphor-icons/react/Minus";
+import { Palette } from "@phosphor-icons/react/Palette";
+import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
+import { Play } from "@phosphor-icons/react/Play";
+import { Plus } from "@phosphor-icons/react/Plus";
+import { Square } from "@phosphor-icons/react/Square";
+import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
+import { Trash } from "@phosphor-icons/react/Trash";
+import { Trophy } from "@phosphor-icons/react/Trophy";
+import { X } from "@phosphor-icons/react/X";
 import type { ArtworkSuggestion, FolderSyncSettings, GameAchievements, GameSession, LibraryGame, LibrarySnapshot, SteamAccountSettings } from "@launcher/core";
 
 import "./styles.css";
+import { buildMonthlyActivity } from "./statistics";
+import { useLibraryController } from "./useLibraryController";
 
 const componentUtilities: Record<string, string> = {
   "accent-grid": "[display:grid] [grid-template-columns:repeat(5,_minmax(0,_1fr))] [gap:10px] [margin-top:22px] [&_>_button]:[position:relative] [&_>_button]:[display:grid] [&_>_button]:[justify-items:start] [&_>_button]:[gap:10px] [&_>_button]:[min-width:0] [&_>_button]:[border:1px_solid_#ffffff0d] [&_>_button]:[border-radius:13px] [&_>_button]:[padding:11px] [&_>_button]:[background:#090a0f80] [&_>_button]:[color:#b9bbc3] [&_>_button]:[text-align:left] [&_>_button]:[cursor:pointer] [&_>_button]:[transition:border-color_.16s_ease,_background_.16s_ease,_transform_.16s_ease] [&_>_button:hover]:[border-color:#ffffff20] [&_>_button:hover]:[background:#ffffff08] [&_>_button:hover]:[transform:translateY(-2px)] [&_>_button.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_48%,_transparent)] [&_>_button.selected]:[background:color-mix(in_srgb,_var(--accent-a)_7%,_#090a0f)] [&_>_button.selected]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_10%,_transparent)] [&_>_button_>_span:nth-child(2)]:[min-width:0] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[font-size:11px] [&_small]:[margin-top:4px] [&_small]:[color:#686b77] [&_small]:[font-size:9px] [&_>_button_>_b]:[position:absolute] [&_>_button_>_b]:[top:10px] [&_>_button_>_b]:[right:10px] [&_>_button_>_b]:[width:7px] [&_>_button_>_b]:[height:7px] [&_>_button_>_b]:[border:1px_solid_#ffffff2b] [&_>_button_>_b]:[border-radius:50%] [&_>_button.selected_>_b]:[border-color:var(--accent-a)] [&_>_button.selected_>_b]:[background:var(--accent-a)] [&_>_button.selected_>_b]:[box-shadow:0_0_9px_color-mix(in_srgb,_var(--accent-a)_60%,_transparent)]",
@@ -47,14 +70,14 @@ const componentUtilities: Record<string, string> = {
   "empty-state": "[display:grid] [place-items:center] [align-content:center] [margin:0_34px] [padding:40px] [border:1px_dashed_#ffffff17] [border-radius:24px] [background:#ffffff04] [text-align:center] [&_h1]:[font-size:38px] [&_h1]:[letter-spacing:-1.8px] [&_p]:[max-width:470px] [&_p]:[margin:0_0_26px] [&_p]:[color:#898c97] [&_p]:[line-height:1.6]",
   "eyebrow": "[color:#a3f982] [font-size:11px] [font-weight:700] [letter-spacing:1.7px]",
   "file-field": "[display:grid] [grid-template-columns:minmax(0,_1fr)_auto] [gap:8px] [&_button]:[display:flex] [&_button]:[align-items:center] [&_button]:[gap:7px] [&_button]:[border:1px_solid_#ffffff16] [&_button]:[border-radius:10px] [&_button]:[padding:0_13px] [&_button]:[background:#ffffff08] [&_button]:[cursor:pointer]",
-  "game-avatar": "[overflow:hidden] [&_img]:[position:absolute] [&_img]:[inset:0] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]",
+  "game-avatar": "[position:relative] [display:grid] [place-items:center] [width:36px] [height:36px] [overflow:hidden] [border-radius:8px] [background:#242630] [color:#8c8f99] [font-size:12px] [font-weight:700] [&_img]:[position:absolute] [&_img]:[inset:0] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]",
   "game-context-backdrop": "[position:fixed] [z-index:80] [inset:0] [-webkit-app-region:no-drag]",
   "game-context-menu": "[position:fixed] [width:218px] [overflow:hidden] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:6px] [background:#171820f5] [box-shadow:0_18px_55px_#00000080] [backdrop-filter:blur(18px)] [&_>_small]:[display:block] [&_>_small]:[overflow:hidden] [&_>_small]:[padding:7px_9px_9px] [&_>_small]:[color:#777a86] [&_>_small]:[font-size:9px] [&_>_small]:[text-overflow:ellipsis] [&_>_small]:[white-space:nowrap] [&_>_button]:[display:flex] [&_>_button]:[align-items:center] [&_>_button]:[gap:9px] [&_>_button]:[width:100%] [&_>_button]:[border:0] [&_>_button]:[border-radius:8px] [&_>_button]:[padding:10px] [&_>_button]:[background:transparent] [&_>_button]:[color:#ee959b] [&_>_button]:[font-size:12px] [&_>_button]:[text-align:left] [&_>_button]:[cursor:pointer] [&_>_button:hover]:[background:#ff727d12] [&_>_button_svg]:[width:16px] [&_>_button_svg]:[height:16px]",
   "game-fields": "[display:flex] [flex-direction:column] [gap:18px] [padding-top:8px] [&_label_>_span]:[display:block] [&_label_>_span]:[margin:0_0_8px_2px] [&_label_>_span]:[color:#989ba5] [&_label_>_span]:[font-size:11px] [&_label_>_span]:[font-weight:600] [&_label_em]:[margin-left:5px] [&_label_em]:[color:#626571] [&_label_em]:[font-size:9px] [&_label_em]:[font-style:normal] [&_label_em]:[font-weight:500] [&_label_em]:[text-transform:uppercase] [&_input]:[width:100%] [&_input]:[height:44px] [&_input]:[border:1px_solid_#ffffff14] [&_input]:[border-radius:10px] [&_input]:[outline:none] [&_input]:[padding:0_12px] [&_input]:[background:#090a0fa3] [&_input]:[color:white] [&_input:focus]:[border-color:#a9fb766b] [&_input:focus]:[box-shadow:0_0_0_3px_#a9fb760d] [&_input:focus]:[border-color:color-mix(in_srgb,_var(--accent-a)_42%,_transparent)] [&_input:focus]:[box-shadow:0_0_0_3px_color-mix(in_srgb,_var(--accent-a)_5%,_transparent)]",
   "game-hero": "[position:relative] [overflow:hidden] [height:min(510px,_62vh)] [min-height:410px] [margin:0_34px] [border:1px_solid_#ffffff10] [border-radius:24px] [background:linear-gradient(120deg,_#11131c_8%,_#171a27_55%,_#20253a)] [&:not(:has(.hero-art))_.ambient::after]:[content:\"\"] [&:not(:has(.hero-art))_.ambient::after]:[position:absolute] [&:not(:has(.hero-art))_.ambient::after]:[width:380px] [&:not(:has(.hero-art))_.ambient::after]:[height:380px] [&:not(:has(.hero-art))_.ambient::after]:[right:10%] [&:not(:has(.hero-art))_.ambient::after]:[top:13%] [&:not(:has(.hero-art))_.ambient::after]:[border:1px_solid_#adff8f28] [&:not(:has(.hero-art))_.ambient::after]:[border-radius:42%_58%_67%_33%] [&:not(:has(.hero-art))_.ambient::after]:[transform:rotate(18deg)] [&:not(:has(.hero-art))_.ambient::after]:[box-shadow:0_0_90px_#7eff6815,_inset_0_0_80px_#6caaff0d]",
   "game-list": "[min-height:0] [overflow-x:hidden] [overflow-y:auto] [display:grid] [align-content:start] [gap:3px]",
   "game-name-field": "[position:relative]",
-  "game-row": "[display:grid] [grid-template-columns:36px_1fr] [gap:10px] [width:100%] [border:0] [background:transparent] [padding:7px] [border-radius:10px] [text-align:left] [cursor:pointer] [&:hover]:[background:#ffffff0b] [&.selected]:[background:#ffffff0b] [&.selected]:[box-shadow:inset_2px_0_#9df37b] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_strong]:[max-width:175px] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_small]:[max-width:175px] [&_strong]:[margin-top:1px] [&_strong]:[font-size:13px] [&_strong]:[font-weight:500] [&_small]:[margin-top:3px] [&_small]:[color:#686b77] [&_small]:[font-size:11px] [&.running]:[background:#a9fb760b] [&.running]:[box-shadow:inset_2px_0_#9df37b] [&.running_.game-avatar]:[overflow:visible] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_#9df37b55] [&.running_.game-avatar_img]:[border-radius:8px] [&.running_.game-avatar::after]:[content:\"\"] [&.running_.game-avatar::after]:[position:absolute] [&.running_.game-avatar::after]:[z-index:2] [&.running_.game-avatar::after]:[right:-3px] [&.running_.game-avatar::after]:[bottom:-3px] [&.running_.game-avatar::after]:[width:9px] [&.running_.game-avatar::after]:[height:9px] [&.running_.game-avatar::after]:[border:2px_solid_#11121a] [&.running_.game-avatar::after]:[border-radius:50%] [&.running_.game-avatar::after]:[background:#9df37b] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_#9df37b] [&.running_.game-avatar::after]:[animation:running-pulse_1.6s_ease-in-out_infinite] [&.running_small]:[color:#9df37b] [&.running_small]:[font-weight:600] [&.selected]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_5%,_transparent)] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running_.game-avatar::after]:[background:var(--accent-a)] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_var(--accent-a)]",
+  "game-row": "[display:grid] [grid-template-columns:36px_minmax(0,_1fr)] [align-items:center] [gap:10px] [width:100%] [border:0] [background:transparent] [padding:7px] [border-radius:10px] [text-align:left] [cursor:pointer] [&_>_span:last-child]:[min-width:0] [&:hover]:[background:#ffffff0b] [&.selected]:[background:#ffffff0b] [&.selected]:[box-shadow:inset_2px_0_#9df37b] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[margin-top:1px] [&_strong]:[font-size:13px] [&_strong]:[font-weight:500] [&_small]:[margin-top:3px] [&_small]:[color:#686b77] [&_small]:[font-size:11px] [&.running]:[background:#a9fb760b] [&.running]:[box-shadow:inset_2px_0_#9df37b] [&.running_.game-avatar]:[overflow:visible] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_#9df37b55] [&.running_.game-avatar_img]:[border-radius:8px] [&.running_.game-avatar::after]:[content:\"\"] [&.running_.game-avatar::after]:[position:absolute] [&.running_.game-avatar::after]:[z-index:2] [&.running_.game-avatar::after]:[right:-3px] [&.running_.game-avatar::after]:[bottom:-3px] [&.running_.game-avatar::after]:[width:9px] [&.running_.game-avatar::after]:[height:9px] [&.running_.game-avatar::after]:[border:2px_solid_#11121a] [&.running_.game-avatar::after]:[border-radius:50%] [&.running_.game-avatar::after]:[background:#9df37b] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_#9df37b] [&.running_.game-avatar::after]:[animation:running-pulse_1.6s_ease-in-out_infinite] [&.running_small]:[color:#9df37b] [&.running_small]:[font-weight:600] [&.selected]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_5%,_transparent)] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running_.game-avatar::after]:[background:var(--accent-a)] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_var(--accent-a)]",
   "game-view": "[min-width:0] [min-height:0] [overflow-x:hidden] [overflow-y:auto] [overscroll-behavior:contain] [padding-bottom:30px] [scrollbar-gutter:stable]",
   "hero-actions": "[display:flex] [gap:10px]",
   "hero-art": "[position:absolute] [inset:0] [width:100%] [height:100%] [object-fit:cover] [object-position:center]",
@@ -137,7 +160,14 @@ const componentUtilities: Record<string, string> = {
   "ranking-name": "[&_strong]:[overflow:hidden] [&_strong]:[font-size:12px] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[margin-top:4px] [&_small]:[color:#626570] [&_small]:[font-size:9px]",
 };
 
-const tw = (classNames: string) => classNames.split(/\s+/).filter(Boolean).flatMap((name) => [name, componentUtilities[name]]).filter(Boolean).join(" ");
+const classNameCache = new Map<string, string>();
+const tw = (classNames: string) => {
+  const cached = classNameCache.get(classNames);
+  if (cached) return cached;
+  const resolved = classNames.split(/\s+/).filter(Boolean).flatMap((name) => [name, componentUtilities[name]]).filter(Boolean).join(" ");
+  classNameCache.set(classNames, resolved);
+  return resolved;
+};
 
 type AccentTheme = "forest" | "aurora" | "ember" | "amethyst" | "glacier";
 
@@ -185,7 +215,15 @@ function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const refresh = () => window.launcher.getSavegames(game.id).then(setData);
-  useEffect(() => { void refresh(); }, [game.id]);
+  useEffect(() => {
+    let active = true;
+    setData(null);
+    setStatus("");
+    void window.launcher.getSavegames(game.id)
+      .then((result) => { if (active) setData(result); })
+      .catch((error) => { if (active) setStatus(error instanceof Error ? error.message : "No se pudieron cargar las partidas"); });
+    return () => { active = false; };
+  }, [game.id]);
 
   const run = async (action: () => Promise<unknown>, success: string) => {
     setBusy(true); setStatus("");
@@ -244,6 +282,55 @@ function LibraryCollection({ games, runningGameIds, onSelect }: Readonly<{ games
   );
 }
 
+const Sidebar = memo(function Sidebar({
+  games,
+  totalCount,
+  selectedId,
+  runningGameIds,
+  onOpenLibrary,
+  onOpenStatistics,
+  onOpenSettings,
+  onAddGame,
+  onSelect,
+  onContextMenu,
+  view,
+}: Readonly<{
+  games: LibraryGame[];
+  totalCount: number;
+  selectedId: string | null;
+  runningGameIds: Set<string>;
+  view: "library" | "statistics" | "settings";
+  onOpenLibrary: () => void;
+  onOpenStatistics: () => void;
+  onOpenSettings: () => void;
+  onAddGame: () => void;
+  onSelect: (gameId: string) => void;
+  onContextMenu: (game: LibraryGame, x: number, y: number) => void;
+}>) {
+  return <aside className={tw("sidebar")}>
+    <div className={tw("brand")}><span className={tw("brand-mark")}><NemetonMark /></span><span>Nemeton</span></div>
+    <nav className={tw("primary-nav")}>
+      <button className={tw(`nav-item ${view === "library" && !selectedId ? "active" : ""}`)} onClick={onOpenLibrary}><GameController /> Biblioteca</button>
+      <button className={tw(`nav-item ${view === "statistics" ? "active" : ""}`)} onClick={onOpenStatistics}><ChartDonut /> Estadísticas</button>
+      <button className={tw(`nav-item ${view === "settings" ? "active" : ""}`)} onClick={onOpenSettings}><Gear /> Ajustes</button>
+      <button className={tw("nav-item")} onClick={onAddGame}><Plus /> Añadir juego</button>
+    </nav>
+    <div className={tw("library-heading")}><span>JUEGOS</span><span>{totalCount}</span></div>
+    <div className={tw("game-list")}>
+      {games.map((game) => {
+        const cover = gameCoverUrl(game);
+        return <button key={game.id} className={tw(`game-row ${selectedId === game.id ? "selected" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`)} onClick={() => onSelect(game.id)} onContextMenu={(event) => { event.preventDefault(); onContextMenu(game, event.clientX, event.clientY); }}>
+          <span className={tw("game-avatar")}>
+            {game.title.slice(0, 1).toUpperCase()}
+            {cover ? <img src={cover} alt="" onError={(event) => event.currentTarget.remove()} /> : null}
+          </span>
+          <span><strong>{game.title}</strong><small>{runningGameIds.has(game.id) ? "Jugando ahora" : game.installed ? formatPlaytime(game.platformPlaytimeMinutes ?? game.playtimeMinutes) : "No instalado"}</small></span>
+        </button>;
+      })}
+    </div>
+  </aside>;
+});
+
 function StatisticsView({ games, sessions }: Readonly<{ games: LibraryGame[]; sessions: GameSession[] }>) {
   const [period, setPeriod] = useState<"all" | "2026">("all");
   const [summaryPeriod, setSummaryPeriod] = useState<"week" | "month">("week");
@@ -259,33 +346,20 @@ function StatisticsView({ games, sessions }: Readonly<{ games: LibraryGame[]; se
   const totalHours = Math.round((statistics.totalMinutes / 60) * 10) / 10;
   const months = useMemo(() => {
     const formatter = new Intl.DateTimeFormat("es-ES", { month: "long" });
-    return Array.from({ length: 12 }, (_, month) => {
-      const activity = new Map<string, { launcherSeconds: number; steamSeconds: number }>();
-      sessions.forEach((session) => {
-        const date = new Date(session.endedAt);
-        if (date.getFullYear() !== 2026 || date.getMonth() !== month) return;
-        const previous = activity.get(session.gameId) ?? { launcherSeconds: 0, steamSeconds: 0 };
-        if (session.origin === "steam-sync") previous.steamSeconds += session.durationSeconds;
-        else previous.launcherSeconds += session.durationSeconds;
-        activity.set(session.gameId, previous);
-      });
-      games.forEach((game) => {
-        if (!game.lastPlayedAt) return;
-        const date = new Date(game.lastPlayedAt);
-        if (date.getFullYear() === 2026 && date.getMonth() === month && !activity.has(game.id)) activity.set(game.id, { launcherSeconds: 0, steamSeconds: 0 });
-      });
-      const entries = [...activity.entries()].map(([gameId, data]) => ({ game: games.find((game) => game.id === gameId), seconds: Math.max(data.launcherSeconds, data.steamSeconds) }))
-        .filter((entry): entry is { game: LibraryGame; seconds: number } => Boolean(entry.game))
-        .sort((a, b) => b.seconds - a.seconds || a.game.title.localeCompare(b.game.title));
-      return { name: formatter.format(new Date(2026, month, 1)), entries };
-    });
+    return buildMonthlyActivity(games, sessions, 2026).map(({ month, entries }) => ({
+      name: formatter.format(new Date(2026, month, 1)),
+      entries,
+    }));
   }, [games, sessions]);
   const annualSeconds = months.reduce((total, month) => total + month.entries.reduce((monthTotal, entry) => monthTotal + entry.seconds, 0), 0);
   const annualRanking = useMemo(() => {
     const totals = new Map<string, number>();
     months.forEach((month) => month.entries.forEach((entry) => totals.set(entry.game.id, (totals.get(entry.game.id) ?? 0) + entry.seconds)));
-    return [...totals.entries()].map(([gameId, seconds]) => ({ game: games.find((game) => game.id === gameId), seconds }))
-      .filter((entry): entry is { game: LibraryGame; seconds: number } => Boolean(entry.game) && entry.seconds > 0)
+    const gamesById = new Map(games.map((game) => [game.id, game]));
+    return [...totals.entries()].flatMap(([gameId, seconds]) => {
+      const game = gamesById.get(gameId);
+      return game && seconds > 0 ? [{ game, seconds }] : [];
+    })
       .sort((a, b) => b.seconds - a.seconds).slice(0, 3);
   }, [games, months]);
   const automaticSummary = useMemo(() => {
@@ -684,21 +758,20 @@ function EditGameModal({ game, onClose, onUpdated }: Readonly<{ game: LibraryGam
 }
 
 function App() {
-  const [games, setGames] = useState<LibraryGame[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const {
+    games, setGames, sessions, setSessions, selectedId, setSelectedId,
+    message, setMessage, steamSettings, setSteamSettings,
+    syncSettings, setSyncSettings, runningGameIds,
+  } = useLibraryController();
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
   const [scanning, setScanning] = useState(false);
-  const [message, setMessage] = useState("Tu biblioteca vive en este equipo");
   const [achievements, setAchievements] = useState<GameAchievements | null>(null);
   const [view, setView] = useState<"library" | "statistics" | "settings">("library");
-  const [steamSettings, setSteamSettings] = useState<SteamAccountSettings | null>(null);
-  const [syncSettings, setSyncSettings] = useState<FolderSyncSettings | null>(null);
   const [showAddGame, setShowAddGame] = useState(false);
   const [artworkGame, setArtworkGame] = useState<LibraryGame | null>(null);
   const [editGame, setEditGame] = useState<LibraryGame | null>(null);
-  const [sessions, setSessions] = useState<GameSession[]>([]);
   const [gameMenu, setGameMenu] = useState<{ game: LibraryGame; x: number; y: number } | null>(null);
-  const [runningGameIds, setRunningGameIds] = useState<Set<string>>(() => new Set());
   const [accentTheme, setAccentTheme] = useState<AccentTheme>(() => {
     const stored = window.localStorage.getItem("nemeton.accent-theme");
     return accentThemes.some((theme) => theme.id === stored) ? stored as AccentTheme : "forest";
@@ -710,39 +783,6 @@ function App() {
   }, [accentTheme]);
 
   useEffect(() => {
-    void window.launcher.listGames().then(async (snapshot) => {
-      const initialSnapshot = snapshot.games.length > 0
-        ? snapshot
-        : await window.launcher.scanSteam();
-      setGames(initialSnapshot.games);
-      setSessions(initialSnapshot.sessions);
-      setSelectedId(null);
-      if (snapshot.games.length === 0 && initialSnapshot.games.length > 0) {
-        setMessage(`${initialSnapshot.games.length} juegos importados desde Steam`);
-      }
-    }).catch((error) => {
-      setMessage(error instanceof Error ? error.message : "No se pudo cargar la biblioteca");
-    });
-    window.launcher.onLibraryChanged((snapshot) => { setGames(snapshot.games); setSessions(snapshot.sessions); });
-    window.launcher.onGameRunningChanged(({ gameId, running }) => {
-      setRunningGameIds((current) => {
-        const next = new Set(current);
-        if (running) next.add(gameId); else next.delete(gameId);
-        return next;
-      });
-    });
-    void window.launcher.getSteamSettings().then(setSteamSettings);
-    void window.launcher.getSyncSettings().then(setSyncSettings);
-  }, []);
-
-  useEffect(() => {
-    const refresh = () => { void window.launcher.getSyncSettings().then(setSyncSettings); };
-    const timer = window.setInterval(refresh, 30_000);
-    window.addEventListener("focus", refresh);
-    return () => { window.clearInterval(timer); window.removeEventListener("focus", refresh); };
-  }, []);
-
-  useEffect(() => {
     if (!gameMenu) return;
     const close = () => setGameMenu(null);
     window.addEventListener("blur", close);
@@ -750,13 +790,22 @@ function App() {
     return () => { window.removeEventListener("blur", close); window.removeEventListener("resize", close); };
   }, [gameMenu]);
 
+  const libraryGames = useMemo(() => games.filter((game) => !game.hiddenFromLibrary && (game.source === "local" || game.installed)), [games]);
   const visibleGames = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
-    const libraryGames = games.filter((game) => !game.hiddenFromLibrary && (game.source === "local" || game.installed));
+    const normalized = deferredQuery.trim().toLocaleLowerCase();
     return normalized ? libraryGames.filter((game) => game.title.toLocaleLowerCase().includes(normalized)) : libraryGames;
-  }, [games, query]);
-  const collectionGames = useMemo(() => visibleGames.filter((game) => game.source === "local" || game.installed), [visibleGames]);
+  }, [libraryGames, deferredQuery]);
+  const collectionGames = visibleGames;
   const selected = games.find((game) => game.id === selectedId) ?? null;
+
+  const openLibrary = useCallback(() => { setView("library"); setSelectedId(null); }, [setSelectedId]);
+  const openStatistics = useCallback(() => setView("statistics"), []);
+  const openSettings = useCallback(() => setView("settings"), []);
+  const addGame = useCallback(() => setShowAddGame(true), []);
+  const selectGame = useCallback((gameId: string) => { setGameMenu(null); setView("library"); setSelectedId(gameId); }, [setSelectedId]);
+  const openGameMenu = useCallback((game: LibraryGame, x: number, y: number) => {
+    setGameMenu({ game, x: Math.min(x, window.innerWidth - 230), y: Math.min(y, window.innerHeight - 90) });
+  }, []);
 
   useEffect(() => {
     setAchievements(null);
@@ -764,7 +813,7 @@ function App() {
     let active = true;
     void window.launcher.getAchievements(selected.id).then((result) => {
       if (active) setAchievements(result);
-    });
+    }).catch(() => { if (active) setAchievements(null); });
     return () => { active = false; };
   }, [selected?.id, selected ? runningGameIds.has(selected.id) : false]);
 
@@ -809,27 +858,7 @@ function App() {
 
   return (
     <main className={tw("app-shell")}>
-      <aside className={tw("sidebar")}>
-        <div className={tw("brand")}><span className={tw("brand-mark")}><NemetonMark /></span><span>Nemeton</span></div>
-        <nav className={tw("primary-nav")}>
-          <button className={tw(`nav-item ${view === "library" && !selected ? "active" : ""}`)} onClick={() => { setView("library"); setSelectedId(null); }}><GameController /> Biblioteca</button>
-          <button className={tw(`nav-item ${view === "statistics" ? "active" : ""}`)} onClick={() => setView("statistics")}><ChartDonut /> Estadísticas</button>
-          <button className={tw(`nav-item ${view === "settings" ? "active" : ""}`)} onClick={() => setView("settings")}><Gear /> Ajustes</button>
-          <button className={tw("nav-item")} onClick={() => setShowAddGame(true)}><Plus /> Añadir juego</button>
-        </nav>
-        <div className={tw("library-heading")}><span>JUEGOS</span><span>{games.filter((game) => !game.hiddenFromLibrary && (game.source === "local" || game.installed)).length}</span></div>
-        <div className={tw("game-list")}>
-          {visibleGames.map((game) => (
-            <button key={game.id} className={tw(`game-row ${selected?.id === game.id ? "selected" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`)} onClick={() => { setGameMenu(null); setView("library"); setSelectedId(game.id); }} onContextMenu={(event) => { event.preventDefault(); setGameMenu({ game, x: Math.min(event.clientX, window.innerWidth - 230), y: Math.min(event.clientY, window.innerHeight - 90) }); }}>
-              <span className={tw("game-avatar")}>
-                {game.title.slice(0, 1).toUpperCase()}
-                {gameCoverUrl(game) && <img src={gameCoverUrl(game)!} alt="" onError={(event) => event.currentTarget.remove()} />}
-              </span>
-              <span><strong>{game.title}</strong><small>{runningGameIds.has(game.id) ? "Jugando ahora" : game.installed ? formatPlaytime(game.platformPlaytimeMinutes ?? game.playtimeMinutes) : "No instalado"}</small></span>
-            </button>
-          ))}
-        </div>
-      </aside>
+      <Sidebar games={visibleGames} totalCount={libraryGames.length} selectedId={selectedId} runningGameIds={runningGameIds} view={view} onOpenLibrary={openLibrary} onOpenStatistics={openStatistics} onOpenSettings={openSettings} onAddGame={addGame} onSelect={selectGame} onContextMenu={openGameMenu} />
 
       <section className={tw("content")}>
         <header className={tw("topbar")}>
@@ -875,7 +904,7 @@ function App() {
                 </div>
               </section>
             )}
-            {selected.source === "local" && <SavegamesPanel game={selected} />}
+            {selected.source === "local" && <SavegamesPanel key={selected.id} game={selected} />}
           </div>
         ) : collectionGames.length > 0 ? (
           <LibraryCollection games={collectionGames} runningGameIds={runningGameIds} onSelect={setSelectedId} />

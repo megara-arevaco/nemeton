@@ -44,10 +44,12 @@ const api = {
   onLibraryChanged: (callback: (snapshot: LibrarySnapshot) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, snapshot: LibrarySnapshot) => callback(snapshot);
     ipcRenderer.on("library:changed", listener);
+    return () => ipcRenderer.removeListener("library:changed", listener);
   },
   onGameRunningChanged: (callback: (state: { gameId: string; running: boolean }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, state: { gameId: string; running: boolean }) => callback(state);
     ipcRenderer.on("game:running-changed", listener);
+    return () => ipcRenderer.removeListener("game:running-changed", listener);
   },
 };
 

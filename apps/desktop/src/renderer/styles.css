@@ -25,6 +25,7 @@ button { color: inherit; }
 
 /* Shared relationships that remain clearer than repeated arbitrary variants. */
 .primary-nav, .game-list { -webkit-app-region: no-drag; }
+.game-row, .installed-card, .ranking-row, .month-card { content-visibility: auto; contain-intrinsic-size: auto 72px; }
 .nav-item, .settings { display: flex; gap: 11px; align-items: center; border: 0; background: transparent; border-radius: 10px; padding: 11px 12px; color: #9b9da8; text-align: left; cursor: pointer; }
 h1 { margin: 14px 0 8px; font-size: clamp(40px, 5vw, 72px); font-weight: 800; line-height: 1; letter-spacing: -3px; }
 .achievements-heading, .achievements-heading > div { display: flex; align-items: center; }

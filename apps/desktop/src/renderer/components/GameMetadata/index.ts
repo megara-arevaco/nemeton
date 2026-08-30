@@ -1,0 +1,1 @@
+export { GameMetadata } from "./GameMetadata";

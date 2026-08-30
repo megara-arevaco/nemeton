@@ -84,6 +84,16 @@ export interface ArtworkSuggestion {
   heroUrl: string;
 }
 
+export interface GameMetadata {
+  appId: string;
+  description: string;
+  genres: string[];
+  developers: string[];
+  publishers: string[];
+  releaseDate: string | null;
+  website: string | null;
+}
+
 export interface GameAchievement {
   id: string;
   name: string;

@@ -18,6 +18,7 @@ import { AddGameModal } from "../AddGameModal";
 import { ArtworkModal } from "../ArtworkModal";
 import { EditGameModal } from "../EditGameModal";
 import { GameLaunchButton } from "../GameLaunchButton";
+import { GameMetadata } from "../GameMetadata";
 import { LibraryCollection } from "../LibraryCollection";
 import { SavegamesPanel } from "../SavegamesPanel";
 import { SettingsView } from "../SettingsView";
@@ -43,6 +44,7 @@ export function App() {
     setQuery,
     scanning,
     achievements,
+    metadata,
     view,
     showAddGame,
     artworkGame,
@@ -279,6 +281,7 @@ export function App() {
                 </div>
               </div>
             </section>
+            {metadata && <GameMetadata metadata={metadata} />}
             {selected.source === "local" &&
               achievements &&
               achievements.total === 0 && (

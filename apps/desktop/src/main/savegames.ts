@@ -14,6 +14,10 @@ export interface SavegameVersion {
   pinned?: boolean;
 }
 
+export interface SavegameConflict {
+  remoteVersion: SavegameVersion;
+}
+
 export interface SavegameSuggestion {
   path: string;
   confidence: "high" | "medium" | "low";
@@ -530,6 +534,24 @@ export class SavegameManager {
       .digest("hex")
       .slice(0, 12);
     return versions[0].id.endsWith(signature);
+  }
+
+  async detectExternalConflict(
+    gameId: string,
+    sourceId: string,
+    syncFolder: string,
+  ): Promise<SavegameConflict | null> {
+    const [config, versions] = await Promise.all([
+      this.readConfig(),
+      this.listVersions(syncFolder, sourceId),
+    ]);
+    const latest = versions[0];
+    if (!latest || latest.deviceId === config.deviceId) {
+      return null;
+    }
+
+    const matchesLatest = await this.currentMatchesLatest(gameId, sourceId, syncFolder);
+    return matchesLatest ? null : { remoteVersion: latest };
   }
 
   async backup(

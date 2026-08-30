@@ -4,8 +4,17 @@ import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { useSavegamesPanel } from "./SavegamesPanel.hook";
 
 export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
-  const { data, busy, status, copy, run, chooseFolder, backup } =
-    useSavegamesPanel(game);
+  const {
+    data,
+    busy,
+    status,
+    copy,
+    conflictCopy,
+    run,
+    chooseFolder,
+    backup,
+    restoreLatest,
+  } = useSavegamesPanel(game);
 
   return (
     <section
@@ -42,6 +51,34 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
       >
         {copy.detail}
       </p>
+      {data && data.syncState === "conflict" && (
+        <div
+          className={
+            "[margin-top:16px] [padding:14px] [border:1px_solid_#e9bd7040] [border-radius:12px] [background:#e9bd700c] [&_p]:[margin:0_0_12px] [&_p]:[color:#d9bd86] [&_p]:[font-size:11px] [&_div]:[display:flex] [&_div]:[gap:8px] [&_button]:[border:1px_solid_#ffffff18] [&_button]:[border-radius:9px] [&_button]:[padding:8px_10px] [&_button]:[background:#ffffff0b] [&_button]:[color:#f0f1f4] [&_button]:[font-size:11px] [&_button]:[cursor:pointer] [&_button:disabled]:[opacity:.5]"
+          }
+        >
+          <p>{conflictCopy} Conserva ambas versiones antes de elegir.</p>
+          <div>
+            <button
+              disabled={busy}
+              onClick={() => run(backup, "Tus partidas se guardaron como otra versión")}
+            >
+              Conservar las mías
+            </button>
+            <button
+              disabled={busy}
+              onClick={() =>
+                run(
+                  restoreLatest,
+                  "Copia remota restaurada; tu estado anterior quedó protegido",
+                )
+              }
+            >
+              Restaurar copia remota
+            </button>
+          </div>
+        </div>
+      )}
       {data &&
         (data.syncState === "not-detected" || data.syncState === "path-missing") && (
           <button

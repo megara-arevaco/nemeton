@@ -3,6 +3,7 @@ import type {
   ArtworkSuggestion,
   FolderSyncSettings,
   GameAchievements,
+  GameMetadata,
   LibrarySnapshot,
   SteamAccountSettings,
 } from "@launcher/core";
@@ -13,6 +14,8 @@ const api = {
     ipcRenderer.invoke("window:toggle-maximize"),
   closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
   listGames: (): Promise<LibrarySnapshot> => ipcRenderer.invoke("library:list"),
+  getGameMetadata: (gameId: string): Promise<GameMetadata | null> =>
+    ipcRenderer.invoke("library:metadata", gameId),
   getSteamSettings: (): Promise<SteamAccountSettings> =>
     ipcRenderer.invoke("steam:settings"),
   getSyncSettings: (): Promise<FolderSyncSettings> =>
@@ -57,8 +60,18 @@ const api = {
       | "not-detected"
       | "waiting-backup"
       | "synced"
+      | "conflict"
       | "pending";
     missingPaths: string[];
+    conflict: {
+      id: string;
+      createdAt: string;
+      deviceId: string;
+      deviceName: string;
+      sizeBytes: number;
+      fileCount: number;
+      pinned?: boolean;
+    } | null;
   }> => ipcRenderer.invoke("savegames:get", gameId),
   setSavegamePolicy: (
     gameId: string,

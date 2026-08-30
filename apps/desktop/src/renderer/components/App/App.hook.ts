@@ -27,7 +27,7 @@ import {
   useSyncSettingsQuery,
 } from "../../queries/library.queries";
 import { queryKeys } from "../../queries/queryKeys";
-import { useAchievementsQuery } from "../../queries/game.queries";
+import { useAchievementsQuery, useGameMetadataQuery } from "../../queries/game.queries";
 
 export function useLibraryController() {
   const queryClient = useQueryClient();
@@ -199,6 +199,8 @@ export function useApp() {
     selectedIsRunning,
   );
   const achievements = achievementsQuery.data ?? null;
+  const metadataQuery = useGameMetadataQuery(selected?.id ?? null);
+  const metadata = metadataQuery.data ?? null;
 
   const openLibrary = useCallback(() => {
     dispatchNavigation({ type: "select-game", gameId: null });
@@ -368,6 +370,7 @@ export function useApp() {
     setQuery,
     scanning: scanSteamMutation.isPending,
     achievements,
+    metadata,
     view,
     showAddGame,
     artworkGame,

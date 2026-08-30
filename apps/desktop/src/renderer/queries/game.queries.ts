@@ -9,6 +9,15 @@ export function useAchievementsQuery(gameId: string | null, refreshToken: boolea
   });
 }
 
+export function useGameMetadataQuery(gameId: string | null) {
+  return useQuery({
+    queryKey: queryKeys.metadata(gameId ?? "none"),
+    queryFn: () => window.launcher.getGameMetadata(gameId!),
+    enabled: gameId !== null,
+    staleTime: 1000 * 60 * 60 * 24,
+  });
+}
+
 export function useSavegamesQuery(gameId: string) {
   return useQuery({
     queryKey: queryKeys.savegames(gameId),
@@ -60,6 +69,20 @@ export function useChooseSavegameFolderMutation(gameId: string) {
 
       return window.launcher.addSavegameFolder(gameId);
     },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.savegames(gameId),
+      });
+    },
+  });
+}
+
+export function useRestoreSavegamesMutation(gameId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (versionId: string) =>
+      window.launcher.restoreSavegames(gameId, versionId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.savegames(gameId),

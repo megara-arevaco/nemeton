@@ -104,3 +104,34 @@ test("enforces retention and rejects a corrupted backup", async () => {
     await fs.promises.rm(root, { recursive: true, force: true });
   }
 });
+
+test("detects changes that conflict with another device's latest version", async () => {
+  const root = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-next-conflict-"),
+  );
+  try {
+    const remote = path.join(root, "remote");
+    const firstLocal = path.join(root, "first-local");
+    const secondLocal = path.join(root, "second-local");
+    await fs.promises.mkdir(firstLocal, { recursive: true });
+    await fs.promises.mkdir(secondLocal, { recursive: true });
+    await fs.promises.writeFile(path.join(firstLocal, "slot1.sav"), "remote-progress");
+    await fs.promises.writeFile(path.join(secondLocal, "slot1.sav"), "local-progress");
+
+    const firstDevice = new SavegameManager(path.join(root, "first-config.json"));
+    await firstDevice.addPath("game", firstLocal);
+    const remoteVersion = await firstDevice.backup("game", "source", remote);
+
+    const secondDevice = new SavegameManager(path.join(root, "second-config.json"));
+    await secondDevice.addPath("game", secondLocal);
+    const conflict = await secondDevice.detectExternalConflict(
+      "game",
+      "source",
+      remote,
+    );
+
+    assert.equal(conflict?.remoteVersion.id, remoteVersion?.id);
+  } finally {
+    await fs.promises.rm(root, { recursive: true, force: true });
+  }
+});

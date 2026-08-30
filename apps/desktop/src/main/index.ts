@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import {
   detectLocalSteamId,
   discoverSteamGames,
+  fetchSteamGameMetadata,
   fetchOwnedSteamGames,
   LibraryStore,
   searchSteamArtwork,
@@ -157,6 +158,19 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("library:list", () => store.read());
+  ipcMain.handle("library:metadata", async (_event, gameId: string) => {
+    const game = (await store.read()).games.find((item) => item.id === gameId);
+    if (!game) {
+      return null;
+    }
+
+    const appId = game.source === "steam" ? game.sourceId : game.steamAppId;
+    if (!appId) {
+      return null;
+    }
+
+    return fetchSteamGameMetadata(appId);
+  });
   ipcMain.handle("window:minimize", (event) =>
     BrowserWindow.fromWebContents(event.sender)?.minimize(),
   );
@@ -300,6 +314,14 @@ app.whenReady().then(() => {
             settings.syncFolderPath,
           )
         : false;
+    const conflict =
+      settings.syncFolderPath && paths.length && !missingPaths.length && !synchronized
+        ? await savegameManager.detectExternalConflict(
+            gameId,
+            game.sourceId,
+            settings.syncFolderPath,
+          )
+        : null;
     const syncState = !settings.syncFolderPath
       ? "unconfigured"
       : missingPaths.length
@@ -310,7 +332,9 @@ app.whenReady().then(() => {
             ? "waiting-backup"
             : synchronized
               ? "synced"
-              : "pending";
+              : conflict
+                ? "conflict"
+                : "pending";
     return {
       paths,
       suggestions: suggestions.filter((item) => !paths.includes(item.path)),
@@ -319,6 +343,7 @@ app.whenReady().then(() => {
       syncConfigured: Boolean(settings.syncFolderPath),
       syncState,
       missingPaths,
+      conflict: conflict?.remoteVersion ?? null,
     };
   });
   ipcMain.handle(

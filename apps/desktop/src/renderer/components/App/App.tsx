@@ -5,7 +5,6 @@ import { LockKey } from "@phosphor-icons/react/LockKey";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Minus } from "@phosphor-icons/react/Minus";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
-import { Play } from "@phosphor-icons/react/Play";
 import { Square } from "@phosphor-icons/react/Square";
 import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
 import { Trophy } from "@phosphor-icons/react/Trophy";
@@ -18,6 +17,7 @@ import {
 import { AddGameModal } from "../AddGameModal";
 import { ArtworkModal } from "../ArtworkModal";
 import { EditGameModal } from "../EditGameModal";
+import { GameLaunchButton } from "../GameLaunchButton";
 import { LibraryCollection } from "../LibraryCollection";
 import { SavegamesPanel } from "../SavegamesPanel";
 import { SettingsView } from "../SettingsView";
@@ -243,35 +243,21 @@ export function App() {
                   <span>
                     <b>
                       {formatPlaytime(
-                        selected.platformPlaytimeMinutes ??
-                          selected.playtimeMinutes,
+                        selected.platformPlaytimeMinutes ?? selected.playtimeMinutes,
                       )}
                     </b>{" "}
                     {selected.source === "steam" ? "en Steam" : "tiempo total"}
                   </span>
                   <span>
-                    <b>{formatLastPlayed(selected.lastPlayedAt)}</b> última
-                    partida
+                    <b>{formatLastPlayed(selected.lastPlayedAt)}</b> última partida
                   </span>
                 </div>
                 <div className={"hero-actions [display:flex] [gap:10px]"}>
-                  <button
-                    className={`play [background:linear-gradient(135deg,_var(--accent-a),_var(--accent-b))] [color:var(--accent-ink)] [box-shadow:0_12px_40px_color-mix(in_srgb,_var(--accent-a)_15%,_transparent)] [&:disabled]:[filter:grayscale(1)] [&:disabled]:[opacity:.45] [&:disabled]:[cursor:default] [&.running]:[filter:none] [&.running]:[opacity:1] [&.running]:[background:#a9fb7617] [&.running]:[color:#a9fb76] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running:disabled]:[filter:none] [&.running:disabled]:[opacity:1] [&.running:disabled]:[background:#a9fb7617] [&.running:disabled]:[color:#a9fb76] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running]:[color:var(--accent-a)] [&.running]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] [&.running:disabled]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running:disabled]:[color:var(--accent-a)] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] ${runningGameIds.has(selected.id) ? "running" : ""}`}
-                    disabled={
-                      runningGameIds.has(selected.id) ||
-                      (selected.source === "local" && !selected.installPath)
-                    }
-                    onClick={() => launchSelected()}
-                  >
-                    <Play weight="fill" />{" "}
-                    {runningGameIds.has(selected.id)
-                      ? "Jugando"
-                      : selected.source === "local" && !selected.installPath
-                        ? "Sin ejecutable"
-                        : selected.installed
-                          ? "Jugar"
-                          : "Instalar"}
-                  </button>
+                  <GameLaunchButton
+                    game={selected}
+                    isRunning={runningGameIds.has(selected.id)}
+                    onLaunch={launchSelected}
+                  />
                   {selected.source === "local" && (
                     <button
                       className={
@@ -362,16 +348,12 @@ export function App() {
                           : ""}
                       </small>
                       <strong>
-                        {achievements.unlocked} de {achievements.total}{" "}
-                        desbloqueados
+                        {achievements.unlocked} de {achievements.total} desbloqueados
                       </strong>
                     </span>
                   </div>
                   <b>
-                    {Math.round(
-                      (achievements.unlocked / achievements.total) * 100,
-                    )}
-                    %
+                    {Math.round((achievements.unlocked / achievements.total) * 100)}%
                   </b>
                 </div>
                 <div
@@ -424,9 +406,9 @@ export function App() {
                         </p>
                         <small>
                           {achievement.achieved && achievement.unlockedAt
-                            ? new Date(
-                                achievement.unlockedAt,
-                              ).toLocaleDateString("es-ES")
+                            ? new Date(achievement.unlockedAt).toLocaleDateString(
+                                "es-ES",
+                              )
                             : achievement.globalPercentage !== null
                               ? `${achievement.globalPercentage.toFixed(1)}% de jugadores`
                               : "Bloqueado"}
@@ -462,8 +444,8 @@ export function App() {
             </span>
             <h1>Tu biblioteca, sin ruido</h1>
             <p>
-              Importa los juegos instalados en Steam. Se guardarán únicamente en
-              este ordenador.
+              Importa los juegos instalados en Steam. Se guardarán únicamente en este
+              ordenador.
             </p>
             <button
               className={

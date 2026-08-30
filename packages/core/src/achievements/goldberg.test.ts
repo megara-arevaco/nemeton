@@ -1,15 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseEmulatorIniAchievements, parseGoldbergAchievements } from "./achievements.js";
+import { parseEmulatorIniAchievements, parseGoldbergAchievements } from "./service.js";
 
 test("combines a Goldberg/GSE runtime save with its local schema", () => {
   const result = parseGoldbergAchievements(
-    JSON.stringify({ FIRST_WIN: { earned: true, earned_time: 1_700_000_000 }, COLLECT_ALL: { earned: false, earned_time: 0 } }),
+    JSON.stringify({
+      FIRST_WIN: { earned: true, earned_time: 1_700_000_000 },
+      COLLECT_ALL: { earned: false, earned_time: 0 },
+    }),
     JSON.stringify([
-      { name: "FIRST_WIN", displayName: "Primera victoria", description: "Gana una partida", hidden: false },
-      { name: "COLLECT_ALL", displayName: "Coleccionista", description: "Encuéntralo todo", hidden: true },
-    ])
+      {
+        name: "FIRST_WIN",
+        displayName: "Primera victoria",
+        description: "Gana una partida",
+        hidden: false,
+      },
+      {
+        name: "COLLECT_ALL",
+        displayName: "Coleccionista",
+        description: "Encuéntralo todo",
+        hidden: true,
+      },
+    ]),
   );
 
   assert.equal(result.total, 2);
@@ -25,7 +38,7 @@ test("parses common INI achievement sections", () => {
     JSON.stringify([
       { name: "FIRST_WIN", displayName: "Primera victoria" },
       { name: "COLLECT_ALL", displayName: "Coleccionista" },
-    ])
+    ]),
   );
 
   assert.equal(result.total, 2);

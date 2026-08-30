@@ -134,9 +134,7 @@ export function EditGameModal({
                     <span>
                       <b>{item.name}</b>
                       <small>
-                        {item.steamAppId
-                          ? `Steam ${item.steamAppId}`
-                          : "Ludusavi"}
+                        {item.steamAppId ? `Steam ${item.steamAppId}` : "Ludusavi"}
                       </small>
                     </span>
                     <Plus />
@@ -152,9 +150,7 @@ export function EditGameModal({
             <input
               inputMode="numeric"
               value={steamAppId}
-              onChange={(event) =>
-                setSteamAppId(event.target.value.replace(/\D/g, ""))
-              }
+              onChange={(event) => setSteamAppId(event.target.value.replace(/\D/g, ""))}
               placeholder="Ej. 1238840"
             />
           </label>
@@ -174,8 +170,8 @@ export function EditGameModal({
             </div>
           </label>
           <p>
-            La asociación de Ludusavi localiza las partidas; el AppID permite
-            leer logros locales.
+            La asociación de Ludusavi localiza las partidas; el AppID permite leer
+            logros locales.
           </p>
         </div>
         {error && (

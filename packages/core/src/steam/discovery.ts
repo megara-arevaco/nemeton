@@ -2,27 +2,38 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { SteamCandidate } from "./types.js";
+import type { SteamCandidate } from "../shared/types.js";
 
 type VdfValue = string | VdfObject;
-interface VdfObject { [key: string]: VdfValue }
+interface VdfObject {
+  [key: string]: VdfValue;
+}
 
 const tokenizeVdf = (content: string): string[] => {
   const tokens: string[] = [];
   let cursor = 0;
   while (cursor < content.length) {
     const character = content[cursor];
-    if (character && /\s/.test(character)) { cursor += 1; continue; }
+    if (character && /\s/.test(character)) {
+      cursor += 1;
+      continue;
+    }
     if (character === "/" && content[cursor + 1] === "/") {
       const newline = content.indexOf("\n", cursor + 2);
-      if (newline < 0) break;
+      if (newline < 0) {
+        break;
+      }
       cursor = newline + 1;
       continue;
     }
     if (character === "{" || character === "}") {
-      tokens.push(character); cursor += 1; continue;
+      tokens.push(character);
+      cursor += 1;
+      continue;
     }
-    if (character !== '"') throw new Error(`Invalid VDF at ${cursor}`);
+    if (character !== '"') {
+      throw new Error(`Invalid VDF at ${cursor}`);
+    }
     cursor += 1;
     let value = "";
     while (cursor < content.length && content[cursor] !== '"') {
@@ -31,10 +42,13 @@ const tokenizeVdf = (content: string): string[] => {
         value += escaped === "n" ? "\n" : escaped === "t" ? "\t" : escaped;
         cursor += 2;
       } else {
-        value += content[cursor]; cursor += 1;
+        value += content[cursor];
+        cursor += 1;
       }
     }
-    if (content[cursor] !== '"') throw new Error("Unclosed VDF string");
+    if (content[cursor] !== '"') {
+      throw new Error("Unclosed VDF string");
+    }
     cursor += 1;
     tokens.push(value);
   }
@@ -49,14 +63,20 @@ export const parseVdf = (content: string): VdfObject => {
     while (cursor < tokens.length) {
       const key = tokens[cursor++];
       if (key === "}") {
-        if (!nested) throw new Error("Unexpected VDF brace");
+        if (!nested) {
+          throw new Error("Unexpected VDF brace");
+        }
         return result;
       }
       const value = tokens[cursor++];
-      if (!key || value === undefined) throw new Error("Incomplete VDF pair");
+      if (!key || value === undefined) {
+        throw new Error("Incomplete VDF pair");
+      }
       result[key] = value === "{" ? parseObject(true) : value;
     }
-    if (nested) throw new Error("Unclosed VDF object");
+    if (nested) {
+      throw new Error("Unclosed VDF object");
+    }
     return result;
   };
   return parseObject(false);
@@ -68,7 +88,9 @@ const stringValue = (value: VdfValue | undefined): string | null =>
   typeof value === "string" ? value : null;
 const integerValue = (value: VdfValue | undefined): number | null => {
   const raw = stringValue(value);
-  if (!raw || !/^\d+$/.test(raw)) return null;
+  if (!raw || !/^\d+$/.test(raw)) {
+    return null;
+  }
   const parsed = Number(raw);
   return Number.isSafeInteger(parsed) ? parsed : null;
 };
@@ -90,7 +112,9 @@ export const defaultSteamRoots = (): string[] => {
 
 const windowsPathOnWsl = (value: string): string | null => {
   const match = /^([a-z]):[\\/](.*)$/i.exec(value);
-  if (!match || !match[1] || !match[2] || !process.env.WSL_DISTRO_NAME) return null;
+  if (!match || !match[1] || !match[2] || !process.env.WSL_DISTRO_NAME) {
+    return null;
+  }
   return path.posix.join("/mnt", match[1].toLowerCase(), ...match[2].split(/[\\/]+/));
 };
 
@@ -104,24 +128,34 @@ const libraryFolders = async (steamRoot: string): Promise<string[]> => {
     .readFile(path.join(steamRoot, "steamapps/libraryfolders.vdf"), "utf8")
     .catch(() => null);
   const roots = new Set<string>([steamRoot]);
-  if (!config) return [...roots];
+  if (!config) {
+    return [...roots];
+  }
   const libraries = objectValue(parseVdf(config).libraryfolders);
-  if (!libraries) return [...roots];
+  if (!libraries) {
+    return [...roots];
+  }
   for (const entry of Object.values(libraries)) {
     const raw = typeof entry === "string" ? entry : stringValue(entry.path);
     const normalized = raw ? normalizeLibraryPath(raw) : null;
-    if (normalized) roots.add(normalized);
+    if (normalized) {
+      roots.add(normalized);
+    }
   }
   return [...roots];
 };
 
 const parseManifest = (content: string, libraryPath: string): SteamCandidate | null => {
   const state = objectValue(parseVdf(content).AppState);
-  if (!state) return null;
+  if (!state) {
+    return null;
+  }
   const appId = stringValue(state.appid);
   const title = stringValue(state.name);
   const installDir = stringValue(state.installdir);
-  if (!appId || !title || !installDir) return null;
+  if (!appId || !title || !installDir) {
+    return null;
+  }
   return {
     appId,
     title,
@@ -133,56 +167,83 @@ const parseManifest = (content: string, libraryPath: string): SteamCandidate | n
 };
 
 const discoverPlaytimes = async (steamRoot: string) => {
-  const result = new Map<string, Pick<SteamCandidate, "playtimeMinutes" | "lastPlayedAt">>();
+  const result = new Map<
+    string,
+    Pick<SteamCandidate, "playtimeMinutes" | "lastPlayedAt">
+  >();
   const userdata = path.join(steamRoot, "userdata");
-  const users = await fs.promises.readdir(userdata, { withFileTypes: true }).catch(() => []);
+  const users = await fs.promises
+    .readdir(userdata, { withFileTypes: true })
+    .catch(() => []);
   for (const user of users) {
-    if (!user.isDirectory() || !/^\d+$/.test(user.name)) continue;
+    if (!user.isDirectory() || !/^\d+$/.test(user.name)) {
+      continue;
+    }
     const configPath = path.join(userdata, user.name, "config/localconfig.vdf");
     const content = await fs.promises.readFile(configPath, "utf8").catch(() => null);
-    if (!content) continue;
+    if (!content) {
+      continue;
+    }
     try {
       const root = objectValue(parseVdf(content).UserLocalConfigStore);
       const software = objectValue(root?.Software);
       const valve = objectValue(software?.Valve);
       const steam = objectValue(valve?.Steam);
       const apps = objectValue(steam?.apps);
-      if (!apps) continue;
+      if (!apps) {
+        continue;
+      }
       for (const [appId, value] of Object.entries(apps)) {
         const app = objectValue(value);
-        if (!app || !/^\d+$/.test(appId)) continue;
+        if (!app || !/^\d+$/.test(appId)) {
+          continue;
+        }
         const playtimeMinutes = integerValue(app.Playtime) ?? 0;
         const lastPlayed = integerValue(app.LastPlayed);
         const previous = result.get(appId);
         if (!previous || playtimeMinutes > previous.playtimeMinutes) {
           result.set(appId, {
             playtimeMinutes,
-            lastPlayedAt: lastPlayed ? new Date(lastPlayed * 1_000).toISOString() : null,
+            lastPlayedAt: lastPlayed
+              ? new Date(lastPlayed * 1_000).toISOString()
+              : null,
           });
         }
       }
-    } catch { /* Steam may be updating this file. */ }
+    } catch {
+      /* Steam may be updating this file. */
+    }
   }
   return result;
 };
 
 export const discoverSteamGames = async (): Promise<SteamCandidate[]> => {
   const steamRoot = defaultSteamRoots().find(fs.existsSync);
-  if (!steamRoot) return [];
+  if (!steamRoot) {
+    return [];
+  }
   const candidates = new Map<string, SteamCandidate>();
   const playtimes = await discoverPlaytimes(steamRoot);
   for (const libraryPath of await libraryFolders(steamRoot)) {
     const steamapps = path.join(libraryPath, "steamapps");
     const entries = await fs.promises.readdir(steamapps).catch(() => []);
-    for (const entry of entries.filter((name) => /^appmanifest_\d+\.acf$/i.test(name))) {
-      const content = await fs.promises.readFile(path.join(steamapps, entry), "utf8").catch(() => null);
-      if (!content) continue;
+    for (const entry of entries.filter((name) =>
+      /^appmanifest_\d+\.acf$/i.test(name),
+    )) {
+      const content = await fs.promises
+        .readFile(path.join(steamapps, entry), "utf8")
+        .catch(() => null);
+      if (!content) {
+        continue;
+      }
       try {
         const game = parseManifest(content, libraryPath);
         if (game && fs.existsSync(game.installPath)) {
           candidates.set(game.appId, { ...game, ...playtimes.get(game.appId) });
         }
-      } catch { /* Steam may be writing the manifest while we scan. */ }
+      } catch {
+        /* Steam may be writing the manifest while we scan. */
+      }
     }
   }
   return [...candidates.values()].sort((a, b) => a.title.localeCompare(b.title));

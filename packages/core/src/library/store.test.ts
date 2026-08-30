@@ -4,10 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
-import { LibraryStore } from "./library.js";
+import { LibraryStore } from "./store.js";
 
 test("adds a local game only once and keeps a stable id", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-library-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-library-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
   const input = { title: "Example", executablePath: path.join(directory, "game.exe") };
@@ -20,10 +22,15 @@ test("adds a local game only once and keeps a stable id", async (context) => {
 });
 
 test("carries partial minutes between play sessions", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-playtime-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-playtime-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
-  const snapshot = await store.addLocal({ title: "Example", executablePath: "/games/example" });
+  const snapshot = await store.addLocal({
+    title: "Example",
+    executablePath: "/games/example",
+  });
   const gameId = snapshot.games[0]!.id;
 
   await store.addPlaytime(gameId, 35);
@@ -35,7 +42,9 @@ test("carries partial minutes between play sessions", async (context) => {
 });
 
 test("keeps a local placeholder editable without an executable", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-placeholder-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-placeholder-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
   const created = await store.addLocal({ title: "Backlog game", executablePath: "" });
@@ -53,41 +62,64 @@ test("keeps a local placeholder editable without an executable", async (context)
 });
 
 test("records only Steam playtime gained after the initial account baseline", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-steam-history-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-steam-history-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
   const lastPlayedAt = "2026-08-20T18:00:00.000Z";
 
-  const baseline = await store.importSteamAccount([{ appId: "123", title: "Example", playtimeMinutes: 100, lastPlayedAt }]);
+  const baseline = await store.importSteamAccount([
+    { appId: "123", title: "Example", playtimeMinutes: 100, lastPlayedAt },
+  ]);
   assert.equal(baseline.sessions.length, 0);
 
-  const updated = await store.importSteamAccount([{ appId: "123", title: "Example", playtimeMinutes: 145, lastPlayedAt }]);
+  const updated = await store.importSteamAccount([
+    { appId: "123", title: "Example", playtimeMinutes: 145, lastPlayedAt },
+  ]);
   assert.equal(updated.sessions.length, 1);
   assert.equal(updated.sessions[0]?.durationSeconds, 45 * 60);
   assert.equal(updated.sessions[0]?.origin, "steam-sync");
 
-  const unchanged = await store.importSteamAccount([{ appId: "123", title: "Example", playtimeMinutes: 145, lastPlayedAt }]);
+  const unchanged = await store.importSteamAccount([
+    { appId: "123", title: "Example", playtimeMinutes: 145, lastPlayedAt },
+  ]);
   assert.equal(unchanged.sessions.length, 1);
 });
 
 test("filters Steamworks redistributables from the library", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-steam-filter-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-steam-filter-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
 
   const snapshot = await store.importSteamAccount([
-    { appId: "228980", title: "Steamworks Common Redistributables", playtimeMinutes: 10, lastPlayedAt: null },
+    {
+      appId: "228980",
+      title: "Steamworks Common Redistributables",
+      playtimeMinutes: 10,
+      lastPlayedAt: null,
+    },
     { appId: "123", title: "Real game", playtimeMinutes: 20, lastPlayedAt: null },
   ]);
 
-  assert.deepEqual(snapshot.games.map((game) => game.sourceId), ["123"]);
+  assert.deepEqual(
+    snapshot.games.map((game) => game.sourceId),
+    ["123"],
+  );
 });
 
 test("hides a game without deleting its history", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-hide-game-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-hide-game-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
-  const created = await store.addLocal({ title: "Example", executablePath: "/games/example" });
+  const created = await store.addLocal({
+    title: "Example",
+    executablePath: "/games/example",
+  });
   const gameId = created.games[0]!.id;
   await store.addPlaytime(gameId, 120);
 
@@ -100,12 +132,26 @@ test("hides a game without deleting its history", async (context) => {
 });
 
 test("merges remote manual history without copying another device executable", async (context) => {
-  const firstDirectory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-sync-first-"));
-  const secondDirectory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-sync-second-"));
-  context.after(() => Promise.all([firstDirectory, secondDirectory].map((directory) => fs.promises.rm(directory, { recursive: true, force: true }))));
+  const firstDirectory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-sync-first-"),
+  );
+  const secondDirectory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-sync-second-"),
+  );
+  context.after(() =>
+    Promise.all(
+      [firstDirectory, secondDirectory].map((directory) =>
+        fs.promises.rm(directory, { recursive: true, force: true }),
+      ),
+    ),
+  );
   const first = new LibraryStore(path.join(firstDirectory, "library.json"));
   const second = new LibraryStore(path.join(secondDirectory, "library.json"));
-  const created = await first.addLocal({ title: "Example", executablePath: "/first/game.exe", coverUrl: "https://example.com/cover.jpg" });
+  const created = await first.addLocal({
+    title: "Example",
+    executablePath: "/first/game.exe",
+    coverUrl: "https://example.com/cover.jpg",
+  });
   await first.addPlaytime(created.games[0]!.id, 90);
 
   const remote = await first.exportManualHistory();
@@ -120,13 +166,21 @@ test("merges remote manual history without copying another device executable", a
 });
 
 test("keeps newer local artwork when an older remote snapshot arrives", async (context) => {
-  const directory = await fs.promises.mkdtemp(path.join(os.tmpdir(), "launcher-sync-artwork-"));
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-sync-artwork-"),
+  );
   context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
   const store = new LibraryStore(path.join(directory, "library.json"));
-  const created = await store.addLocal({ title: "Example", executablePath: "/games/example" });
+  const created = await store.addLocal({
+    title: "Example",
+    executablePath: "/games/example",
+  });
   const staleRemote = await store.exportManualHistory();
 
-  await store.setRemoteArtwork(created.games[0]!.id, { coverUrl: "https://example.com/new-cover.jpg", heroUrl: "https://example.com/new-hero.jpg" });
+  await store.setRemoteArtwork(created.games[0]!.id, {
+    coverUrl: "https://example.com/new-cover.jpg",
+    heroUrl: "https://example.com/new-hero.jpg",
+  });
   const merged = await store.mergeRemoteManual(staleRemote);
 
   assert.equal(merged.games[0]?.coverUrl, "https://example.com/new-cover.jpg");

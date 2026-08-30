@@ -197,8 +197,8 @@ export function SettingsView({
             "settings-note [margin:16px_0_0] [color:#666975] [font-size:11px] [line-height:1.55]"
           }
         >
-          La clave se usa directamente con la API oficial de Steam y se cifra en
-          este equipo. El perfil debe permitir consultar los detalles de juegos.
+          La clave se usa directamente con la API oficial de Steam y se cifra en este
+          equipo. El perfil debe permitir consultar los detalles de juegos.
         </p>
         {status && (
           <div
@@ -226,8 +226,8 @@ export function SettingsView({
           <div>
             <h2>Carpeta de sincronización</h2>
             <p>
-              Historial y partidas guardadas; el estado indica la carpeta local,
-              no la subida de Google Drive.
+              Historial y partidas guardadas; el estado indica la carpeta local, no la
+              subida de Google Drive.
             </p>
           </div>
           <i className={syncSettings?.status === "ready" ? "connected" : ""}>

@@ -25,8 +25,7 @@ export function useSettingsView(options: SettingsViewOptions) {
   const [syncStatus, setSyncStatus] = useState("");
   const steamId = steamIdDraft ?? settings?.steamId ?? "";
   const connectMutation = useMutation({
-    mutationFn: () =>
-      window.launcher.connectSteam(apiKey, steamId || undefined),
+    mutationFn: () => window.launcher.connectSteam(apiKey, steamId || undefined),
   });
   const chooseSyncFolderMutation = useMutation({
     mutationFn: window.launcher.selectSyncFolder,
@@ -48,9 +47,7 @@ export function useSettingsView(options: SettingsViewOptions) {
       setStatus(`${result.ownedCount} juegos importados desde tu cuenta`);
     } catch (error) {
       setStatus(
-        error instanceof Error
-          ? error.message
-          : "No se pudo conectar con Steam",
+        error instanceof Error ? error.message : "No se pudo conectar con Steam",
       );
     }
   };
@@ -69,9 +66,7 @@ export function useSettingsView(options: SettingsViewOptions) {
       }
     } catch (error) {
       setSyncStatus(
-        error instanceof Error
-          ? error.message
-          : "No se pudo configurar la carpeta",
+        error instanceof Error ? error.message : "No se pudo configurar la carpeta",
       );
     }
   };
@@ -84,9 +79,7 @@ export function useSettingsView(options: SettingsViewOptions) {
       onSynced(result.snapshot, result.settings);
       setSyncStatus("Sincronización completada");
     } catch (error) {
-      setSyncStatus(
-        error instanceof Error ? error.message : "No se pudo sincronizar",
-      );
+      setSyncStatus(error instanceof Error ? error.message : "No se pudo sincronizar");
     }
   };
 
@@ -99,9 +92,7 @@ export function useSettingsView(options: SettingsViewOptions) {
       setSyncStatus(`${result.count} juegos asociados con Ludusavi`);
     } catch (error) {
       setSyncStatus(
-        error instanceof Error
-          ? error.message
-          : "No se pudo consultar Ludusavi",
+        error instanceof Error ? error.message : "No se pudo consultar Ludusavi",
       );
     }
   };

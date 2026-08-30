@@ -1,10 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
 
-export function useAchievementsQuery(
-  gameId: string | null,
-  refreshToken: boolean,
-) {
+export function useAchievementsQuery(gameId: string | null, refreshToken: boolean) {
   return useQuery({
     queryKey: [...queryKeys.achievements(gameId ?? "none"), refreshToken],
     queryFn: () => window.launcher.getAchievements(gameId!),

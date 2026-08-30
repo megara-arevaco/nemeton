@@ -67,16 +67,12 @@ export function buildMonthlyActivity(
           : [];
       })
       .sort(
-        (a, b) =>
-          b.seconds - a.seconds || a.game.title.localeCompare(b.game.title),
+        (a, b) => b.seconds - a.seconds || a.game.title.localeCompare(b.game.title),
       ),
   }));
 }
 
-export function useStatisticsView(
-  games: LibraryGame[],
-  sessions: GameSession[],
-) {
+export function useStatisticsView(games: LibraryGame[], sessions: GameSession[]) {
   const [period, setPeriod] = useState<"all" | "2026">("all");
   const [summaryPeriod, setSummaryPeriod] = useState<"week" | "month">("week");
   const statistics = useMemo(() => {
@@ -87,40 +83,29 @@ export function useStatisticsView(
     const played = games
       .filter((game) => minutesFor(game) > 0)
       .sort((a, b) => minutesFor(b) - minutesFor(a));
-    const totalMinutes = played.reduce(
-      (total, game) => total + minutesFor(game),
-      0,
-    );
+    const totalMinutes = played.reduce((total, game) => total + minutesFor(game), 0);
     return { played, totalMinutes };
   }, [games]);
 
   const totalHours = Math.round((statistics.totalMinutes / 60) * 10) / 10;
   const months = useMemo(() => {
     const formatter = new Intl.DateTimeFormat("es-ES", { month: "long" });
-    return buildMonthlyActivity(games, sessions, 2026).map(
-      ({ month, entries }) => ({
-        name: formatter.format(new Date(2026, month, 1)),
-        entries,
-      }),
-    );
+    return buildMonthlyActivity(games, sessions, 2026).map(({ month, entries }) => ({
+      name: formatter.format(new Date(2026, month, 1)),
+      entries,
+    }));
   }, [games, sessions]);
   const annualSeconds = months.reduce(
     (total, month) =>
       total +
-      month.entries.reduce(
-        (monthTotal, entry) => monthTotal + entry.seconds,
-        0,
-      ),
+      month.entries.reduce((monthTotal, entry) => monthTotal + entry.seconds, 0),
     0,
   );
   const annualRanking = useMemo(() => {
     const totals = new Map<string, number>();
     months.forEach((month) =>
       month.entries.forEach((entry) =>
-        totals.set(
-          entry.game.id,
-          (totals.get(entry.game.id) ?? 0) + entry.seconds,
-        ),
+        totals.set(entry.game.id, (totals.get(entry.game.id) ?? 0) + entry.seconds),
       ),
     );
     const gamesById = new Map(games.map((game) => [game.id, game]));
@@ -134,22 +119,15 @@ export function useStatisticsView(
   }, [games, months]);
   const automaticSummary = useMemo(() => {
     const now = new Date();
-    const startOfToday = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-    );
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const currentMonday = new Date(startOfToday);
-    currentMonday.setDate(
-      currentMonday.getDate() - ((currentMonday.getDay() + 6) % 7),
-    );
+    currentMonday.setDate(currentMonday.getDate() - ((currentMonday.getDay() + 6) % 7));
     const previousMonday = new Date(currentMonday);
     previousMonday.setDate(previousMonday.getDate() - 7);
     const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const periodStart = summaryPeriod === "week" ? currentMonday : currentMonth;
-    const previousStart =
-      summaryPeriod === "week" ? previousMonday : previousMonth;
+    const previousStart = summaryPeriod === "week" ? previousMonday : previousMonth;
     const valid = sessions
       .map((session) => ({ ...session, ended: new Date(session.endedAt) }))
       .filter(
@@ -158,8 +136,7 @@ export function useStatisticsView(
       );
     const current = valid.filter((session) => session.ended >= periodStart);
     const previous = valid.filter(
-      (session) =>
-        session.ended >= previousStart && session.ended < periodStart,
+      (session) => session.ended >= previousStart && session.ended < periodStart,
     );
     const currentSeconds = current.reduce(
       (sum, session) => sum + session.durationSeconds,
@@ -219,19 +196,13 @@ export function useStatisticsView(
     );
     let comeback: { gameId: string; days: number; ended: Date } | null = null;
     byGameSessions.forEach((items, gameId) => {
-      const ordered = items.sort(
-        (a, b) => a.ended.getTime() - b.ended.getTime(),
-      );
+      const ordered = items.sort((a, b) => a.ended.getTime() - b.ended.getTime());
       for (let index = 1; index < ordered.length; index += 1) {
         const ended = ordered[index]!.ended;
         const days = Math.floor(
           (ended.getTime() - ordered[index - 1]!.ended.getTime()) / 86_400_000,
         );
-        if (
-          ended >= periodStart &&
-          days >= 30 &&
-          (!comeback || days > comeback.days)
-        ) {
+        if (ended >= periodStart && days >= 30 && (!comeback || days > comeback.days)) {
           comeback = { gameId, days, ended };
         }
       }

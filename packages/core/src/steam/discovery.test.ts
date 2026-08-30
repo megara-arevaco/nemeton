@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseVdf } from "./steam.js";
+import { parseVdf } from "./discovery.js";
 
 test("parses nested Steam VDF data", () => {
   assert.deepEqual(parseVdf('"AppState" { "appid" "620" "name" "Portal 2" }'), {

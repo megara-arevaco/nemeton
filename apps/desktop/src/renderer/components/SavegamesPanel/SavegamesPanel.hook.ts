@@ -14,10 +14,7 @@ export function useSavegamesPanel(game: LibraryGame) {
   const data = savegamesQuery.data ?? null;
   const busy = backupMutation.isPending || chooseFolderMutation.isPending;
 
-  const run = async (
-    action: () => Promise<unknown>,
-    successMessage: string,
-  ) => {
+  const run = async (action: () => Promise<unknown>, successMessage: string) => {
     setStatus("");
 
     try {
@@ -25,9 +22,7 @@ export function useSavegamesPanel(game: LibraryGame) {
       setStatus(successMessage);
     } catch (error) {
       setStatus(
-        error instanceof Error
-          ? error.message
-          : "No se pudo completar la operación",
+        error instanceof Error ? error.message : "No se pudo completar la operación",
       );
     }
   };
@@ -53,16 +48,13 @@ export function useSavegamesPanel(game: LibraryGame) {
       : data.syncState === "unconfigured"
         ? {
             title: "Sincronización sin configurar",
-            detail:
-              "Elige una carpeta de Google Drive u otro servicio desde Ajustes.",
+            detail: "Elige una carpeta de Google Drive u otro servicio desde Ajustes.",
             tone: "warning",
           }
         : data.syncState === "path-missing"
           ? {
               title: "No se encuentra la carpeta de partidas",
-              detail:
-                data.missingPaths[0] ??
-                "La ubicación configurada ya no existe.",
+              detail: data.missingPaths[0] ?? "La ubicación configurada ya no existe.",
               tone: "error",
             }
           : data.syncState === "not-detected"
@@ -85,8 +77,7 @@ export function useSavegamesPanel(game: LibraryGame) {
                     "Las partidas actuales son más recientes que la última copia.",
                   tone: "warning",
                 };
-  const chooseFolder = () =>
-    chooseFolderMutation.mutateAsync(data?.missingPaths ?? []);
+  const chooseFolder = () => chooseFolderMutation.mutateAsync(data?.missingPaths ?? []);
 
   const backup = () => backupMutation.mutateAsync();
 

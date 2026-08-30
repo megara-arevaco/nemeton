@@ -156,8 +156,7 @@ export function useApp() {
     navigation.overlay?.type === "artwork" ? navigation.overlay.game : null;
   const editGame =
     navigation.overlay?.type === "edit-game" ? navigation.overlay.game : null;
-  const gameMenu =
-    navigation.overlay?.type === "game-menu" ? navigation.overlay : null;
+  const gameMenu = navigation.overlay?.type === "game-menu" ? navigation.overlay : null;
   const view = navigation.view;
   const deferredQuery = useDeferredValue(query);
 
@@ -180,8 +179,7 @@ export function useApp() {
     () =>
       library.games.filter(
         (game) =>
-          !game.hiddenFromLibrary &&
-          (game.source === "local" || game.installed),
+          !game.hiddenFromLibrary && (game.source === "local" || game.installed),
       ),
     [library.games],
   );
@@ -195,9 +193,7 @@ export function useApp() {
   }, [libraryGames, deferredQuery]);
   const selected =
     library.games.find((game) => game.id === navigation.selectedId) ?? null;
-  const selectedIsRunning = selected
-    ? library.runningGameIds.has(selected.id)
-    : false;
+  const selectedIsRunning = selected ? library.runningGameIds.has(selected.id) : false;
   const achievementsQuery = useAchievementsQuery(
     selected?.id ?? null,
     selectedIsRunning,
@@ -219,20 +215,17 @@ export function useApp() {
   const selectGame = useCallback((gameId: string) => {
     dispatchNavigation({ type: "select-game", gameId });
   }, []);
-  const openGameMenu = useCallback(
-    (game: LibraryGame, x: number, y: number) => {
-      dispatchNavigation({
-        type: "open-overlay",
-        overlay: {
-          type: "game-menu",
-          game,
-          x: Math.min(x, window.innerWidth - 230),
-          y: Math.min(y, window.innerHeight - 90),
-        },
-      });
-    },
-    [],
-  );
+  const openGameMenu = useCallback((game: LibraryGame, x: number, y: number) => {
+    dispatchNavigation({
+      type: "open-overlay",
+      overlay: {
+        type: "game-menu",
+        game,
+        x: Math.min(x, window.innerWidth - 230),
+        y: Math.min(y, window.innerHeight - 90),
+      },
+    });
+  }, []);
 
   const updateQuery = (event: ChangeEvent<HTMLInputElement>) => {
     setQuery(event.target.value);
@@ -264,10 +257,7 @@ export function useApp() {
     library.setMessage(`${count} juegos en tu cuenta de Steam`);
   };
 
-  const syncLibrary = (
-    snapshot: LibrarySnapshot,
-    nextSettings: FolderSyncSettings,
-  ) => {
+  const syncLibrary = (snapshot: LibrarySnapshot, nextSettings: FolderSyncSettings) => {
     updateLibrary(snapshot);
     library.setSyncSettings(nextSettings);
     library.setMessage("Historial manual sincronizado");
@@ -302,9 +292,7 @@ export function useApp() {
 
     try {
       const snapshot = await scanSteamMutation.mutateAsync();
-      library.setMessage(
-        `${snapshot.games.length} juegos disponibles localmente`,
-      );
+      library.setMessage(`${snapshot.games.length} juegos disponibles localmente`);
     } catch (error) {
       library.setMessage(
         error instanceof Error ? error.message : "No se pudo leer Steam",
@@ -333,9 +321,7 @@ export function useApp() {
       library.setMessage(`${selected.title} iniciado`);
     } catch (error) {
       library.setMessage(
-        error instanceof Error
-          ? error.message
-          : `No se pudo iniciar ${selected.title}`,
+        error instanceof Error ? error.message : `No se pudo iniciar ${selected.title}`,
       );
     }
   };

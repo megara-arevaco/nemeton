@@ -3,11 +3,7 @@ import { GameController } from "@phosphor-icons/react/GameController";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Play } from "@phosphor-icons/react/Play";
 import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
-import {
-  formatPlaytime,
-  gameCoverUrl,
-  gameHeroUrl,
-} from "../../shared/presentation";
+import { formatPlaytime, gameCoverUrl, gameHeroUrl } from "../../shared/presentation";
 
 export function LibraryCollection({
   games,

@@ -86,9 +86,7 @@ export function AddGameModal({
                     "ludusavi-selected [margin-top:7px] [border:1px_solid_#a9fb7625] [background:#a9fb7608] [&_b]:[display:block] [&_small]:[display:block] [&_b]:[font-size:10px] [&_small]:[margin-top:3px] [&_small]:[color:#6f737e] [&_small]:[font-size:8px] [&_>_img]:[width:32px] [&_>_img]:[height:42px] [&_>_img]:[margin-right:9px] [&_>_img]:[border-radius:6px] [&_>_img]:[object-fit:cover] [&_>_button]:[display:grid] [&_>_button]:[place-items:center] [&_>_button]:[border:0] [&_>_button]:[background:transparent] [&_>_button]:[color:#777b85] [&_>_button]:[cursor:pointer]"
                   }
                 >
-                  {automaticArtwork && (
-                    <img src={automaticArtwork.coverUrl} alt="" />
-                  )}
+                  {automaticArtwork && <img src={automaticArtwork.coverUrl} alt="" />}
                   <span>
                     <b>{selectedLudusavi.name}</b>
                     <small>
@@ -120,9 +118,7 @@ export function AddGameModal({
                         <span>
                           <b>{item.name}</b>
                           <small>
-                            {item.steamAppId
-                              ? `Steam ${item.steamAppId}`
-                              : "Ludusavi"}
+                            {item.steamAppId ? `Steam ${item.steamAppId}` : "Ludusavi"}
                           </small>
                         </span>
                         <Plus />
@@ -158,8 +154,8 @@ export function AddGameModal({
             >
               <GameController />
               <span>
-                La carátula, el ejecutable y otros datos se pueden completar
-                después desde la ficha del juego.
+                La carátula, el ejecutable y otros datos se pueden completar después
+                desde la ficha del juego.
               </span>
             </div>
           </div>

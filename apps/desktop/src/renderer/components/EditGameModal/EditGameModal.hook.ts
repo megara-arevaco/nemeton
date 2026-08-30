@@ -3,9 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import type { LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { useLudusaviQuery } from "../../queries/game.queries";
 
-type LudusaviMatch = Awaited<
-  ReturnType<Window["launcher"]["searchLudusavi"]>
->[number];
+type LudusaviMatch = Awaited<ReturnType<Window["launcher"]["searchLudusavi"]>>[number];
 
 export interface EditGameModalOptions {
   game: LibraryGame;
@@ -13,11 +11,7 @@ export interface EditGameModalOptions {
   onUpdated: (snapshot: LibrarySnapshot) => void;
 }
 
-export function useEditGameModal({
-  game,
-  onClose,
-  onUpdated,
-}: EditGameModalOptions) {
+export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOptions) {
   const [title, setTitle] = useState(game.title);
   const [executablePath, setExecutablePath] = useState(game.installPath);
   const [hours, setHours] = useState(
@@ -70,9 +64,7 @@ export function useEditGameModal({
       onUpdated(snapshot);
       onClose();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "No se pudo actualizar",
-      );
+      setError(reason instanceof Error ? reason.message : "No se pudo actualizar");
     }
   };
   return {

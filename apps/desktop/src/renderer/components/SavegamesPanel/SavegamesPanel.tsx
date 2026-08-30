@@ -43,8 +43,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
         {copy.detail}
       </p>
       {data &&
-        (data.syncState === "not-detected" ||
-          data.syncState === "path-missing") && (
+        (data.syncState === "not-detected" || data.syncState === "path-missing") && (
           <button
             className={
               "cover-button [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:12px_16px] [background:#ffffff0b] [cursor:pointer]"
@@ -56,8 +55,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
           </button>
         )}
       {data &&
-        (data.syncState === "waiting-backup" ||
-          data.syncState === "pending") && (
+        (data.syncState === "waiting-backup" || data.syncState === "pending") && (
           <button
             className={
               "cover-button [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:12px_16px] [background:#ffffff0b] [cursor:pointer]"

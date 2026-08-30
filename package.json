@@ -15,7 +15,12 @@
     "dist:win": "corepack pnpm --filter @launcher/desktop dist:win",
     "dist:win:installer": "corepack pnpm --filter @launcher/desktop dist:win:installer",
     "dist:win:portable": "corepack pnpm --filter @launcher/desktop dist:win:portable",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "corepack pnpm -r typecheck",
     "test": "corepack pnpm -r test"
+  },
+  "devDependencies": {
+    "prettier": "3.6.2"
   }
 }

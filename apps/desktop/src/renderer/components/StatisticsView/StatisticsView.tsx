@@ -108,9 +108,7 @@ export function StatisticsView({
           <article>
             <Clock />
             <span>
-              <small>
-                {period === "all" ? "TIEMPO TOTAL" : "TIEMPO EN 2026"}
-              </small>
+              <small>{period === "all" ? "TIEMPO TOTAL" : "TIEMPO EN 2026"}</small>
               <strong>
                 {period === "all"
                   ? `${totalHours} h`
@@ -127,9 +125,7 @@ export function StatisticsView({
           <CalendarBlank />
           <select
             value={period}
-            onChange={(event) =>
-              setPeriod(event.target.value as "all" | "2026")
-            }
+            onChange={(event) => setPeriod(event.target.value as "all" | "2026")}
           >
             <option value="all">Total histórico</option>
             <option value="2026">Anual · 2026</option>
@@ -184,8 +180,8 @@ export function StatisticsView({
                   <strong>{game.title}</strong>
                   <span>{formatPlaytime(minutes)}</span>
                   <small>
-                    {Math.round((minutes / statistics.totalMinutes) * 100)}% de
-                    tu tiempo
+                    {Math.round((minutes / statistics.totalMinutes) * 100)}% de tu
+                    tiempo
                   </small>
                 </article>
               );
@@ -232,9 +228,7 @@ export function StatisticsView({
                     >
                       <strong>{game.title}</strong>
                       <small>
-                        {game.source === "steam"
-                          ? "Steam"
-                          : "Añadido manualmente"}
+                        {game.source === "steam" ? "Steam" : "Añadido manualmente"}
                       </small>
                     </span>
                     <div

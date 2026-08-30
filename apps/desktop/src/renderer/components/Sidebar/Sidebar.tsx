@@ -52,9 +52,7 @@ export const Sidebar = memo(function Sidebar({
         </span>
         <span>Nemeton</span>
       </div>
-      <nav
-        className={"primary-nav [display:grid] [gap:4px] [margin:20px_0_24px]"}
-      >
+      <nav className={"primary-nav [display:grid] [gap:4px] [margin:20px_0_24px]"}>
         <button
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "library" && !selectedId ? "active" : ""}`}
           onClick={onOpenLibrary}

@@ -17,17 +17,16 @@ export interface AddGameModalOptions {
 export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
   const [title, setTitle] = useState("");
   const [executablePath, setExecutablePath] = useState("");
-  const [selectedLudusavi, setSelectedLudusavi] =
-    useState<LudusaviSuggestion | null>(null);
-  const [automaticArtwork, setAutomaticArtwork] =
-    useState<ArtworkSuggestion | null>(null);
+  const [selectedLudusavi, setSelectedLudusavi] = useState<LudusaviSuggestion | null>(
+    null,
+  );
+  const [automaticArtwork, setAutomaticArtwork] = useState<ArtworkSuggestion | null>(
+    null,
+  );
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const deferredTitle = useDeferredValue(title);
-  const ludusaviQuery = useLudusaviQuery(
-    deferredTitle,
-    selectedLudusavi === null,
-  );
+  const ludusaviQuery = useLudusaviQuery(deferredTitle, selectedLudusavi === null);
   const createGameMutation = useMutation({
     mutationFn: window.launcher.addLocalGame,
   });
@@ -90,9 +89,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
       onCreated(snapshot);
       onClose();
     } catch (reason) {
-      setError(
-        reason instanceof Error ? reason.message : "No se pudo añadir el juego",
-      );
+      setError(reason instanceof Error ? reason.message : "No se pudo añadir el juego");
     }
   };
   return {

@@ -12,7 +12,11 @@ export default defineConfig({
         output: {
           manualChunks(id) {
             if (id.includes("@phosphor-icons/react")) return "phosphor-icons";
-            if (id.includes("node_modules/react") || id.includes("node_modules/react-dom")) return "react-vendor";
+            if (
+              id.includes("node_modules/react") ||
+              id.includes("node_modules/react-dom")
+            )
+              return "react-vendor";
           },
         },
       },

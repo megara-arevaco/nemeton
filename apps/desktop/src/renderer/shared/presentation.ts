@@ -1,11 +1,6 @@
 import type { LibraryGame } from "@launcher/core";
 
-export type AccentTheme =
-  | "forest"
-  | "aurora"
-  | "ember"
-  | "amethyst"
-  | "glacier";
+export type AccentTheme = "forest" | "aurora" | "ember" | "amethyst" | "glacier";
 
 export const accentThemes: Array<{
   id: AccentTheme;
@@ -97,6 +92,4 @@ export const gameCoverUrl = (game: LibraryGame) =>
   game.coverPath ? localCoverUrl(game.coverPath) : game.coverUrl;
 
 export const gameHeroUrl = (game: LibraryGame) =>
-  game.coverPath
-    ? localCoverUrl(game.coverPath)
-    : (game.heroUrl ?? game.coverUrl);
+  game.coverPath ? localCoverUrl(game.coverPath) : (game.heroUrl ?? game.coverUrl);

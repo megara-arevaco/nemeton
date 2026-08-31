@@ -4,6 +4,7 @@ import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { GameController } from "@phosphor-icons/react/GameController";
 import { Gear } from "@phosphor-icons/react/Gear";
 import { Plus } from "@phosphor-icons/react/Plus";
+import { Button } from "../Button";
 import { formatPlaytime, gameCoverUrl } from "../../shared/presentation";
 import { NemetonMark } from "../NemetonMark";
 
@@ -71,14 +72,14 @@ export const Sidebar = memo(function Sidebar({
         >
           <Gear /> Ajustes
         </button>
-        <button
-          className={
-            "nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white]"
-          }
+        <Button
+          className="[justify-content:flex-start] [width:100%]"
           onClick={onAddGame}
+          size="small"
+          variant="secondary"
         >
           <Plus /> Añadir juego
-        </button>
+        </Button>
       </nav>
       <div
         className={
@@ -115,6 +116,8 @@ export const Sidebar = memo(function Sidebar({
                   <img
                     src={cover}
                     alt=""
+                    loading="lazy"
+                    decoding="async"
                     onError={(event) => event.currentTarget.remove()}
                   />
                 ) : null}

@@ -5,7 +5,6 @@ import type { LibrarySnapshot } from "@launcher/core";
 import { AchievementService, type AchievementHistoryEntry } from "./achievements.js";
 import { toLinuxPath } from "./platform.js";
 import { SettingsStore } from "./settings.js";
-
 export interface FolderSyncResult {
   snapshot: LibrarySnapshot;
   settings: {

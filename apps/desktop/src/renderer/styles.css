@@ -3,11 +3,44 @@
 :root {
   color-scheme: dark;
   font-family: Inter, "Segoe UI", sans-serif;
-  background: #090a0f;
-  color: #f5f5f7;
+  --surface-canvas: #090a0f;
+  --surface-card: #101119;
+  --surface-raised: #ffffff08;
+  --surface-subtle: #ffffff06;
+  --surface-hover: #ffffff0c;
+  --border-subtle: #ffffff0d;
+  --border-default: #ffffff1c;
+  --border-strong: #ffffff33;
+  --text-primary: #f5f5f7;
+  --text-secondary: #c4c6cf;
+  --text-muted: #777a86;
+  --text-faint: #585b66;
+  --radius-field: 10px;
+  --radius-compact: 8px;
+  --radius-action: 11px;
+  --radius-card: 20px;
+  --radius-hero: 24px;
+  --radius-pill: 999px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --card-padding: 26px;
+  --page-gutter: 34px;
+  --text-label: 9px;
+  --text-caption: 11px;
+  --text-body: 12px;
+  --transition-interactive: 0.16s ease;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
   --accent-a: #b7ff64;
   --accent-b: #65f0b5;
   --accent-ink: #10140e;
+}
+
+.installed-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 249px;
 }
 :root[data-accent="aurora"] {
   --accent-a: #47e9ff;
@@ -62,6 +95,7 @@ input {
   font: inherit;
 }
 button {
+  border-radius: var(--radius-action);
   color: inherit;
 }
 
@@ -80,13 +114,13 @@ button {
 .nav-item,
 .settings {
   display: flex;
-  gap: 11px;
+  gap: var(--space-3);
   align-items: center;
   border: 0;
   background: transparent;
-  border-radius: 10px;
-  padding: 11px 12px;
-  color: #9b9da8;
+  border-radius: var(--radius-field);
+  padding: 11px var(--space-3);
+  color: var(--text-secondary);
   text-align: left;
   cursor: pointer;
 }
@@ -115,12 +149,12 @@ h1 {
 }
 .savegame-warning,
 .savegame-status {
-  margin: 16px 0 0;
-  border-radius: 10px;
-  padding: 10px 12px;
+  margin: var(--space-4) 0 0;
+  border-radius: var(--radius-field);
+  padding: 10px var(--space-3);
   background: #f4bb5510;
   color: #e9bd70;
-  font-size: 11px;
+  font-size: var(--text-caption);
 }
 .ranking-name,
 .ranking-name strong,
@@ -137,19 +171,98 @@ h1 {
   justify-content: space-between;
   width: 100%;
   border: 0;
-  border-radius: 8px;
-  padding: 9px 10px;
+  border-radius: var(--radius-compact);
+  padding: 9px var(--radius-field);
   background: transparent;
-  color: #b8bbc4;
+  color: var(--text-secondary);
   text-align: left;
+}
+.settings-form .play,
+.sync-folder-row .play {
+  min-width: 146px;
+  border-radius: var(--radius-action);
+  cursor: pointer;
+  transition:
+    transform var(--transition-interactive),
+    box-shadow var(--transition-interactive),
+    filter var(--transition-interactive);
+}
+.settings-form .play:hover:not(:disabled),
+.sync-folder-row .play:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--accent-a) 24%, transparent);
+}
+.settings-form .play:focus-visible,
+.sync-folder-row .play:focus-visible,
+.sync-folder-row .cancel-button:focus-visible,
+.sync-settings-card > .cancel-button:focus-visible {
+  outline: 2px solid var(--accent-a);
+  outline-offset: 3px;
+}
+.sync-folder-row .cancel-button,
+.sync-settings-card > .cancel-button {
+  border-color: var(--border-default);
+  background: var(--surface-subtle);
+  color: var(--text-secondary);
+  transition:
+    background var(--transition-interactive),
+    border-color var(--transition-interactive);
+}
+.sync-folder-row .cancel-button:hover:not(:disabled),
+.sync-settings-card > .cancel-button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
+}
+.settings-card {
+  padding: var(--card-padding);
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--surface-card);
+}
+.settings-card-heading > p {
+  color: var(--text-muted);
+  font-size: var(--text-body);
+}
+.settings-form input {
+  border-radius: var(--radius-field);
+  border-color: var(--border-default);
+  background: color-mix(in srgb, var(--surface-canvas) 60%, transparent);
+}
+.game-hero {
+  border-radius: var(--radius-hero);
+}
+.game-metadata {
+  border-color: var(--border-subtle);
+}
+.settings-status {
+  border-radius: var(--radius-field);
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: var(--text-body);
+}
+.add-game-modal > footer {
+  padding: 24px 16px;
+}
+.ludusavi-results {
+  max-height: none;
+  overflow: hidden;
 }
 footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 36px;
-  color: #585b66;
-  font-size: 11px;
+  color: var(--text-faint);
+  font-size: var(--text-caption);
+}
+.statusbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+.statusbar-meta span {
+  white-space: nowrap;
 }
 
 @keyframes running-pulse {
@@ -203,7 +316,7 @@ footer {
     grid-template-columns: 220px 1fr;
   }
   .hero-copy {
-    width: 82%;
+    width: 58%;
     padding: 42px;
   }
   .chart-layout {

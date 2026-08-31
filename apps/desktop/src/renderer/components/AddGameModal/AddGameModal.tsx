@@ -3,6 +3,8 @@ import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { GameController } from "@phosphor-icons/react/GameController";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { X } from "@phosphor-icons/react/X";
+import { Button } from "../Button";
+import { LudusaviSuggestions } from "../LudusaviSuggestions";
 import { useAddGameModal } from "./AddGameModal.hook";
 
 export function AddGameModal({
@@ -42,7 +44,7 @@ export function AddGameModal({
     >
       <section
         className={
-          "add-game-modal [width:min(780px,_94vw)] [overflow:hidden] [border:1px_solid_#ffffff17] [border-radius:22px] [background:#12131b] [box-shadow:0_30px_100px_#0000008a] [&_>_header]:[display:flex] [&_>_header]:[justify-content:space-between] [&_>_header]:[align-items:center] [&_>_header]:[padding:22px_24px] [&_>_header]:[border-bottom:1px_solid_#ffffff0d] [&_>_header_>_div]:[display:flex] [&_>_header_>_div]:[align-items:center] [&_>_header_>_div]:[gap:12px] [&_>_header_small]:[display:block] [&_>_header_small]:[margin:0] [&_>_header_h2]:[display:block] [&_>_header_h2]:[margin:0] [&_>_header_small]:[margin-bottom:3px] [&_>_header_small]:[color:#696c78] [&_>_header_small]:[font-size:9px] [&_>_header_small]:[font-weight:700] [&_>_header_small]:[letter-spacing:1.3px] [&_>_header_h2]:[font-size:18px] [&_>_header_>_button]:[display:grid] [&_>_header_>_button]:[place-items:center] [&_>_header_>_button]:[width:34px] [&_>_header_>_button]:[height:34px] [&_>_header_>_button]:[border:0] [&_>_header_>_button]:[border-radius:9px] [&_>_header_>_button]:[background:#ffffff08] [&_>_header_>_button]:[color:#8b8e99] [&_>_header_>_button]:[cursor:pointer] [&_>_footer]:[display:flex] [&_>_footer]:[justify-content:flex-end] [&_>_footer]:[gap:9px] [&_>_footer]:[height:auto] [&_>_footer]:[padding:17px_24px] [&_>_footer]:[border-top:1px_solid_#ffffff0d] [&_>_footer]:[color:inherit] [&_>_footer_.play]:[padding:11px_18px]"
+          "add-game-modal [width:min(780px,_94vw)] [overflow:hidden] [border:1px_solid_#ffffff17] [border-radius:22px] [background:#12131b] [box-shadow:0_30px_100px_#0000008a] [&_>_header]:[display:flex] [&_>_header]:[justify-content:space-between] [&_>_header]:[align-items:center] [&_>_header]:[padding:22px_24px] [&_>_header]:[border-bottom:1px_solid_#ffffff0d] [&_>_header_>_div]:[display:flex] [&_>_header_>_div]:[align-items:center] [&_>_header_>_div]:[gap:12px] [&_>_header_small]:[display:block] [&_>_header_small]:[margin:0] [&_>_header_h2]:[display:block] [&_>_header_h2]:[margin:0] [&_>_header_small]:[margin-bottom:3px] [&_>_header_small]:[color:#696c78] [&_>_header_small]:[font-size:9px] [&_>_header_small]:[font-weight:700] [&_>_header_small]:[letter-spacing:1.3px] [&_>_header_h2]:[font-size:18px] [&_>_header_>_button]:[display:grid] [&_>_header_>_button]:[place-items:center] [&_>_header_>_button]:[width:34px] [&_>_header_>_button]:[height:34px] [&_>_header_>_button]:[border:0] [&_>_header_>_button]:[border-radius:9px] [&_>_header_>_button]:[background:#ffffff08] [&_>_header_>_button]:[color:#8b8e99] [&_>_header_>_button]:[cursor:pointer] [&_>_footer]:[display:flex] [&_>_footer]:[justify-content:flex-end] [&_>_footer]:[gap:9px] [&_>_footer]:[height:auto] [&_>_footer]:[padding:17px_24px] [&_>_footer]:[border-top:1px_solid_#ffffff0d] [&_>_footer]:[color:inherit]"
         }
         role="dialog"
         aria-modal="true"
@@ -106,25 +108,11 @@ export function AddGameModal({
                     "ludusavi-results [position:absolute] [z-index:8] [top:72px] [right:0] [left:0] [overflow:auto] [max-height:240px] [border:1px_solid_#ffffff18] [border-radius:11px] [padding:6px] [background:#171821] [box-shadow:0_18px_45px_#0009] [&_>_small]:[display:block] [&_>_small]:[padding:10px] [&_>_small]:[color:#737783] [&_>_small]:[font-size:10px] [&_>_button]:[cursor:pointer] [&_>_button:hover]:[background:#a9fb760d] [&_>_button:hover]:[color:#a9fb76] [&_b]:[display:block] [&_small]:[display:block] [&_b]:[font-size:10px] [&_small]:[margin-top:3px] [&_small]:[color:#6f737e] [&_small]:[font-size:8px] [&_>_button:hover]:[color:var(--accent-a)]"
                   }
                 >
-                  {searchingLudusavi && !ludusaviSuggestions.length ? (
-                    <small>Consultando catálogo de partidas…</small>
-                  ) : (
-                    ludusaviSuggestions.map((item) => (
-                      <button
-                        type="button"
-                        key={item.name}
-                        onClick={() => chooseLudusaviSuggestion(item)}
-                      >
-                        <span>
-                          <b>{item.name}</b>
-                          <small>
-                            {item.steamAppId ? `Steam ${item.steamAppId}` : "Ludusavi"}
-                          </small>
-                        </span>
-                        <Plus />
-                      </button>
-                    ))
-                  )}
+                  <LudusaviSuggestions
+                    items={ludusaviSuggestions}
+                    loading={searchingLudusavi}
+                    onSelect={chooseLudusaviSuggestion}
+                  />
                 </div>
               ) : null}
             </label>
@@ -170,23 +158,16 @@ export function AddGameModal({
           </div>
         )}
         <footer>
-          <button
-            className={
-              "cancel-button [border:1px_solid_#ffffff14] [border-radius:11px] [padding:11px_17px] [background:transparent] [color:#a2a4ad] [cursor:pointer]"
-            }
-            onClick={onClose}
-          >
+          <Button onClick={onClose} variant="secondary">
             Cancelar
-          </button>
-          <button
-            className={
-              "play [background:linear-gradient(135deg,_var(--accent-a),_var(--accent-b))] [color:var(--accent-ink)] [box-shadow:0_12px_40px_color-mix(in_srgb,_var(--accent-a)_15%,_transparent)] [&:disabled]:[filter:grayscale(1)] [&:disabled]:[opacity:.45] [&:disabled]:[cursor:default] [&.running]:[filter:none] [&.running]:[opacity:1] [&.running]:[background:#a9fb7617] [&.running]:[color:#a9fb76] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running:disabled]:[filter:none] [&.running:disabled]:[opacity:1] [&.running:disabled]:[background:#a9fb7617] [&.running:disabled]:[color:#a9fb76] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running]:[color:var(--accent-a)] [&.running]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] [&.running:disabled]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running:disabled]:[color:var(--accent-a)] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)]"
-            }
+          </Button>
+          <Button
             disabled={saving || !title.trim()}
             onClick={() => createGame()}
+            variant="primary"
           >
             {saving ? "Añadiendo…" : "Añadir a la biblioteca"}
-          </button>
+          </Button>
         </footer>
       </section>
     </div>

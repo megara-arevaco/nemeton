@@ -1,5 +1,4 @@
 import type { LibraryGame } from "@launcher/core";
-
 export interface UseGameLaunchButtonOptions {
   game: LibraryGame;
   isRunning: boolean;
@@ -16,8 +15,8 @@ export function useGameLaunchButton({ game, isRunning }: UseGameLaunchButtonOpti
 
   if (game.source === "local" && !game.installPath) {
     return {
-      disabled: true,
-      label: "Sin ejecutable",
+      disabled: false,
+      label: "Añadir ejecutable",
       status: "unavailable" as const,
     };
   }

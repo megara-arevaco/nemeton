@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-
 import { defaultSteamRoots } from "./discovery.js";
 import type { SteamOwnedGame } from "../shared/types.js";
-
 const STEAM_ID64_BASE = 76_561_197_960_265_728n;
 
 export const accountIdToSteamId64 = (accountId: string): string | null => {
@@ -15,9 +13,11 @@ export const accountIdToSteamId64 = (accountId: string): string | null => {
 
 export const detectLocalSteamId = async (): Promise<string | null> => {
   const steamRoot = defaultSteamRoots().find(fs.existsSync);
+
   if (!steamRoot) {
     return null;
   }
+
   const userdata = path.join(steamRoot, "userdata");
   const users = await fs.promises
     .readdir(userdata, { withFileTypes: true })
@@ -60,6 +60,7 @@ export const fetchOwnedSteamGames = async (
   if (!/^7656119\d{10}$/.test(steamId)) {
     throw new Error("El SteamID64 no es válido");
   }
+
   const query = new URLSearchParams({
     steamid: steamId,
     include_appinfo: "true",
@@ -72,9 +73,11 @@ export const fetchOwnedSteamGames = async (
       headers: { "x-webapi-key": apiKey.trim() },
     },
   );
+
   if (!response.ok) {
     throw new Error(`Steam respondió con ${response.status}`);
   }
+
   const payload = (await response.json()) as OwnedGamesResponse;
   return (payload.response?.games ?? [])
     .filter((game) => Number.isSafeInteger(game.appid) && typeof game.name === "string")

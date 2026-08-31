@@ -55,7 +55,6 @@ test("agrupa las sesiones en una sola estructura mensual y evita sumar fuentes d
     [["a", 300]],
   );
 });
-
 test("ignora sesiones cuyo juego ya no existe", () => {
   const sessions = [
     {

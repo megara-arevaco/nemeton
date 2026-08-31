@@ -1,5 +1,4 @@
 import type { LibraryGame } from "@launcher/core";
-
 export type AccentTheme = "forest" | "aurora" | "ember" | "amethyst" | "glacier";
 
 export const accentThemes: Array<{
@@ -51,10 +50,13 @@ export const formatLastPlayed = (value: string | null) => {
   if (!value) {
     return "Nunca";
   }
+
   const date = new Date(value);
+
   if (Number.isNaN(date.getTime())) {
     return "Nunca";
   }
+
   const today = new Date();
   const startOfToday = new Date(
     today.getFullYear(),
@@ -67,6 +69,7 @@ export const formatLastPlayed = (value: string | null) => {
     date.getDate(),
   ).getTime();
   const daysAgo = Math.round((startOfToday - startOfDate) / 86_400_000);
+
   if (daysAgo === 0) {
     return "Hoy";
   }

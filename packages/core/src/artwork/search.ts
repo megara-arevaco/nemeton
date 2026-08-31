@@ -1,5 +1,5 @@
 import type { ArtworkSuggestion } from "../shared/types.js";
-
+import { steamFallbackArtwork } from "./steam.js";
 interface SteamStoreSearchResponse {
   items?: Array<{ id?: number; name?: string }>;
 }
@@ -19,36 +19,37 @@ interface WikipediaSearchResponse {
 
 const searchSteamProvider = async (query: string): Promise<ArtworkSuggestion[]> => {
   const normalized = query.trim();
+
   if (normalized.length < 2) {
     return [];
   }
+
   const params = new URLSearchParams({ term: normalized, l: "spanish", cc: "ES" });
   const response = await fetch(
     `https://store.steampowered.com/api/storesearch/?${params}`,
     {
       headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10_000),
     },
   );
+
   if (!response.ok) {
     throw new Error("No se pudo consultar el catálogo de arte");
   }
+
   const payload = (await response.json()) as SteamStoreSearchResponse;
-  return (payload.items ?? []).slice(0, 6).flatMap((item) => {
+  const candidates = (payload.items ?? []).slice(0, 6).flatMap((item) => {
     if (!Number.isSafeInteger(item.id) || typeof item.name !== "string") {
       return [];
     }
-    const providerId = String(item.id);
-    const base = `https://cdn.cloudflare.steamstatic.com/steam/apps/${providerId}`;
-    return [
-      {
-        provider: "steam" as const,
-        providerId,
-        title: item.name,
-        coverUrl: `${base}/library_600x900_2x.jpg`,
-        heroUrl: `${base}/library_hero.jpg`,
-      },
-    ];
+    return [{ providerId: String(item.id), title: item.name }];
   });
+  return candidates.map(({ providerId, title }) => ({
+    provider: "steam" as const,
+    providerId,
+    title,
+    ...steamFallbackArtwork(providerId),
+  }));
 };
 
 const searchWikipediaArtwork = async (query: string): Promise<ArtworkSuggestion[]> => {
@@ -70,23 +71,28 @@ const searchWikipediaArtwork = async (query: string): Promise<ArtworkSuggestion[
   });
   const response = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, {
     headers: { Accept: "application/json", "User-Agent": "LauncherNext/0.1" },
+    signal: AbortSignal.timeout(10_000),
   });
+
   if (!response.ok) {
     return [];
   }
+
   const payload = (await response.json()) as WikipediaSearchResponse;
   return (payload.query?.pages ?? [])
     .sort((a, b) => (a.index ?? 99) - (b.index ?? 99))
     .flatMap((page) => {
       const imageUrl = page.thumbnail?.source ?? page.original?.source;
       const description = page.terms?.description?.[0]?.toLowerCase() ?? "";
+
       if (
         !page.pageid ||
         !page.title ||
         !imageUrl ||
         (!description.includes("video game") && !description.includes("videojuego"))
-      )
+      ) {
         return [];
+      }
       return [
         {
           provider: "wikipedia" as const,
@@ -104,9 +110,11 @@ export const searchSteamArtwork = async (
   query: string,
 ): Promise<ArtworkSuggestion[]> => {
   const normalized = query.trim();
+
   if (normalized.length < 2) {
     return [];
   }
+
   const [steam, wikipedia] = await Promise.all([
     searchSteamProvider(normalized).catch(() => []),
     searchWikipediaArtwork(normalized).catch(() => []),

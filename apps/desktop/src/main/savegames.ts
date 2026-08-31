@@ -2,8 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { strToU8, unzipSync, zipSync } from "fflate";
-
+import { strToU8, unzip, zip } from "fflate";
 export interface SavegameVersion {
   id: string;
   createdAt: string;
@@ -41,6 +40,7 @@ interface SavegameConfig {
   policies?: Record<string, SavegamePolicy>;
   learned?: Record<string, string[]>;
 }
+
 interface SnapshotFile {
   rootIndex: number;
   rootKey?: string;
@@ -49,6 +49,7 @@ interface SnapshotFile {
   size: number;
   archivePath?: string;
 }
+
 interface SnapshotManifest extends SavegameVersion {
   files: SnapshotFile[];
 }
@@ -60,7 +61,9 @@ const emptyConfig = (): SavegameConfig => ({
   policies: {},
   learned: {},
 });
+
 const safeSegment = (value: string) => value.replace(/[^a-z0-9_-]/gi, "_");
+
 const defaultPolicy = (): SavegamePolicy => ({
   autoBackup: true,
   backupBeforeLaunch: false,
@@ -70,8 +73,10 @@ const defaultPolicy = (): SavegamePolicy => ({
   exactRestore: false,
   includeConfig: false,
 });
+
 const rootKey = (root: string) => {
   const normalized = path.resolve(root).replaceAll("\\", "/").toLocaleLowerCase();
+
   for (const [marker, label] of [
     ["/documents/", "documents"],
     ["/saved games/", "saved-games"],
@@ -80,17 +85,47 @@ const rootKey = (root: string) => {
     ["/appdata/locallow/", "local-low"],
   ] as const) {
     const index = normalized.indexOf(marker);
-    if (index >= 0)
+
+    if (index >= 0) {
       return `${label}:${safeSegment(normalized.slice(index + marker.length))}`;
+    }
   }
   return `custom:${safeSegment(path.basename(normalized)) || "root"}`;
 };
 
+const zipAsync = (files: Record<string, Uint8Array>) =>
+  new Promise<Uint8Array>((resolve, reject) => {
+    zip(files, { level: 6 }, (error, data) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(data);
+    });
+  });
+
+const unzipAsync = (bytes: Uint8Array) =>
+  new Promise<Record<string, Uint8Array>>((resolve, reject) => {
+    unzip(bytes, (error, data) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(data);
+    });
+  });
+
 export class SavegameManager {
+  private readonly suggestionCache = new Map<
+    string,
+    { expiresAt: number; suggestions: SavegameSuggestion[] }
+  >();
+
   constructor(private readonly configPath: string) {}
 
   private async readConfig(): Promise<SavegameConfig> {
     const raw = await fs.promises.readFile(this.configPath, "utf8").catch(() => null);
+
     if (!raw) {
       const config = emptyConfig();
       await this.writeConfig(config);
@@ -143,7 +178,11 @@ export class SavegameManager {
 
   async addPath(gameId: string, folderPath: string) {
     const info = await fs.promises.stat(folderPath).catch(() => null);
-    if (!info?.isDirectory()) throw new Error("La carpeta de partidas no existe");
+
+    if (!info?.isDirectory()) {
+      throw new Error("La carpeta de partidas no existe");
+    }
+
     const config = await this.readConfig();
     config.games[gameId] = [
       ...new Set([...(config.games[gameId] ?? []), path.resolve(folderPath)]),
@@ -162,7 +201,10 @@ export class SavegameManager {
   }
 
   async removeInstallRoot(gameId: string, executablePath: string) {
-    if (!executablePath) return this.getPaths(gameId);
+    if (!executablePath) {
+      return this.getPaths(gameId);
+    }
+
     const executable = path.resolve(executablePath);
     const config = await this.readConfig();
     const current = config.games[gameId] ?? [];
@@ -170,7 +212,9 @@ export class SavegameManager {
       const root = path.resolve(item);
       return executable !== root && !executable.startsWith(`${root}${path.sep}`);
     });
-    if (config.games[gameId]!.length !== current.length) await this.writeConfig(config);
+    if (config.games[gameId]!.length !== current.length) {
+      await this.writeConfig(config);
+    }
     return config.games[gameId]!;
   }
 
@@ -186,22 +230,36 @@ export class SavegameManager {
     const snapshot = new Map<string, number>();
     let visited = 0;
     const walk = async (directory: string, depth: number): Promise<void> => {
-      if (visited++ >= 2_500 || depth > 3) return;
+      if (visited++ >= 2_500 || depth > 3) {
+        return;
+      }
+
       const entries = await fs.promises
         .readdir(directory, { withFileTypes: true })
         .catch(() => []);
+
       for (const entry of entries) {
-        if (/^\.|^(cache|logs?|temp|tmp|node_modules)$/i.test(entry.name)) continue;
+        if (/^\.|^(cache|logs?|temp|tmp|node_modules)$/i.test(entry.name)) {
+          continue;
+        }
+
         const absolute = path.join(directory, entry.name);
-        if (entry.isDirectory() && !entry.isSymbolicLink())
+
+        if (entry.isDirectory() && !entry.isSymbolicLink()) {
           await walk(absolute, depth + 1);
-        else if (entry.isFile()) {
+        } else if (entry.isFile()) {
           const info = await fs.promises.stat(absolute).catch(() => null);
-          if (info) snapshot.set(absolute, info.mtimeMs);
+
+          if (info) {
+            snapshot.set(absolute, info.mtimeMs);
+          }
         }
       }
     };
-    for (const root of roots) await walk(root, 0);
+
+    for (const root of roots) {
+      await walk(root, 0);
+    }
     return snapshot;
   }
 
@@ -219,7 +277,11 @@ export class SavegameManager {
             /(^|[\\/])(save|saves|savegames?|saved games)([\\/]|$)/i.test(file)),
       )
       .map(([file]) => path.dirname(file));
-    if (!changed.length) return [];
+
+    if (!changed.length) {
+      return [];
+    }
+
     const config = await this.readConfig();
     config.learned ??= {};
     config.learned[gameTitle] = [
@@ -236,7 +298,23 @@ export class SavegameManager {
     steamAppId?: string | null,
     ludusavi?: { name: string; files: Array<{ path: string; tags: string[] }> } | null,
     includeConfig = false,
+    scanHeuristics = true,
   ): Promise<SavegameSuggestion[]> {
+    const cacheKey = JSON.stringify([
+      gameTitle,
+      roamingAppData,
+      executablePath,
+      steamAppId,
+      ludusavi?.name,
+      includeConfig,
+      scanHeuristics,
+    ]);
+    const cached = this.suggestionCache.get(cacheKey);
+
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.suggestions;
+    }
+
     const profile = path.dirname(path.dirname(roamingAppData));
     const executableDirectory = executablePath ? path.dirname(executablePath) : "";
     const roots = [
@@ -281,18 +359,22 @@ export class SavegameManager {
     ]);
     const found = new Map<string, SavegameSuggestion>();
     const learned = (await this.readConfig()).learned?.[gameTitle] ?? [];
+
     for (const learnedPath of learned) {
       const info = await fs.promises.stat(learnedPath).catch(() => null);
+
       if (
         info?.isDirectory() &&
         /(^|[\\/])(save|saves|savegames?|saved games)([\\/]|$)/i.test(learnedPath)
-      )
+      ) {
         found.set(learnedPath, {
           path: learnedPath,
           confidence: "high",
           reason: "Archivos de partida modificados mientras jugabas",
         });
+      }
     }
+
     let visited = 0;
 
     if (ludusavi) {
@@ -311,35 +393,54 @@ export class SavegameManager {
         "<storeGameId>": steamAppId ?? "",
         "<storeUserId>": "*",
       };
+
       for (const manifestFile of ludusavi.files) {
         if (
           !includeConfig &&
           manifestFile.tags.includes("config") &&
           !manifestFile.tags.includes("save")
-        )
+        ) {
           continue;
+        }
+
         const manifestPath = manifestFile.path;
+
         if (
           (manifestPath.includes("<base>") || manifestPath.includes("<root>")) &&
           !executableDirectory
-        )
+        ) {
           continue;
+        }
+
         let resolved = manifestPath;
-        for (const [placeholder, value] of Object.entries(replacements))
+
+        for (const [placeholder, value] of Object.entries(replacements)) {
           resolved = resolved.replaceAll(placeholder, value);
-        if (!resolved || /<[^>]+>/.test(resolved)) continue;
+        }
+        if (!resolved || /<[^>]+>/.test(resolved)) {
+          continue;
+        }
         resolved = path.resolve(resolved.replaceAll("/", path.sep));
         const allowed = [...roots, profile].some((root) =>
           resolved.startsWith(path.resolve(root)),
         );
-        if (!allowed) continue;
+
+        if (!allowed) {
+          continue;
+        }
+
         const matches: string[] = [];
+
         if (/[*?{}[\]]/.test(resolved)) {
           for await (const match of fs.promises.glob(resolved)) {
             matches.push(match);
-            if (matches.length >= 100) break;
+            if (matches.length >= 100) {
+              break;
+            }
           }
-        } else matches.push(resolved);
+        } else {
+          matches.push(resolved);
+        }
         for (const match of matches) {
           const info = await fs.promises.stat(match).catch(() => null);
           const directory = info?.isDirectory()
@@ -347,12 +448,14 @@ export class SavegameManager {
             : info?.isFile()
               ? path.dirname(match)
               : null;
-          if (directory)
+
+          if (directory) {
             found.set(directory, {
               path: directory,
               confidence: "high",
               reason: `Ruta conocida de Ludusavi para ${ludusavi.name}`,
             });
+          }
         }
       }
     }
@@ -362,7 +465,10 @@ export class SavegameManager {
       depth: number,
       root: string,
     ): Promise<void> => {
-      if (visited++ >= 2_000) return;
+      if (visited++ >= 2_000) {
+        return;
+      }
+
       const entries = await fs.promises
         .readdir(directory, { withFileTypes: true })
         .catch(() => []);
@@ -385,6 +491,7 @@ export class SavegameManager {
             /^(save|slot|profile|checkpoint)/i.test(entry.name)),
       );
       const appIdMatch = Boolean(steamAppId && normalizedSegments.includes(steamAppId));
+
       if ((matchingIdentifier || appIdMatch) && (hasSaveFile || depth < 2)) {
         const confidence =
           appIdMatch || (matchingIdentifier && hasSaveFile)
@@ -403,34 +510,48 @@ export class SavegameManager {
           reason,
         } satisfies SavegameSuggestion;
         const previous = found.get(directory);
+
         if (
           !previous ||
           ["low", "medium", "high"].indexOf(candidate.confidence) >
             ["low", "medium", "high"].indexOf(previous.confidence)
-        )
+        ) {
           found.set(directory, candidate);
+        }
       }
-      if (depth >= 3) return;
+      if (depth >= 3) {
+        return;
+      }
       for (const entry of entries) {
         if (
           !entry.isDirectory() ||
           entry.isSymbolicLink() ||
           /^\.|^(cache|logs?|temp|tmp|node_modules)$/i.test(entry.name)
-        )
+        ) {
           continue;
+        }
         await inspect(path.join(directory, entry.name), depth + 1, root);
       }
     };
-    for (const root of roots) {
-      await inspect(root, 0, root);
+
+    if (scanHeuristics) {
+      for (const root of roots) {
+        await inspect(root, 0, root);
+      }
     }
+
     const rank = { high: 2, medium: 1, low: 0 } as const;
-    return [...found.values()]
+    const suggestions = [...found.values()]
       .sort(
         (a, b) =>
           rank[b.confidence] - rank[a.confidence] || a.path.localeCompare(b.path),
       )
       .slice(0, 20);
+    this.suggestionCache.set(cacheKey, {
+      expiresAt: Date.now() + 5 * 60_000,
+      suggestions,
+    });
+    return suggestions;
   }
 
   private gameRoot(syncFolder: string, sourceId: string) {
@@ -441,17 +562,31 @@ export class SavegameManager {
     const gameRoot = this.gameRoot(syncFolder, sourceId);
     const versions: SavegameVersion[] = [];
     const archiveDirectory = path.join(gameRoot, "versions");
+    const directory = path.join(gameRoot, "snapshots");
+    const entries = await fs.promises
+      .readdir(directory, { withFileTypes: true })
+      .catch(() => []);
     const archives = await fs.promises
       .readdir(archiveDirectory, { withFileTypes: true })
       .catch(() => []);
+    const snapshotIds = new Set(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+        .map((entry) => entry.name.slice(0, -5)),
+    );
+
     for (const entry of archives) {
-      if (!entry.isFile() || !entry.name.endsWith(".zip")) continue;
+      if (!entry.isFile() || !entry.name.endsWith(".zip")) {
+        continue;
+      }
+      if (snapshotIds.has(entry.name.slice(0, -4))) {
+        continue;
+      }
       try {
-        const archive = unzipSync(
+        const archive = await unzipAsync(
           new Uint8Array(
             await fs.promises.readFile(path.join(archiveDirectory, entry.name)),
           ),
-          { filter: (file) => file.name === "manifest.json" },
         );
         const manifest = JSON.parse(
           Buffer.from(archive["manifest.json"]!).toString("utf8"),
@@ -469,16 +604,18 @@ export class SavegameManager {
         /* Ignore an archive while Drive is downloading it. */
       }
     }
-    const directory = path.join(gameRoot, "snapshots");
-    const entries = await fs.promises
-      .readdir(directory, { withFileTypes: true })
-      .catch(() => []);
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+      if (!entry.isFile() || !entry.name.endsWith(".json")) {
+        continue;
+      }
+
       const raw = await fs.promises
         .readFile(path.join(directory, entry.name), "utf8")
         .catch(() => null);
-      if (!raw) continue;
+
+      if (!raw) {
+        continue;
+      }
       try {
         const manifest = JSON.parse(raw) as SnapshotManifest;
         versions.push({
@@ -497,22 +634,32 @@ export class SavegameManager {
     return versions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  async currentMatchesLatest(gameId: string, sourceId: string, syncFolder: string) {
+  private async currentSignature(gameId: string) {
     const roots = await this.getPaths(gameId);
-    const versions = await this.listVersions(syncFolder, sourceId);
-    if (!roots.length || !versions[0]) return false;
+
+    if (!roots.length) {
+      return null;
+    }
+
     const policy = await this.getPolicy(gameId);
     const files: Array<{ rootIndex: number; relativePath: string; hash: string }> = [];
+
     for (const [rootIndex, root] of roots.entries()) {
       const walk = async (directory: string): Promise<void> => {
         const entries = await fs.promises
           .readdir(directory, { withFileTypes: true })
           .catch(() => []);
+
         for (const entry of entries) {
-          if (policy.excludedNames.includes(entry.name.toLocaleLowerCase())) continue;
+          if (policy.excludedNames.includes(entry.name.toLocaleLowerCase())) {
+            continue;
+          }
+
           const absolute = path.join(directory, entry.name);
-          if (entry.isDirectory() && !entry.isSymbolicLink()) await walk(absolute);
-          else if (entry.isFile()) {
+
+          if (entry.isDirectory() && !entry.isSymbolicLink()) {
+            await walk(absolute);
+          } else if (entry.isFile()) {
             const bytes = await fs.promises.readFile(absolute);
             files.push({
               rootIndex,
@@ -533,24 +680,38 @@ export class SavegameManager {
       .update(JSON.stringify(files))
       .digest("hex")
       .slice(0, 12);
-    return versions[0].id.endsWith(signature);
+    return signature;
+  }
+
+  async currentMatchesLatest(gameId: string, latestVersion?: SavegameVersion) {
+    if (!latestVersion) {
+      return false;
+    }
+
+    const signature = await this.currentSignature(gameId);
+    return Boolean(signature && latestVersion.id.endsWith(signature));
   }
 
   async detectExternalConflict(
     gameId: string,
     sourceId: string,
     syncFolder: string,
+    latestVersion?: SavegameVersion,
+    currentMatchesLatest?: boolean,
   ): Promise<SavegameConflict | null> {
-    const [config, versions] = await Promise.all([
+    const [config, latest] = await Promise.all([
       this.readConfig(),
-      this.listVersions(syncFolder, sourceId),
+      latestVersion
+        ? Promise.resolve(latestVersion)
+        : this.listVersions(syncFolder, sourceId).then((versions) => versions[0]),
     ]);
-    const latest = versions[0];
+
     if (!latest || latest.deviceId === config.deviceId) {
       return null;
     }
 
-    const matchesLatest = await this.currentMatchesLatest(gameId, sourceId, syncFolder);
+    const matchesLatest =
+      currentMatchesLatest ?? (await this.currentMatchesLatest(gameId, latest));
     return matchesLatest ? null : { remoteVersion: latest };
   }
 
@@ -562,32 +723,47 @@ export class SavegameManager {
     const config = await this.readConfig();
     const roots = config.games[gameId] ?? [];
     const policy = { ...defaultPolicy(), ...config.policies?.[gameId] };
-    if (roots.length === 0) return null;
+
+    if (roots.length === 0) {
+      return null;
+    }
+
     const gameRoot = this.gameRoot(syncFolder, sourceId);
     const archiveRoot = path.join(gameRoot, "versions");
     await fs.promises.mkdir(archiveRoot, { recursive: true });
     const files: SnapshotFile[] = [];
     const archiveFiles: Record<string, Uint8Array> = {};
+    let totalSize = 0;
+
     for (const [rootIndex, root] of roots.entries()) {
       const walk = async (directory: string) => {
         const entries = await fs.promises
           .readdir(directory, { withFileTypes: true })
           .catch(() => []);
+
         for (const entry of entries) {
           const absolute = path.join(directory, entry.name);
-          if (policy.excludedNames.includes(entry.name.toLocaleLowerCase())) continue;
-          if (entry.isDirectory()) await walk(absolute);
-          else if (entry.isFile()) {
+
+          if (policy.excludedNames.includes(entry.name.toLocaleLowerCase())) {
+            continue;
+          }
+          if (entry.isDirectory()) {
+            await walk(absolute);
+          } else if (entry.isFile()) {
             const stat = await fs.promises.stat(absolute);
-            if (stat.size > policy.maxSizeMb * 1024 * 1024)
+
+            if (stat.size > policy.maxSizeMb * 1024 * 1024) {
               throw new Error(
                 `El archivo ${entry.name} supera el límite de ${policy.maxSizeMb} MB`,
               );
+            }
+
             const bytes = await fs.promises.readFile(absolute);
             const hash = createHash("sha256").update(bytes).digest("hex");
             const relativePath = path.relative(root, absolute);
             const archivePath = `files/${rootIndex}/${relativePath.split(path.sep).map(safeSegment).join("/")}`;
             archiveFiles[archivePath] = new Uint8Array(bytes);
+            totalSize += bytes.length;
             files.push({
               rootIndex,
               rootKey: rootKey(root),
@@ -596,12 +772,9 @@ export class SavegameManager {
               size: bytes.length,
               archivePath,
             });
-            if (
-              files.length > 100_000 ||
-              files.reduce((sum, file) => sum + file.size, 0) >
-                policy.maxSizeMb * 1024 * 1024
-            )
+            if (files.length > 100_000 || totalSize > policy.maxSizeMb * 1024 * 1024) {
               throw new Error(`La copia supera el límite de ${policy.maxSizeMb} MB`);
+            }
           }
         }
       };
@@ -624,7 +797,11 @@ export class SavegameManager {
       )
       .digest("hex");
     const versions = await this.listVersions(syncFolder, sourceId);
-    if (versions[0]?.id.endsWith(signature.slice(0, 12))) return versions[0];
+
+    if (versions[0]?.id.endsWith(signature.slice(0, 12))) {
+      return versions[0];
+    }
+
     const createdAt = new Date().toISOString();
     const id = `${createdAt.replace(/[:.]/g, "-")}-${safeSegment(config.deviceId)}-${signature.slice(0, 12)}`;
     const manifest: SnapshotManifest = {
@@ -632,15 +809,23 @@ export class SavegameManager {
       createdAt,
       deviceId: config.deviceId,
       deviceName: config.deviceName,
-      sizeBytes: files.reduce((sum, file) => sum + file.size, 0),
+      sizeBytes: totalSize,
       fileCount: files.length,
       files,
     };
     archiveFiles["manifest.json"] = strToU8(JSON.stringify(manifest, null, 2));
     const target = path.join(archiveRoot, `${id}.zip`);
     const temporary = `${target}.tmp`;
-    await fs.promises.writeFile(temporary, zipSync(archiveFiles, { level: 6 }));
+    await fs.promises.writeFile(temporary, await zipAsync(archiveFiles));
     await fs.promises.rename(temporary, target);
+    const snapshotRoot = path.join(gameRoot, "snapshots");
+    await fs.promises.mkdir(snapshotRoot, { recursive: true });
+    const manifestPath = path.join(snapshotRoot, `${id}.json`);
+    await fs.promises.writeFile(
+      `${manifestPath}.tmp`,
+      JSON.stringify(manifest, null, 2),
+    );
+    await fs.promises.rename(`${manifestPath}.tmp`, manifestPath);
     await this.prune(syncFolder, sourceId, policy.maxVersions);
     return manifest;
   }
@@ -651,6 +836,7 @@ export class SavegameManager {
     const archiveRoot = path.join(gameRoot, "versions");
     const versions = await this.listVersions(syncFolder, sourceId);
     const removable = versions.filter((version) => !version.pinned).slice(maxVersions);
+
     for (const version of removable) {
       await fs.promises
         .unlink(path.join(archiveRoot, `${version.id}.zip`))
@@ -659,24 +845,33 @@ export class SavegameManager {
         .unlink(path.join(snapshotRoot, `${version.id}.json`))
         .catch(() => undefined);
     }
+
     const retained = await this.listVersions(syncFolder, sourceId);
     const hashes = new Set<string>();
+
     for (const version of retained) {
       const raw = await fs.promises
         .readFile(path.join(snapshotRoot, `${version.id}.json`), "utf8")
         .catch(() => null);
-      if (raw)
-        for (const file of (JSON.parse(raw) as SnapshotManifest).files)
+
+      if (raw) {
+        for (const file of (JSON.parse(raw) as SnapshotManifest).files) {
           hashes.add(file.hash);
+        }
+      }
     }
+
     const blobRoot = path.join(gameRoot, "blobs");
+
     for (const entry of await fs.promises
       .readdir(blobRoot, { withFileTypes: true })
-      .catch(() => []))
-      if (entry.isFile() && !hashes.has(entry.name))
+      .catch(() => [])) {
+      if (entry.isFile() && !hashes.has(entry.name)) {
         await fs.promises
           .unlink(path.join(blobRoot, entry.name))
           .catch(() => undefined);
+      }
+    }
   }
 
   async setPinned(
@@ -690,27 +885,28 @@ export class SavegameManager {
       "versions",
       `${versionId}.zip`,
     );
-    const archiveBytes = await fs.promises.readFile(archivePath).catch(() => null);
-    if (archiveBytes) {
-      const archive = unzipSync(new Uint8Array(archiveBytes));
+    const manifestPath = path.join(
+      this.gameRoot(syncFolder, sourceId),
+      "snapshots",
+      `${versionId}.json`,
+    );
+    const raw = await fs.promises.readFile(manifestPath, "utf8").catch(() => null);
+
+    if (!raw) {
+      const archiveBytes = await fs.promises.readFile(archivePath);
+      const archive = await unzipAsync(new Uint8Array(archiveBytes));
       const manifest = JSON.parse(
         Buffer.from(archive["manifest.json"]!).toString("utf8"),
       ) as SnapshotManifest;
       manifest.pinned = pinned;
       archive["manifest.json"] = strToU8(JSON.stringify(manifest, null, 2));
       const temporary = `${archivePath}.tmp`;
-      await fs.promises.writeFile(temporary, zipSync(archive, { level: 6 }));
+      await fs.promises.writeFile(temporary, await zipAsync(archive));
       await fs.promises.rename(temporary, archivePath);
       return this.listVersions(syncFolder, sourceId);
     }
-    const manifestPath = path.join(
-      this.gameRoot(syncFolder, sourceId),
-      "snapshots",
-      `${versionId}.json`,
-    );
-    const manifest = JSON.parse(
-      await fs.promises.readFile(manifestPath, "utf8"),
-    ) as SnapshotManifest;
+
+    const manifest = JSON.parse(raw) as SnapshotManifest;
     manifest.pinned = pinned;
     const temporary = `${manifestPath}.tmp`;
     await fs.promises.writeFile(temporary, JSON.stringify(manifest, null, 2));
@@ -725,30 +921,44 @@ export class SavegameManager {
     versionId: string,
   ) {
     const roots = await this.getPaths(gameId);
-    if (roots.length === 0)
+
+    if (roots.length === 0) {
       throw new Error("Configura primero una carpeta local de partidas");
+    }
+
     const gameRoot = this.gameRoot(syncFolder, sourceId);
     const archiveBytes = await fs.promises
       .readFile(path.join(gameRoot, "versions", `${versionId}.zip`))
       .catch(() => null);
-    const archive = archiveBytes ? unzipSync(new Uint8Array(archiveBytes)) : null;
-    const raw = archive
-      ? Buffer.from(archive["manifest.json"]!).toString("utf8")
-      : await fs.promises.readFile(
-          path.join(gameRoot, "snapshots", `${versionId}.json`),
-          "utf8",
-        );
+    const archive = archiveBytes
+      ? await unzipAsync(new Uint8Array(archiveBytes))
+      : null;
+    const raw = await fs.promises
+      .readFile(path.join(gameRoot, "snapshots", `${versionId}.json`), "utf8")
+      .catch(() =>
+        archive ? Buffer.from(archive["manifest.json"]!).toString("utf8") : null,
+      );
+
+    if (!raw) {
+      throw new Error("No se encontró la copia de partidas");
+    }
+
     const manifest = JSON.parse(raw) as SnapshotManifest;
     const policy = await this.getPolicy(gameId);
+
     if (policy.exactRestore) {
       for (const root of roots) {
         const info = await fs.promises.stat(root).catch(() => null);
-        if (!info?.isDirectory()) continue;
-        for (const entry of await fs.promises.readdir(root))
+
+        if (!info?.isDirectory()) {
+          continue;
+        }
+        for (const entry of await fs.promises.readdir(root)) {
           await fs.promises.rm(path.join(root, entry), {
             recursive: true,
             force: true,
           });
+        }
       }
     }
     for (const file of manifest.files) {
@@ -756,17 +966,25 @@ export class SavegameManager {
         ? (roots.find((item) => rootKey(item) === file.rootKey) ??
           roots[file.rootIndex])
         : roots[file.rootIndex];
-      if (!root) continue;
+
+      if (!root) {
+        continue;
+      }
+
       const target = path.resolve(root, file.relativePath);
-      if (!target.startsWith(`${path.resolve(root)}${path.sep}`))
+
+      if (!target.startsWith(`${path.resolve(root)}${path.sep}`)) {
         throw new Error("La copia contiene una ruta no válida");
+      }
       await fs.promises.mkdir(path.dirname(target), { recursive: true });
       const bytes =
         archive && file.archivePath
           ? Buffer.from(archive[file.archivePath]!)
           : await fs.promises.readFile(path.join(gameRoot, "blobs", file.hash));
-      if (createHash("sha256").update(bytes).digest("hex") !== file.hash)
+
+      if (createHash("sha256").update(bytes).digest("hex") !== file.hash) {
         throw new Error(`La copia está dañada: ${file.relativePath}`);
+      }
       await fs.promises.writeFile(target, bytes);
     }
     return { restoredFiles: manifest.files.length };

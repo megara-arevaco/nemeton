@@ -4,16 +4,19 @@ import { parse } from "yaml";
 
 const MANIFEST_URL =
   "https://raw.githubusercontent.com/mtkennerly/ludusavi-manifest/master/data/manifest.yaml";
+
 const MAX_CACHE_AGE = 24 * 60 * 60 * 1_000;
 
 interface ManifestGame {
   steam?: { id?: number | string };
   files?: Record<string, { tags?: string[] }>;
 }
+
 interface CacheFile {
   updatedAt: string;
   games: LudusaviGame[];
 }
+
 export interface LudusaviGame {
   name: string;
   steamAppId: string | null;
@@ -39,7 +42,10 @@ export class LudusaviCatalog {
 
   private async readCache() {
     const raw = await fs.promises.readFile(this.cachePath, "utf8").catch(() => null);
-    if (!raw) return null;
+
+    if (!raw) {
+      return null;
+    }
     try {
       return JSON.parse(raw) as CacheFile;
     } catch {
@@ -48,19 +54,25 @@ export class LudusaviCatalog {
   }
 
   private async load(): Promise<LudusaviGame[]> {
-    if (this.games) return this.games;
-    if (this.loading) return this.loading;
+    if (this.games) {
+      return this.games;
+    }
+    if (this.loading) {
+      return this.loading;
+    }
     this.loading = (async () => {
       const cached = await this.readCache();
       const fresh =
         cached && Date.now() - new Date(cached.updatedAt).getTime() < MAX_CACHE_AGE;
-      if (fresh)
+
+      if (fresh) {
         return (this.games = cached.games.map((game) => ({
           ...game,
           files: (game.files ?? []).map((file) =>
             typeof file === "string" ? { path: file, tags: [] } : file,
           ),
         })));
+      }
       try {
         const document = parse(await this.fetchText(MANIFEST_URL)) as Record<
           string,
@@ -84,13 +96,14 @@ export class LudusaviCatalog {
         );
         return (this.games = games);
       } catch (error) {
-        if (cached)
+        if (cached) {
           return (this.games = cached.games.map((game) => ({
             ...game,
             files: (game.files ?? []).map((file) =>
               typeof file === "string" ? { path: file, tags: [] } : file,
             ),
           })));
+        }
         throw error;
       }
     })().finally(() => {
@@ -101,7 +114,11 @@ export class LudusaviCatalog {
 
   async search(query: string): Promise<LudusaviGame[]> {
     const wanted = normalize(query);
-    if (wanted.length < 2) return [];
+
+    if (wanted.length < 2) {
+      return [];
+    }
+
     const words = wanted.split(" ");
     return (await this.load())
       .map((game) => {
@@ -120,8 +137,12 @@ export class LudusaviCatalog {
       })
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score || a.game.name.localeCompare(b.game.name))
-      .slice(0, 8)
+      .slice(0, 30)
       .map(({ game }) => game);
+  }
+
+  async warmup() {
+    await this.load();
   }
 
   async find(name: string) {
@@ -130,10 +151,15 @@ export class LudusaviCatalog {
 
   async match(title: string, steamAppId?: string | null) {
     const games = await this.load();
+
     if (steamAppId) {
       const byId = games.find((game) => game.steamAppId === steamAppId);
-      if (byId) return byId;
+
+      if (byId) {
+        return byId;
+      }
     }
+
     const wanted = normalize(title);
     return games.find((game) => normalize(game.name) === wanted) ?? null;
   }

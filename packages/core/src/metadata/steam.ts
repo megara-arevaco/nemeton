@@ -1,5 +1,4 @@
 import type { GameMetadata } from "../shared/types.js";
-
 interface SteamAppDetails {
   success?: unknown;
   data?: {
@@ -35,11 +34,13 @@ export const parseSteamGameMetadata = (
   }
 
   const response = (payload as Record<string, unknown>)[appId];
+
   if (!response || typeof response !== "object" || Array.isArray(response)) {
     return null;
   }
 
   const { success, data } = response as SteamAppDetails;
+
   if (success !== true || !data || typeof data !== "object") {
     return null;
   }
@@ -80,8 +81,9 @@ export const fetchSteamGameMetadata = async (
   const query = new URLSearchParams({ appids: appId, l: "spanish", cc: "ES" });
   const response = await fetch(
     `https://store.steampowered.com/api/appdetails?${query}`,
-    { headers: { Accept: "application/json" } },
+    { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(10_000) },
   );
+
   if (!response.ok) {
     throw new Error("No se pudo consultar la ficha de Steam");
   }

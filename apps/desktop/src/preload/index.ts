@@ -14,6 +14,8 @@ const api = {
     ipcRenderer.invoke("window:toggle-maximize"),
   closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
   listGames: (): Promise<LibrarySnapshot> => ipcRenderer.invoke("library:list"),
+  getWorkspaceStatus: (): Promise<{ branch: string | null }> =>
+    ipcRenderer.invoke("workspace:status"),
   getGameMetadata: (gameId: string): Promise<GameMetadata | null> =>
     ipcRenderer.invoke("library:metadata", gameId),
   getSteamSettings: (): Promise<SteamAccountSettings> =>
@@ -217,5 +219,4 @@ const api = {
 };
 
 contextBridge.exposeInMainWorld("launcher", api);
-
 export type LauncherApi = typeof api;

@@ -1,18 +1,20 @@
 import type { LibraryGame } from "@launcher/core";
+import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { Play } from "@phosphor-icons/react/Play";
-import styles from "./GameLaunchButton.module.scss";
+import { Button } from "../Button";
 import { useGameLaunchButton } from "./GameLaunchButton.hook";
-
 export interface GameLaunchButtonProps {
   game: LibraryGame;
   isRunning: boolean;
   onLaunch: () => void;
+  onConfigureExecutable: () => void;
 }
 
 export function GameLaunchButton({
   game,
   isRunning,
   onLaunch,
+  onConfigureExecutable,
 }: Readonly<GameLaunchButtonProps>) {
   const { disabled, label, status } = useGameLaunchButton({
     game,
@@ -20,14 +22,14 @@ export function GameLaunchButton({
   });
 
   return (
-    <button
-      className={`${styles.button} ${status === "running" ? styles.running : ""}`}
+    <Button
       disabled={disabled}
-      onClick={onLaunch}
-      type="button"
+      onClick={status === "unavailable" ? onConfigureExecutable : onLaunch}
+      size="large"
+      variant={status === "unavailable" || status === "running" ? "setup" : "primary"}
     >
-      <Play weight="fill" />
+      {status === "unavailable" ? <FolderOpen weight="bold" /> : <Play weight="fill" />}
       {label}
-    </button>
+    </Button>
   );
 }

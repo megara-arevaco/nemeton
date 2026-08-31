@@ -1,5 +1,4 @@
 import type { GameMetadata as GameMetadataDetails } from "@launcher/core";
-
 interface GameMetadataProps {
   metadata: GameMetadataDetails;
 }
@@ -20,28 +19,46 @@ export function GameMetadata({ metadata }: GameMetadataProps) {
   }
 
   return (
-    <section
+    <aside
       className={
-        "game-metadata [margin:24px_34px_0] [padding:24px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119] [&_h2]:[margin:0_0_15px] [&_h2]:[font-size:15px] [&_p]:[margin:0] [&_p]:[color:#a5a7b0] [&_p]:[font-size:13px] [&_p]:[line-height:1.6]"
+        "game-metadata [position:absolute] [z-index:1] [right:34px] [bottom:34px] [width:clamp(220px,_31%,_390px)] [padding:18px] [border:1px_solid_#ffffff0c] [border-radius:16px] [background:linear-gradient(160deg,_#191b2852,_#0b0d1466)] [box-shadow:0_12px_30px_#0000001a] [backdrop-filter:blur(10px)]"
       }
     >
-      <h2>Acerca del juego</h2>
-      {metadata.description && <p>{metadata.description}</p>}
+      <span
+        className={
+          "[margin-bottom:9px] [color:var(--accent-a)] [font-size:9px] [font-weight:800] [letter-spacing:1.6px]"
+        }
+      >
+        FICHA DEL JUEGO
+      </span>
+      <h2 className={"[margin:0_0_12px] [font-size:17px] [letter-spacing:-.35px]"}>
+        Acerca del juego
+      </h2>
+      {metadata.description && (
+        <p
+          className={
+            "[margin:0] [overflow:hidden] [color:#c4c6cd] [font-size:12px] [line-height:1.55] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3]"
+          }
+        >
+          {metadata.description}
+        </p>
+      )}
       {metadata.genres.length > 0 && (
         <div
           className={
-            "[display:flex] [flex-wrap:wrap] [gap:7px] [margin-top:18px] [&_span]:[padding:5px_9px] [&_span]:[border-radius:999px] [&_span]:[background:#ffffff0a] [&_span]:[color:#c0c3cd] [&_span]:[font-size:11px]"
+            "[display:flex] [flex-wrap:wrap] [gap:6px] [margin-top:14px] [&_span]:[padding:4px_7px] [&_span]:[border:1px_solid_#ffffff0d] [&_span]:[border-radius:999px] [&_span]:[background:#ffffff08] [&_span]:[color:#c7c9d1] [&_span]:[font-size:10px]"
           }
         >
-          {metadata.genres.map((genre) => (
+          {metadata.genres.slice(0, 4).map((genre) => (
             <span key={genre}>{genre}</span>
           ))}
+          {metadata.genres.length > 4 && <span>+{metadata.genres.length - 4}</span>}
         </div>
       )}
       {credits.length > 0 && (
         <dl
           className={
-            "[display:grid] [grid-template-columns:repeat(3,_minmax(0,_1fr))] [gap:16px] [margin:22px_0_0] [&_dt]:[margin-bottom:4px] [&_dt]:[color:#777a86] [&_dt]:[font-size:10px] [&_dt]:[font-weight:700] [&_dt]:[letter-spacing:1px] [&_dd]:[margin:0] [&_dd]:[color:#e1e2e7] [&_dd]:[font-size:12px]"
+            "[display:grid] [gap:7px] [margin:15px_0_0] [padding-top:12px] [border-top:1px_solid_#ffffff0d] [&_div]:[display:grid] [&_div]:[grid-template-columns:78px_minmax(0,_1fr)] [&_div]:[gap:9px] [&_dt]:[color:#8c8f99] [&_dt]:[font-size:9px] [&_dt]:[font-weight:800] [&_dt]:[letter-spacing:1px] [&_dd]:[margin:0] [&_dd]:[overflow:hidden] [&_dd]:[color:#ececf0] [&_dd]:[font-size:11px] [&_dd]:[text-align:right] [&_dd]:[text-overflow:ellipsis] [&_dd]:[white-space:nowrap]"
           }
         >
           {credits.map((credit) => (
@@ -52,6 +69,6 @@ export function GameMetadata({ metadata }: GameMetadataProps) {
           ))}
         </dl>
       )}
-    </section>
+    </aside>
   );
 }

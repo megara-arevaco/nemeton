@@ -4,13 +4,12 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { strToU8, unzipSync, zipSync } from "fflate";
-
 import { SavegameManager } from "./savegames.js";
-
 test("versions, deduplicates and restores manual save files", async () => {
   const root = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-next-saves-"),
   );
+
   try {
     const local = path.join(root, "local");
     const remote = path.join(root, "remote");
@@ -36,11 +35,11 @@ test("versions, deduplicates and restores manual save files", async () => {
     await fs.promises.rm(root, { recursive: true, force: true });
   }
 });
-
 test("detects nested save folders and explains the confidence", async () => {
   const root = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-next-detection-"),
   );
+
   try {
     const roaming = path.join(root, "profile", "AppData", "Roaming");
     const saves = path.join(
@@ -65,11 +64,11 @@ test("detects nested save folders and explains the confidence", async () => {
     await fs.promises.rm(root, { recursive: true, force: true });
   }
 });
-
 test("enforces retention and rejects a corrupted backup", async () => {
   const root = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-next-safety-"),
   );
+
   try {
     const local = path.join(root, "local");
     const remote = path.join(root, "remote");
@@ -81,6 +80,7 @@ test("enforces retention and rejects a corrupted backup", async () => {
       await fs.promises.writeFile(path.join(local, "save.sav"), content);
       await manager.backup("game", "source", remote);
     }
+
     const versions = await manager.listVersions(remote, "source");
     assert.equal(versions.length, 2);
     const archivePath = path.join(
@@ -104,11 +104,11 @@ test("enforces retention and rejects a corrupted backup", async () => {
     await fs.promises.rm(root, { recursive: true, force: true });
   }
 });
-
 test("detects changes that conflict with another device's latest version", async () => {
   const root = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-next-conflict-"),
   );
+
   try {
     const remote = path.join(root, "remote");
     const firstLocal = path.join(root, "first-local");

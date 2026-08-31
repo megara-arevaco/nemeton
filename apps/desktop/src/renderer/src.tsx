@@ -5,13 +5,11 @@ import "./styles.css";
 import { App } from "./components/App";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { queryClient } from "./queries/queryClient";
-
 const root = document.getElementById("root");
 
 if (!root) {
   throw new Error("Renderer root element is missing");
 }
-
 try {
   createRoot(root).render(
     <StrictMode>

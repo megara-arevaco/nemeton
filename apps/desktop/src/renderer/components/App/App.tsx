@@ -18,6 +18,7 @@ import { AddGameModal } from "../AddGameModal";
 import { ArtworkModal } from "../ArtworkModal";
 import { EditGameModal } from "../EditGameModal";
 import { GameLaunchButton } from "../GameLaunchButton";
+import { Button } from "../Button";
 import { GameMetadata } from "../GameMetadata";
 import { LibraryCollection } from "../LibraryCollection";
 import { SavegamesPanel } from "../SavegamesPanel";
@@ -40,9 +41,9 @@ export function App() {
     syncSettings,
     setSyncSettings,
     runningGameIds,
+    workspaceStatus,
     query,
     setQuery,
-    scanning,
     achievements,
     metadata,
     view,
@@ -76,7 +77,6 @@ export function App() {
     closeGameMenuFromContext,
     stopPropagation,
     hideBrokenImage,
-    importSteam,
     onLocalGameCreated,
     launchSelected,
     chooseCover,
@@ -142,18 +142,6 @@ export function App() {
                 </>
               )}
             </span>
-          )}
-          {view === "library" && (
-            <button
-              className={
-                "steam-import [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [padding:9px_14px] [border-radius:10px] [background:#ffffff0b] [cursor:pointer] [-webkit-app-region:no-drag] [&:disabled]:[opacity:.55]"
-              }
-              disabled={scanning}
-              onClick={() => importSteam()}
-            >
-              <SteamLogo />
-              {scanning ? "Buscando…" : "Importar Steam"}
-            </button>
           )}
           <div
             className={
@@ -221,7 +209,7 @@ export function App() {
               />
               <div
                 className={
-                  "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [width:60%] [height:100%] [padding:64px] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
+                  "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [width:58%] [height:100%] [padding:64px] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
                 }
               >
                 <span
@@ -259,29 +247,20 @@ export function App() {
                     game={selected}
                     isRunning={runningGameIds.has(selected.id)}
                     onLaunch={launchSelected}
+                    onConfigureExecutable={openEditor}
                   />
                   {selected.source === "local" && (
-                    <button
-                      className={
-                        "cover-button [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:12px_16px] [background:#ffffff0b] [cursor:pointer]"
-                      }
-                      onClick={openEditor}
-                    >
+                    <Button onClick={openEditor} variant="secondary">
                       <PencilSimple /> Editar
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className={
-                      "cover-button [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:12px_16px] [background:#ffffff0b] [cursor:pointer]"
-                    }
-                    onClick={() => chooseCover()}
-                  >
+                  <Button onClick={chooseCover} variant="secondary">
                     <Image /> Carátula
-                  </button>
+                  </Button>
                 </div>
               </div>
+              {metadata && <GameMetadata metadata={metadata} />}
             </section>
-            {metadata && <GameMetadata metadata={metadata} />}
             {selected.source === "local" &&
               achievements &&
               achievements.total === 0 && (
@@ -454,20 +433,25 @@ export function App() {
               className={
                 "play [background:linear-gradient(135deg,_var(--accent-a),_var(--accent-b))] [color:var(--accent-ink)] [box-shadow:0_12px_40px_color-mix(in_srgb,_var(--accent-a)_15%,_transparent)] [&:disabled]:[filter:grayscale(1)] [&:disabled]:[opacity:.45] [&:disabled]:[cursor:default] [&.running]:[filter:none] [&.running]:[opacity:1] [&.running]:[background:#a9fb7617] [&.running]:[color:#a9fb76] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running:disabled]:[filter:none] [&.running:disabled]:[opacity:1] [&.running:disabled]:[background:#a9fb7617] [&.running:disabled]:[color:#a9fb76] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running]:[color:var(--accent-a)] [&.running]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] [&.running:disabled]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running:disabled]:[color:var(--accent-a)] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)]"
               }
-              disabled={scanning}
-              onClick={() => importSteam()}
+              onClick={openSettings}
             >
-              <SteamLogo /> Importar desde Steam
+              <SteamLogo /> Configurar Steam
             </button>
           </section>
         )}
         <footer>
           {message}
-          <span>
-            {syncSettings?.folderPath
-              ? "Sincronización automática activa"
-              : "Sin sincronización"}
-          </span>
+          <div className="statusbar-meta">
+            <span title="Branch Git actual">⎇ {workspaceStatus?.branch ?? "…"}</span>
+            <span title="Escribe /status en Codex para ver tus límites de 5 horas y semanales">
+              Codex · /status
+            </span>
+            <span>
+              {syncSettings?.folderPath
+                ? "Sincronización automática activa"
+                : "Sin sincronización"}
+            </span>
+          </div>
         </footer>
       </section>
       {showAddGame && (

@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import type { GameSession, LibraryGame } from "@launcher/core";
 import { formatPlaytime } from "../../shared/presentation";
-
 export interface MonthlyActivity {
   month: number;
   entries: Array<{ game: LibraryGame; seconds: number }>;
@@ -20,17 +19,20 @@ export function buildMonthlyActivity(
 
   for (const session of sessions) {
     const date = new Date(session.endedAt);
+
     if (date.getFullYear() !== year) {
       continue;
     }
+
     const activity = activityByMonth[date.getMonth()]!;
     const previous = activity.get(session.gameId) ?? {
       launcherSeconds: 0,
       steamSeconds: 0,
     };
-    if (session.origin === "steam-sync")
+
+    if (session.origin === "steam-sync") {
       previous.steamSeconds += session.durationSeconds;
-    else {
+    } else {
       previous.launcherSeconds += session.durationSeconds;
     }
     activity.set(session.gameId, previous);
@@ -40,7 +42,9 @@ export function buildMonthlyActivity(
     if (!game.lastPlayedAt) {
       continue;
     }
+
     const date = new Date(game.lastPlayedAt);
+
     if (
       date.getFullYear() === year &&
       !activityByMonth[date.getMonth()]!.has(game.id)
@@ -158,6 +162,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       (a, b) => b.durationSeconds - a.durationSeconds,
     )[0];
     const cards: Array<{ label: string; text: string }> = [];
+
     if (currentSeconds > 0) {
       const periodName = summaryPeriod === "week" ? "semana" : "mes";
       const comparison =
@@ -171,6 +176,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     }
     if (top) {
       const game = games.find((item) => item.id === top[0]);
+
       if (game) {
         cards.push({
           label: "MÁS JUGADO",
@@ -180,6 +186,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     }
     if (longest) {
       const game = games.find((item) => item.id === longest.gameId);
+
       if (game) {
         cards.push({
           label: "SESIÓN MÁS LARGA",
@@ -187,6 +194,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
         });
       }
     }
+
     const byGameSessions = new Map<string, typeof valid>();
     valid.forEach((session) =>
       byGameSessions.set(session.gameId, [
@@ -197,11 +205,13 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     let comeback: { gameId: string; days: number; ended: Date } | null = null;
     byGameSessions.forEach((items, gameId) => {
       const ordered = items.sort((a, b) => a.ended.getTime() - b.ended.getTime());
+
       for (let index = 1; index < ordered.length; index += 1) {
         const ended = ordered[index]!.ended;
         const days = Math.floor(
           (ended.getTime() - ordered[index - 1]!.ended.getTime()) / 86_400_000,
         );
+
         if (ended >= periodStart && days >= 30 && (!comeback || days > comeback.days)) {
           comeback = { gameId, days, ended };
         }
@@ -214,6 +224,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
         ended: Date;
       };
       const game = games.find((item) => item.id === resolvedComeback.gameId);
+
       if (game) {
         cards.push({
           label: "DE VUELTA",
@@ -221,6 +232,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
         });
       }
     }
+
     const activeDays = [
       ...new Set(
         valid.map(
@@ -235,6 +247,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       })
       .sort((a, b) => b.getTime() - a.getTime());
     let streak = activeDays.length ? 1 : 0;
+
     for (let index = 1; index < activeDays.length; index += 1) {
       if (
         activeDays[index - 1]!.getTime() - activeDays[index]!.getTime() !==

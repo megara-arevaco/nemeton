@@ -4,13 +4,7 @@ import type { LibrarySnapshot } from "@launcher/core";
 import { queryKeys } from "./queryKeys";
 
 async function loadLibrary(): Promise<LibrarySnapshot> {
-  const snapshot = await window.launcher.listGames();
-
-  if (snapshot.games.length > 0) {
-    return snapshot;
-  }
-
-  return window.launcher.scanSteam();
+  return window.launcher.listGames();
 }
 
 export function useLibraryQuery() {
@@ -32,8 +26,8 @@ export function useSyncSettingsQuery() {
   return useQuery({
     queryKey: queryKeys.syncSettings,
     queryFn: window.launcher.getSyncSettings,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    refetchInterval: 5 * 60_000,
+    refetchOnWindowFocus: false,
   });
 }
 

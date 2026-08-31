@@ -33,10 +33,12 @@ export function SettingsView({
     apiKey,
     setApiKey,
     saving,
+    importingSteam,
     status,
     syncing,
     syncStatus,
     connect,
+    importSteam,
     chooseSyncFolder,
     syncNow,
     associateLudusavi,
@@ -73,7 +75,7 @@ export function SettingsView({
       </div>
       <section
         className={
-          "settings-card [max-width:850px] [margin-top:30px] [padding:26px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119] appearance-settings-card [margin-top:30px] [&_+_.settings-card]:[margin-top:16px]"
+          "settings-card [max-width:850px] [margin-top:30px] [border:1px_solid] appearance-settings-card [&_+_.settings-card]:[margin-top:16px]"
         }
       >
         <div
@@ -126,7 +128,7 @@ export function SettingsView({
       </section>
       <section
         className={
-          "settings-card [max-width:850px] [margin-top:30px] [padding:26px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119]"
+          "settings-card [max-width:850px] [margin-top:30px] [border:1px_solid]"
         }
       >
         <div
@@ -179,6 +181,7 @@ export function SettingsView({
             />
           </label>
           <button
+            type="button"
             className={
               "play [background:linear-gradient(135deg,_var(--accent-a),_var(--accent-b))] [color:var(--accent-ink)] [box-shadow:0_12px_40px_color-mix(in_srgb,_var(--accent-a)_15%,_transparent)] [&:disabled]:[filter:grayscale(1)] [&:disabled]:[opacity:.45] [&:disabled]:[cursor:default] [&.running]:[filter:none] [&.running]:[opacity:1] [&.running]:[background:#a9fb7617] [&.running]:[color:#a9fb76] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running:disabled]:[filter:none] [&.running:disabled]:[opacity:1] [&.running:disabled]:[background:#a9fb7617] [&.running:disabled]:[color:#a9fb76] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running]:[color:var(--accent-a)] [&.running]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] [&.running:disabled]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running:disabled]:[color:var(--accent-a)] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)]"
             }
@@ -192,6 +195,27 @@ export function SettingsView({
                 : "Conectar Steam"}
           </button>
         </div>
+        <div
+          className={
+            "[display:flex] [justify-content:space-between] [align-items:center] [gap:18px] [margin-top:18px] [padding:14px] [border:1px_solid_#ffffff0d] [border-radius:13px] [background:#ffffff04] [&_strong]:[display:block] [&_strong]:[font-size:12px] [&_p]:[margin:4px_0_0] [&_p]:[color:#777a86] [&_p]:[font-size:11px]"
+          }
+        >
+          <div>
+            <strong>Instalaciones locales</strong>
+            <p>Busca juegos instalados sin conectar una cuenta.</p>
+          </div>
+          <button
+            type="button"
+            className={
+              "[display:inline-flex] [align-items:center] [gap:7px] [min-height:38px] [border:1px_solid_color-mix(in_srgb,_var(--accent-a)_40%,_transparent)] [border-radius:10px] [padding:0_13px] [background:color-mix(in_srgb,_var(--accent-a)_10%,_transparent)] [color:var(--accent-a)] [font-size:11px] [font-weight:700] [cursor:pointer] [transition:background_.16s_ease,_transform_.16s_ease] [&:hover:not(:disabled)]:[background:color-mix(in_srgb,_var(--accent-a)_18%,_transparent)] [&:hover:not(:disabled)]:[transform:translateY(-1px)] [&:focus-visible]:[outline:2px_solid_var(--accent-a)] [&:focus-visible]:[outline-offset:3px] [&:disabled]:[opacity:.5]"
+            }
+            disabled={importingSteam}
+            onClick={importSteam}
+          >
+            <SteamLogo weight="fill" />
+            {importingSteam ? "Buscando…" : "Buscar Steam"}
+          </button>
+        </div>
         <p
           className={
             "settings-note [margin:16px_0_0] [color:#666975] [font-size:11px] [line-height:1.55]"
@@ -202,6 +226,8 @@ export function SettingsView({
         </p>
         {status && (
           <div
+            role="status"
+            aria-live="polite"
             className={
               "settings-status [margin-top:16px] [padding:11px_13px] [border-radius:9px] [background:#ffffff07] [color:#aeb0b8] [font-size:12px]"
             }
@@ -212,7 +238,7 @@ export function SettingsView({
       </section>
       <section
         className={
-          "settings-card [max-width:850px] [margin-top:30px] [padding:26px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119] sync-settings-card [margin-top:16px]"
+          "settings-card [max-width:850px] [margin-top:30px] [border:1px_solid] sync-settings-card [margin-top:16px]"
         }
       >
         <div
@@ -254,6 +280,7 @@ export function SettingsView({
             </strong>
           </span>
           <button
+            type="button"
             className={
               "cancel-button [border:1px_solid_#ffffff14] [border-radius:11px] [padding:11px_17px] [background:transparent] [color:#a2a4ad] [cursor:pointer]"
             }
@@ -264,6 +291,7 @@ export function SettingsView({
           </button>
           {syncSettings?.folderPath && (
             <button
+              type="button"
               className={
                 "play [background:linear-gradient(135deg,_var(--accent-a),_var(--accent-b))] [color:var(--accent-ink)] [box-shadow:0_12px_40px_color-mix(in_srgb,_var(--accent-a)_15%,_transparent)] [&:disabled]:[filter:grayscale(1)] [&:disabled]:[opacity:.45] [&:disabled]:[cursor:default] [&.running]:[filter:none] [&.running]:[opacity:1] [&.running]:[background:#a9fb7617] [&.running]:[color:#a9fb76] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running:disabled]:[filter:none] [&.running:disabled]:[opacity:1] [&.running:disabled]:[background:#a9fb7617] [&.running:disabled]:[color:#a9fb76] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running]:[color:var(--accent-a)] [&.running]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] [&.running:disabled]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running:disabled]:[color:var(--accent-a)] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)]"
               }
@@ -286,6 +314,8 @@ export function SettingsView({
         )}
         {syncStatus && (
           <div
+            role="status"
+            aria-live="polite"
             className={
               "settings-status [margin-top:16px] [padding:11px_13px] [border-radius:9px] [background:#ffffff07] [color:#aeb0b8] [font-size:12px]"
             }
@@ -294,6 +324,7 @@ export function SettingsView({
           </div>
         )}
         <button
+          type="button"
           className={
             "cancel-button [border:1px_solid_#ffffff14] [border-radius:11px] [padding:11px_17px] [background:transparent] [color:#a2a4ad] [cursor:pointer]"
           }

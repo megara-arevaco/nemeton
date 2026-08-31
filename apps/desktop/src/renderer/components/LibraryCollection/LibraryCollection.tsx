@@ -1,4 +1,5 @@
 import type { LibraryGame } from "@launcher/core";
+import type { SyntheticEvent } from "react";
 import { GameController } from "@phosphor-icons/react/GameController";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Play } from "@phosphor-icons/react/Play";
@@ -14,6 +15,17 @@ export function LibraryCollection({
   runningGameIds: Set<string>;
   onSelect: (gameId: string) => void;
 }>) {
+  const useFallbackImage = (
+    event: SyntheticEvent<HTMLImageElement>,
+    fallback: string | null,
+  ) => {
+    if (!fallback || event.currentTarget.src === fallback) {
+      event.currentTarget.remove();
+      return;
+    }
+    event.currentTarget.src = fallback;
+  };
+
   return (
     <div
       className={
@@ -46,6 +58,16 @@ export function LibraryCollection({
           {games.map((game) => {
             const cover = gameCoverUrl(game);
             const hero = gameHeroUrl(game);
+            const steamAssetBase =
+              game.source === "steam" && !game.coverPath
+                ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.sourceId}`
+                : null;
+            const libraryCover = steamAssetBase
+              ? `${steamAssetBase}/library_600x900_2x.jpg`
+              : cover;
+            const libraryHero = steamAssetBase
+              ? `${steamAssetBase}/library_hero.jpg`
+              : hero;
             return (
               <button
                 className={`installed-card [position:relative] [min-width:0] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:17px] [padding:0] [background:#151720] [color:white] [text-align:left] [cursor:pointer] [transition:transform_.18s_ease,_border-color_.18s_ease,_box-shadow_.18s_ease] [&:hover]:[z-index:1] [&:hover]:[border-color:#a9fb7652] [&:hover]:[transform:translateY(-4px)] [&:hover]:[box-shadow:0_18px_38px_#00000055] [&.selected]:[border-color:#a9fb7645] [&.selected]:[box-shadow:inset_0_0_0_1px_#a9fb761b] [&.unavailable_.installed-play]:[background:#777b87] [&.unavailable_.installed-play]:[color:#15161d] [&:hover_.installed-cover]:[transform:scale(1.035)] [&:hover_.installed-play]:[opacity:1] [&:hover_.installed-play]:[transform:translateY(0)] [&.selected_.installed-play]:[opacity:1] [&.selected_.installed-play]:[transform:translateY(0)] [&.running]:[border-color:#a9fb765c] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb761a,_0_12px_35px_#68ee8110] [&.running::after]:[content:"JUGANDO"] [&.running::after]:[position:absolute] [&.running::after]:[z-index:4] [&.running::after]:[top:12px] [&.running::after]:[left:12px] [&.running::after]:[padding:5px_8px] [&.running::after]:[border-radius:20px] [&.running::after]:[background:#10150de8] [&.running::after]:[color:#a9fb76] [&.running::after]:[font-size:8px] [&.running::after]:[font-weight:800] [&.running::after]:[letter-spacing:1px] [&.running::after]:[box-shadow:0_0_0_1px_#a9fb7640] [&.running_.installed-copy_small]:[color:#9df37b] [&:hover]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] ${!game.installed ? "unavailable" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
@@ -57,22 +79,28 @@ export function LibraryCollection({
                     'installed-art [position:relative] [display:grid] [place-items:center] [height:185px] [overflow:hidden] [background:linear-gradient(135deg,_#252936,_#141620)] [&::after]:[content:""] [&::after]:[position:absolute] [&::after]:[inset:0] [&::after]:[background:linear-gradient(0deg,_#151720_0,_transparent_48%)] [&_>_b]:[position:relative] [&_>_b]:[z-index:1] [&_>_b]:[color:#a9fb76] [&_>_b]:[font-size:42px] [&_>_i]:[position:absolute] [&_>_i]:[z-index:2] [&_>_i]:[top:11px] [&_>_i]:[right:11px] [&_>_i]:[display:grid] [&_>_i]:[place-items:center] [&_>_i]:[width:28px] [&_>_i]:[height:28px] [&_>_i]:[border-radius:9px] [&_>_i]:[background:#090a0fc7] [&_>_i]:[color:#c7cad2] [&_>_i]:[font-style:normal] [&_>_i]:[backdrop-filter:blur(8px)] [&_>_i_svg]:[width:15px] [&_>_i_svg]:[height:15px]'
                   }
                 >
-                  {hero && (
+                  {libraryHero && (
                     <img
                       className={
                         "installed-backdrop [position:absolute] [inset:-12px] [width:calc(100%_+_24px)] [height:calc(100%_+_24px)] [object-fit:cover] [filter:blur(14px)_brightness(.38)_saturate(1.25)] [transform:scale(1.08)]"
                       }
-                      src={hero}
+                      src={libraryHero}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
+                      onError={(event) => useFallbackImage(event, hero)}
                     />
                   )}
-                  {cover ? (
+                  {libraryCover ? (
                     <img
                       className={
                         "installed-cover [position:relative] [z-index:1] [height:148px] [max-width:74%] [border-radius:9px] [object-fit:cover] [box-shadow:0_14px_35px_#0000008a] [transition:transform_.2s_ease]"
                       }
-                      src={cover}
+                      src={libraryCover}
                       alt=""
+                      loading="lazy"
+                      decoding="async"
+                      onError={(event) => useFallbackImage(event, cover)}
                     />
                   ) : (
                     <b>{game.title.slice(0, 1).toUpperCase()}</b>

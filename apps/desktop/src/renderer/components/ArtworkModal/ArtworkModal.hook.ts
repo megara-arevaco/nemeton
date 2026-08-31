@@ -2,7 +2,6 @@ import { useDeferredValue, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type { ArtworkSuggestion, LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { useArtworkQuery } from "../../queries/game.queries";
-
 export interface ArtworkModalOptions {
   game: LibraryGame;
   onClose: () => void;

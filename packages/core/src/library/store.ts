@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-
 import type {
   LibraryGame,
   LibrarySnapshot,
@@ -9,20 +8,32 @@ import type {
   SteamCandidate,
   SteamOwnedGame,
 } from "../shared/types.js";
-
+import { steamFallbackArtwork } from "../artwork/steam.js";
 const emptySnapshot = (): LibrarySnapshot => ({ version: 1, games: [], sessions: [] });
 const excludedSteamAppIds = new Set(["228980"]);
+
+const isLegacySteamLibraryArtwork = (url: string | null | undefined): boolean =>
+  Boolean(
+    url?.includes("/library_600x900_2x.jpg") || url?.includes("/library_hero.jpg"),
+  );
+
+const retainedArtwork = (url: string | null | undefined) =>
+  isLegacySteamLibraryArtwork(url) ? null : (url ?? null);
+
+const steamArtwork = (appId: string) => steamFallbackArtwork(appId);
 
 export class LibraryStore {
   constructor(private readonly filePath: string) {}
 
   async read(): Promise<LibrarySnapshot> {
     const raw = await fs.promises.readFile(this.filePath, "utf8").catch(() => null);
+
     if (!raw) {
       return emptySnapshot();
     }
     try {
       const parsed = JSON.parse(raw) as LibrarySnapshot;
+
       if (parsed.version !== 1 || !Array.isArray(parsed.games)) {
         return emptySnapshot();
       }
@@ -38,15 +49,11 @@ export class LibraryStore {
             ...game,
             coverPath: game.coverPath ?? null,
             coverUrl:
-              game.coverUrl ??
-              (game.source === "steam"
-                ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.sourceId}/library_600x900_2x.jpg`
-                : null),
+              retainedArtwork(game.coverUrl) ??
+              (game.source === "steam" ? steamArtwork(game.sourceId).coverUrl : null),
             heroUrl:
-              game.heroUrl ??
-              (game.source === "steam"
-                ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.sourceId}/library_hero.jpg`
-                : null),
+              retainedArtwork(game.heroUrl) ??
+              (game.source === "steam" ? steamArtwork(game.sourceId).heroUrl : null),
             playtimeSecondsRemainder: game.playtimeSecondsRemainder ?? 0,
             platformPlaytimeMinutes:
               game.platformPlaytimeMinutes ??
@@ -71,14 +78,17 @@ export class LibraryStore {
     const games = new Map(
       snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
     );
+
     for (const candidate of candidates) {
       if (excludedSteamAppIds.has(candidate.appId)) {
         continue;
       }
+
       const key = `steam:${candidate.appId}`;
       const previous = games.get(key);
       const previousPlatformMinutes =
         previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+
       if (
         previous &&
         previousPlatformMinutes !== undefined &&
@@ -98,6 +108,7 @@ export class LibraryStore {
           origin: "steam-sync",
         });
       }
+
       const game: LibraryGame = {
         id: previous?.id ?? randomUUID(),
         source: "steam",
@@ -106,8 +117,10 @@ export class LibraryStore {
         installPath: candidate.installPath,
         launchUri: `steam://rungameid/${candidate.appId}`,
         coverPath: previous?.coverPath ?? null,
-        coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${candidate.appId}/library_600x900_2x.jpg`,
-        heroUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${candidate.appId}/library_hero.jpg`,
+        coverUrl:
+          retainedArtwork(previous?.coverUrl) ?? steamArtwork(candidate.appId).coverUrl,
+        heroUrl:
+          retainedArtwork(previous?.heroUrl) ?? steamArtwork(candidate.appId).heroUrl,
         playtimeMinutes: Math.max(
           previous?.playtimeMinutes ?? 0,
           candidate.playtimeMinutes,
@@ -127,6 +140,7 @@ export class LibraryStore {
       };
       games.set(key, game);
     }
+
     const next: LibrarySnapshot = {
       version: 1,
       games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
@@ -141,14 +155,17 @@ export class LibraryStore {
     const games = new Map(
       snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
     );
+
     for (const owned of ownedGames) {
       if (excludedSteamAppIds.has(owned.appId)) {
         continue;
       }
+
       const key = `steam:${owned.appId}`;
       const previous = games.get(key);
       const previousPlatformMinutes =
         previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+
       if (
         previous &&
         previousPlatformMinutes !== undefined &&
@@ -175,8 +192,10 @@ export class LibraryStore {
         installPath: previous?.installPath ?? "",
         launchUri: `steam://rungameid/${owned.appId}`,
         coverPath: previous?.coverPath ?? null,
-        coverUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${owned.appId}/library_600x900_2x.jpg`,
-        heroUrl: `https://cdn.cloudflare.steamstatic.com/steam/apps/${owned.appId}/library_hero.jpg`,
+        coverUrl:
+          retainedArtwork(previous?.coverUrl) ?? steamArtwork(owned.appId).coverUrl,
+        heroUrl:
+          retainedArtwork(previous?.heroUrl) ?? steamArtwork(owned.appId).heroUrl,
         playtimeMinutes: owned.playtimeMinutes,
         playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
         platformPlaytimeMinutes: owned.playtimeMinutes,
@@ -189,6 +208,7 @@ export class LibraryStore {
         hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
       });
     }
+
     const next = {
       ...snapshot,
       games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
@@ -210,6 +230,7 @@ export class LibraryStore {
             path.resolve(game.installPath) === normalizedPath,
         )
       : undefined;
+
     if (!previous) {
       const now = new Date().toISOString();
       snapshot.games.push({
@@ -254,6 +275,7 @@ export class LibraryStore {
     const game = snapshot.games.find(
       (item) => item.id === gameId && item.source === "local",
     );
+
     if (!game) {
       throw new Error("No se encontró el juego local");
     }
@@ -271,9 +293,50 @@ export class LibraryStore {
     return snapshot;
   }
 
+  async updateLocalGames(
+    updates: Array<{
+      gameId: string;
+      input: {
+        title: string;
+        executablePath: string;
+        playtimeMinutes: number;
+        steamAppId?: string | null;
+        ludusaviGameName?: string | null;
+      };
+    }>,
+  ): Promise<LibrarySnapshot> {
+    if (!updates.length) {
+      return this.read();
+    }
+
+    const snapshot = await this.read();
+    const byId = new Map(snapshot.games.map((game) => [game.id, game]));
+
+    for (const { gameId, input } of updates) {
+      const game = byId.get(gameId);
+
+      if (!game || game.source !== "local") {
+        continue;
+      }
+      game.title = input.title.trim();
+      game.installPath = input.executablePath ? path.resolve(input.executablePath) : "";
+      game.installed = Boolean(game.installPath);
+      game.playtimeMinutes = Math.max(0, Math.round(input.playtimeMinutes));
+      game.playtimeSecondsRemainder = 0;
+      game.trackedPlaytimeSeconds = game.playtimeMinutes * 60;
+      game.steamAppId = input.steamAppId?.trim() || null;
+      game.ludusaviGameName = input.ludusaviGameName?.trim() || null;
+      game.updatedAt = new Date().toISOString();
+    }
+    snapshot.games.sort((a, b) => a.title.localeCompare(b.title));
+    await this.write(snapshot);
+    return snapshot;
+  }
+
   async setCover(gameId: string, coverPath: string | null): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
     const game = snapshot.games.find((item) => item.id === gameId);
+
     if (game) {
       game.coverPath = coverPath;
       game.updatedAt = new Date().toISOString();
@@ -285,6 +348,7 @@ export class LibraryStore {
   async hideFromLibrary(gameId: string): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
     const game = snapshot.games.find((item) => item.id === gameId);
+
     if (game) {
       game.hiddenFromLibrary = true;
       game.updatedAt = new Date().toISOString();
@@ -298,6 +362,7 @@ export class LibraryStore {
     const games = new Map(
       snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
     );
+
     for (const remoteGame of remote.games.filter((game) => game.source === "local")) {
       const key = `local:${remoteGame.sourceId}`;
       const localGame = games.get(key);
@@ -328,6 +393,7 @@ export class LibraryStore {
             .at(-1) ?? null,
       });
     }
+
     const sessions = new Map(snapshot.sessions.map((session) => [session.id, session]));
     remote.sessions.forEach((session) => {
       if (!sessions.has(session.id)) {
@@ -370,12 +436,14 @@ export class LibraryStore {
   ): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
     const game = snapshot.games.find((item) => item.id === gameId);
+
     if (game) {
       game.coverPath = null;
       game.coverUrl = artwork.coverUrl;
       game.heroUrl = artwork.heroUrl;
-      if (game.source === "local" && artwork.steamAppId)
+      if (game.source === "local" && artwork.steamAppId) {
         game.steamAppId = artwork.steamAppId;
+      }
       game.updatedAt = new Date().toISOString();
     }
     await this.write(snapshot);
@@ -385,6 +453,7 @@ export class LibraryStore {
   async addPlaytime(gameId: string, elapsedSeconds: number): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
     const game = snapshot.games.find((item) => item.id === gameId);
+
     if (game) {
       const durationSeconds = Math.max(0, elapsedSeconds);
       const totalSeconds = (game.playtimeSecondsRemainder ?? 0) + durationSeconds;

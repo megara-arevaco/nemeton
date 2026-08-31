@@ -3,12 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ArtworkSuggestion, LibrarySnapshot } from "@launcher/core";
 import { useLudusaviQuery } from "../../queries/game.queries";
 import { queryKeys } from "../../queries/queryKeys";
-
 export type LudusaviSuggestion = {
   name: string;
   steamAppId: string | null;
   files: Array<{ path: string; tags: string[] }>;
 };
+
 export interface AddGameModalOptions {
   onClose: () => void;
   onCreated: (snapshot: LibrarySnapshot) => void;
@@ -33,6 +33,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
 
   const chooseExecutable = async () => {
     const result = await window.launcher.selectExecutable();
+
     if (!result) {
       return;
     }

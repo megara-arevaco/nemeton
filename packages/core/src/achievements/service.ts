@@ -1,9 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-
 import { defaultSteamRoots } from "../steam/discovery.js";
 import type { GameAchievement, GameAchievements } from "../shared/types.js";
-
 interface SteamAchievement {
   strID?: unknown;
   strName?: unknown;
@@ -33,6 +31,7 @@ const toAchievement = (raw: SteamAchievement): GameAchievement | null => {
   if (typeof raw.strID !== "string" || typeof raw.strName !== "string") {
     return null;
   }
+
   const unixTime = typeof raw.rtUnlocked === "number" ? raw.rtUnlocked : 0;
   return {
     id: raw.strID,
@@ -48,15 +47,18 @@ const toAchievement = (raw: SteamAchievement): GameAchievement | null => {
 
 export const parseSteamLibraryAchievements = (content: string): GameAchievements => {
   const root: unknown = JSON.parse(content);
+
   if (!Array.isArray(root)) {
     return { total: 0, unlocked: 0, items: [] };
   }
+
   const entry = root.find(
     (item): item is [string, Record<string, unknown>] =>
       Array.isArray(item) && item[0] === "achievements" && isRecord(item[1]),
   );
   const data =
     entry && isRecord(entry[1].data) ? (entry[1].data as SteamAchievementsData) : null;
+
   if (!data) {
     return { total: 0, unlocked: 0, items: [] };
   }
@@ -67,12 +69,16 @@ export const parseSteamLibraryAchievements = (content: string): GameAchievements
     ...achievementArray(data.vecAchievedHidden),
     ...achievementArray(data.vecUnachieved),
   ];
+
   for (const value of values) {
     const achievement = toAchievement(value);
+
     if (!achievement) {
       continue;
     }
+
     const previous = byId.get(achievement.id);
+
     if (!previous) {
       byId.set(achievement.id, achievement);
       continue;
@@ -88,6 +94,7 @@ export const parseSteamLibraryAchievements = (content: string): GameAchievements
       hidden: previous.hidden || achievement.hidden,
     });
   }
+
   const items = [...byId.values()].sort((left, right) => {
     if (left.achieved !== right.achieved) {
       return left.achieved ? -1 : 1;
@@ -108,17 +115,22 @@ export const discoverSteamAchievements = async (
   if (!/^\d+$/.test(appId)) {
     return { total: 0, unlocked: 0, items: [] };
   }
+
   const steamRoot = defaultSteamRoots().find(fs.existsSync);
+
   if (!steamRoot) {
     return { total: 0, unlocked: 0, items: [] };
   }
+
   const users = await fs.promises
     .readdir(path.join(steamRoot, "userdata"), { withFileTypes: true })
     .catch(() => []);
+
   for (const user of users) {
     if (!user.isDirectory() || !/^\d+$/.test(user.name)) {
       continue;
     }
+
     const cachePath = path.join(
       steamRoot,
       "userdata",
@@ -127,11 +139,13 @@ export const discoverSteamAchievements = async (
       `${appId}.json`,
     );
     const content = await fs.promises.readFile(cachePath, "utf8").catch(() => null);
+
     if (!content) {
       continue;
     }
     try {
       const result = parseSteamLibraryAchievements(content);
+
       if (result.total > 0 || result.items.length > 0) {
         return result;
       }
@@ -146,6 +160,7 @@ interface GoldbergState {
   earned?: unknown;
   earned_time?: unknown;
 }
+
 interface GoldbergSchema {
   name?: unknown;
   displayName?: unknown;
@@ -212,21 +227,28 @@ export const parseGoldbergAchievements = (
 const parseIni = (content: string) => {
   const sections = new Map<string, Record<string, string>>();
   let section = "";
+
   for (const rawLine of content.split(/\r?\n/)) {
     const line = rawLine.trim();
+
     if (!line || line.startsWith(";") || line.startsWith("#")) {
       continue;
     }
+
     const header = /^\[([^\]]+)]$/.exec(line);
+
     if (header) {
       section = header[1]!.trim();
       sections.set(section, sections.get(section) ?? {});
       continue;
     }
+
     const pair = /^([^=]+)=(.*)$/.exec(line);
+
     if (!pair) {
       continue;
     }
+
     const values = sections.get(section) ?? {};
     values[pair[1]!.trim().toLocaleLowerCase()] = pair[2]!.trim();
     sections.set(section, values);
@@ -241,15 +263,19 @@ export const parseEmulatorIniAchievements = (
 ): GameAchievements => {
   const sections = parseIni(content);
   const states: Record<string, { earned: boolean; earned_time: number }> = {};
+
   for (const [id, values] of sections) {
     if (!id) {
       continue;
     }
+
     const achieved =
       values.achieved ?? values.unlocked ?? values.haveachieved ?? values.unlock;
+
     if (achieved == null) {
       continue;
     }
+
     const time =
       values.unlocktime ??
       values.unlock_time ??
@@ -401,7 +427,7 @@ export const discoverGoldbergAchievements = async (
   executablePath: string,
   roamingAppData: string,
 ): Promise<GameAchievements> => {
-  if (!/^\d+$/.test(appId))
+  if (!/^\d+$/.test(appId)) {
     return {
       total: 0,
       unlocked: 0,
@@ -410,6 +436,8 @@ export const discoverGoldbergAchievements = async (
       statePath: null,
       status: "missing-app-id",
     };
+  }
+
   const gameDirectory = executablePath ? path.dirname(executablePath) : "";
   const schemaCandidates = gameDirectory
     ? [
@@ -423,7 +451,8 @@ export const discoverGoldbergAchievements = async (
     gameDirectory,
     roamingAppData,
   ).find((item) => fs.existsSync(item.filePath));
-  if (!candidate)
+
+  if (!candidate) {
     return {
       total: 0,
       unlocked: 0,
@@ -432,7 +461,10 @@ export const discoverGoldbergAchievements = async (
       statePath: null,
       status: "no-state",
     };
+  }
+
   const schemaPath = schemaCandidates.find(fs.existsSync);
+
   try {
     const [state, schema] = await Promise.all([
       fs.promises.readFile(candidate.filePath, "utf8"),
@@ -474,7 +506,9 @@ export const discoverLocalSteamAppId = async (
   if (!executablePath) {
     return null;
   }
+
   let directory = path.dirname(executablePath);
+
   for (let depth = 0; depth < 4; depth += 1) {
     const candidates = [
       path.join(directory, "steam_appid.txt"),
@@ -482,20 +516,26 @@ export const discoverLocalSteamAppId = async (
       path.join(directory, "steam_settings", "configs.app.ini"),
       path.join(directory, "steam_settings", "configs.app", "configs.app.ini"),
     ];
+
     for (const candidate of candidates) {
       const content = await fs.promises.readFile(candidate, "utf8").catch(() => null);
+
       if (!content) {
         continue;
       }
+
       const direct = content.trim().match(/^\d+$/)?.[0];
       const configured = content.match(
         /(?:^|\n)\s*(?:app_?id|steam_?appid)\s*=\s*(\d+)/i,
       )?.[1];
+
       if (direct || configured) {
         return direct ?? configured ?? null;
       }
     }
+
     const parent = path.dirname(directory);
+
     if (parent === directory) {
       break;
     }

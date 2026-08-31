@@ -1,6 +1,5 @@
 import { createContext, use, useEffect, useState } from "react";
 import { accentThemes, type AccentTheme } from "../../shared/presentation";
-
 export interface ThemeContextValue {
   accentTheme: AccentTheme;
   setAccentTheme: (theme: AccentTheme) => void;

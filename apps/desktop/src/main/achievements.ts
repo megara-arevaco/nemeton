@@ -6,7 +6,6 @@ import {
 } from "@launcher/core";
 import type { GameAchievements, LibraryGame } from "@launcher/core";
 import { getRoamingAppData } from "./platform.js";
-
 export interface AchievementHistoryEntry {
   gameSourceId: string;
   achievementId: string;

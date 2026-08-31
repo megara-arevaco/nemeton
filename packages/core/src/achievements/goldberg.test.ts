@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
 import { parseEmulatorIniAchievements, parseGoldbergAchievements } from "./service.js";
-
 test("combines a Goldberg/GSE runtime save with its local schema", () => {
   const result = parseGoldbergAchievements(
     JSON.stringify({
@@ -31,7 +29,6 @@ test("combines a Goldberg/GSE runtime save with its local schema", () => {
   assert.equal(result.items[0]?.unlockedAt, "2023-11-14T22:13:20.000Z");
   assert.equal(result.items[1]?.hidden, true);
 });
-
 test("parses common INI achievement sections", () => {
   const result = parseEmulatorIniAchievements(
     "[FIRST_WIN]\nAchieved=1\nUnlockTime=1700000000\n\n[COLLECT_ALL]\nHaveAchieved=false",

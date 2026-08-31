@@ -2,7 +2,6 @@ import { execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { app, shell } from "electron";
-
 const execFileAsync = promisify(execFile);
 const powershellPath = "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe";
 
@@ -54,13 +53,17 @@ export async function openExternal(target: string) {
 }
 
 export function spawnLocalGame(executablePath: string) {
-  if (process.env.WSL_DISTRO_NAME && executablePath.startsWith("/mnt/")) {
+  if (
+    process.platform === "win32" ||
+    (process.env.WSL_DISTRO_NAME && executablePath.startsWith("/mnt/"))
+  ) {
     const target = toWindowsPath(executablePath);
     const workingDirectory = toWindowsPath(path.dirname(executablePath));
     const script = `$process=Start-Process -FilePath ${quotePowerShell(target)} -WorkingDirectory ${quotePowerShell(workingDirectory)} -PassThru -ErrorAction Stop;$process.WaitForExit();exit $process.ExitCode`;
+    const powershell = process.platform === "win32" ? "powershell.exe" : powershellPath;
 
     return spawn(
-      powershellPath,
+      powershell,
       [
         "-NoProfile",
         "-NonInteractive",

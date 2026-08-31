@@ -2,7 +2,6 @@ import { useDeferredValue, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type { LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { useLudusaviQuery } from "../../queries/game.queries";
-
 type LudusaviMatch = Awaited<ReturnType<Window["launcher"]["searchLudusavi"]>>[number];
 
 export interface EditGameModalOptions {
@@ -31,6 +30,7 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
   });
   const chooseExecutable = async () => {
     const result = await window.launcher.selectExecutable();
+
     if (result) {
       setExecutablePath(result.path);
     }
@@ -44,6 +44,7 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
   };
   const save = async () => {
     const numericHours = Number(hours.replace(",", "."));
+
     if (!title.trim()) {
       setError("Escribe un nombre");
       return;

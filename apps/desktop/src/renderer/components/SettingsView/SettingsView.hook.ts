@@ -6,7 +6,7 @@ import type {
   SteamAccountSettings,
 } from "@launcher/core";
 import type { AccentTheme } from "../../shared/presentation";
-
+import { useScanSteamMutation } from "../../queries/library.queries";
 export interface SettingsViewOptions {
   settings: SteamAccountSettings | null;
   syncSettings: FolderSyncSettings | null;
@@ -36,6 +36,7 @@ export function useSettingsView(options: SettingsViewOptions) {
   const associateLudusaviMutation = useMutation({
     mutationFn: window.launcher.autoAssociateLudusavi,
   });
+  const importSteamMutation = useScanSteamMutation();
 
   const connect = async () => {
     setStatus("Importando la biblioteca de la cuenta…");
@@ -97,12 +98,29 @@ export function useSettingsView(options: SettingsViewOptions) {
     }
   };
 
+  const importSteam = async () => {
+    setStatus("Buscando instalaciones locales de Steam…");
+
+    try {
+      const snapshot = await importSteamMutation.mutateAsync();
+      onLibraryUpdated(snapshot);
+      setStatus(`${snapshot.games.length} juegos detectados en Steam`);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? error.message
+          : "No se pudo leer la instalación de Steam",
+      );
+    }
+  };
+
   return {
     steamId,
     setSteamId: setSteamIdDraft,
     apiKey,
     setApiKey,
     saving: connectMutation.isPending,
+    importingSteam: importSteamMutation.isPending,
     status: status || (settings?.hasApiKey ? "Cuenta conectada" : ""),
     syncing:
       chooseSyncFolderMutation.isPending ||
@@ -110,6 +128,7 @@ export function useSettingsView(options: SettingsViewOptions) {
       associateLudusaviMutation.isPending,
     syncStatus,
     connect,
+    importSteam,
     chooseSyncFolder,
     syncNow,
     associateLudusavi,

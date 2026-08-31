@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-
 import { parseSteamGameMetadata } from "./steam.js";
-
 test("parses the public Steam metadata response", () => {
   const metadata = parseSteamGameMetadata("123", {
     123: {
@@ -28,7 +26,6 @@ test("parses the public Steam metadata response", () => {
     website: "https://example.com/game",
   });
 });
-
 test("returns null when Steam does not provide a game", () => {
   assert.equal(parseSteamGameMetadata("123", { 123: { success: false } }), null);
 });

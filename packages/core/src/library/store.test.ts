@@ -3,9 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-
 import { LibraryStore } from "./store.js";
-
 test("adds a local game only once and keeps a stable id", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-library-"),
@@ -20,7 +18,6 @@ test("adds a local game only once and keeps a stable id", async (context) => {
   assert.equal(second.games.length, 1);
   assert.equal(second.games[0]?.id, first.games[0]?.id);
 });
-
 test("carries partial minutes between play sessions", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-playtime-"),
@@ -40,7 +37,6 @@ test("carries partial minutes between play sessions", async (context) => {
   assert.equal(result.games[0]?.playtimeSecondsRemainder, 15);
   assert.ok(result.games[0]?.lastPlayedAt);
 });
-
 test("keeps a local placeholder editable without an executable", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-placeholder-"),
@@ -60,7 +56,6 @@ test("keeps a local placeholder editable without an executable", async (context)
   assert.equal(updated.games[0]?.title, "Backlog game edited");
   assert.equal(updated.games[0]?.trackedPlaytimeSeconds, 9_000);
 });
-
 test("records only Steam playtime gained after the initial account baseline", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-steam-history-"),
@@ -86,7 +81,6 @@ test("records only Steam playtime gained after the initial account baseline", as
   ]);
   assert.equal(unchanged.sessions.length, 1);
 });
-
 test("filters Steamworks redistributables from the library", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-steam-filter-"),
@@ -109,7 +103,6 @@ test("filters Steamworks redistributables from the library", async (context) => 
     ["123"],
   );
 });
-
 test("hides a game without deleting its history", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-hide-game-"),
@@ -130,7 +123,6 @@ test("hides a game without deleting its history", async (context) => {
   assert.equal(hidden.sessions.length, 1);
   assert.equal(hidden.sessions[0]?.gameId, gameId);
 });
-
 test("merges remote manual history without copying another device executable", async (context) => {
   const firstDirectory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-sync-first-"),
@@ -164,7 +156,6 @@ test("merges remote manual history without copying another device executable", a
   assert.equal(merged.games[0]?.coverUrl, "https://example.com/cover.jpg");
   assert.equal(merged.sessions.length, 1);
 });
-
 test("keeps newer local artwork when an older remote snapshot arrives", async (context) => {
   const directory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-sync-artwork-"),

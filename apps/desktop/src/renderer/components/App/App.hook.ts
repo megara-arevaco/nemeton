@@ -22,12 +22,12 @@ import {
   useLaunchGameMutation,
   useRemoveGameMutation,
   useRunningGamesQuery,
-  useScanSteamMutation,
   useSteamSettingsQuery,
   useSyncSettingsQuery,
 } from "../../queries/library.queries";
 import { queryKeys } from "../../queries/queryKeys";
 import { useAchievementsQuery, useGameMetadataQuery } from "../../queries/game.queries";
+import { useWorkspaceStatusQuery } from "../../queries/workspace.queries";
 
 export function useLibraryController() {
   const queryClient = useQueryClient();
@@ -35,6 +35,7 @@ export function useLibraryController() {
   const steamSettingsQuery = useSteamSettingsQuery();
   const syncSettingsQuery = useSyncSettingsQuery();
   const runningGamesQuery = useRunningGamesQuery();
+  const workspaceStatusQuery = useWorkspaceStatusQuery();
   const [message, setMessage] = useState("Tu biblioteca vive en este equipo");
   useLibrarySubscriptions();
 
@@ -78,6 +79,7 @@ export function useLibraryController() {
     syncSettings: syncSettingsQuery.data ?? null,
     setSyncSettings,
     runningGameIds: runningGamesQuery.data,
+    workspaceStatus: workspaceStatusQuery.data ?? null,
   };
 }
 
@@ -148,7 +150,6 @@ export function useApp() {
     initialNavigationState,
   );
   const [query, setQuery] = useState("");
-  const scanSteamMutation = useScanSteamMutation();
   const launchGameMutation = useLaunchGameMutation();
   const removeGameMutation = useRemoveGameMutation();
   const showAddGame = navigation.overlay?.type === "add-game";
@@ -289,19 +290,6 @@ export function useApp() {
     event.currentTarget.remove();
   };
 
-  const importSteam = async () => {
-    library.setMessage("Buscando instalaciones de Steam…");
-
-    try {
-      const snapshot = await scanSteamMutation.mutateAsync();
-      library.setMessage(`${snapshot.games.length} juegos disponibles localmente`);
-    } catch (error) {
-      library.setMessage(
-        error instanceof Error ? error.message : "No se pudo leer Steam",
-      );
-    }
-  };
-
   const onLocalGameCreated = (snapshot: LibrarySnapshot) => {
     library.setGames(snapshot.games);
     library.setSessions(snapshot.sessions);
@@ -368,7 +356,6 @@ export function useApp() {
     selectedId: navigation.selectedId,
     query,
     setQuery,
-    scanning: scanSteamMutation.isPending,
     achievements,
     metadata,
     view,
@@ -402,7 +389,6 @@ export function useApp() {
     closeGameMenuFromContext,
     stopPropagation,
     hideBrokenImage,
-    importSteam,
     onLocalGameCreated,
     launchSelected,
     chooseCover,

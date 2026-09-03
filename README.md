@@ -194,7 +194,8 @@ git push origin v0.1.2
 The release workflow validates the tag against `package.json`, runs every quality
 check on a Windows runner, builds the NSIS and portable editions, generates
 `SHA256SUMS.txt`, and publishes all three files to GitHub Releases with generated
-release notes.
+release notes. Published executables use portable asset names such as
+`Nemeton-Setup-0.1.2.exe` and `Nemeton-Portable-0.1.2.exe`.
 
 The `apps/desktop/release/` directory is intentionally ignored; executables belong
 in GitHub Releases, not in source control.

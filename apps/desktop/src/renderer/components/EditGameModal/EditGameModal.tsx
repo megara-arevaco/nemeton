@@ -193,11 +193,7 @@ export function EditGameModal({
           >
             Cancelar
           </button>
-          <Button
-            disabled={saving}
-            onClick={() => save()}
-            variant="primary"
-          >
+          <Button disabled={saving} onClick={() => save()} variant="primary">
             {saving ? "Guardando…" : "Guardar cambios"}
           </Button>
         </footer>

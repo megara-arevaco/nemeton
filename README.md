@@ -8,6 +8,8 @@
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
     <img alt="License" src="https://img.shields.io/badge/License-MIT-B7FF64">
     <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white">
+    <a href="https://github.com/megara-arevaco/nemeton/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/megara-arevaco/nemeton/actions/workflows/ci.yml/badge.svg"></a>
+    <a href="https://github.com/megara-arevaco/nemeton/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/megara-arevaco/nemeton?display_name=tag"></a>
   </p>
 </div>
 
@@ -178,17 +180,29 @@ nemeton/
 └── pnpm-workspace.yaml    Workspace package boundaries
 ```
 
-## Release versioning
+## Publishing a release
 
 Before producing a release, update the version in both `package.json` and
 `apps/desktop/package.json`, refresh the lockfile, run the validation commands, and
-build the artifacts. The `apps/desktop/release/` directory is intentionally ignored;
-executables belong in GitHub Releases, not in source control.
+commit the result. Then create and push a matching tag:
+
+```bash
+git tag -a v0.1.2 -m "Nemeton 0.1.2"
+git push origin v0.1.2
+```
+
+The release workflow validates the tag against `package.json`, runs every quality
+check on a Windows runner, builds the NSIS and portable editions, generates
+`SHA256SUMS.txt`, and publishes all three files to GitHub Releases with generated
+release notes.
+
+The `apps/desktop/release/` directory is intentionally ignored; executables belong
+in GitHub Releases, not in source control.
 
 Current artifacts are not code-signed. Windows SmartScreen may warn when an unsigned
 installer or portable executable is downloaded. An official public release process
-should build in CI, publish checksums, and sign both artifacts without storing signing
-credentials in the repository.
+builds in CI and publishes checksums. A future signing step should sign both artifacts
+without storing signing credentials in the repository.
 
 ## Data locations and privacy
 

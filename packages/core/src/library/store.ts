@@ -9,7 +9,13 @@ import type {
   SteamOwnedGame,
 } from "../shared/types.js";
 import { steamFallbackArtwork } from "../artwork/steam.js";
-const emptySnapshot = (): LibrarySnapshot => ({ version: 1, games: [], sessions: [] });
+const emptySnapshot = (): LibrarySnapshot => ({
+  version: 1,
+  games: [],
+  sessions: [],
+  excludedGameKeys: [],
+});
+
 const excludedSteamAppIds = new Set(["228980"]);
 
 const isLegacySteamLibraryArtwork = (url: string | null | undefined): boolean =>
@@ -40,6 +46,7 @@ export class LibraryStore {
       return {
         ...parsed,
         sessions: parsed.sessions ?? [],
+        excludedGameKeys: parsed.excludedGameKeys ?? [],
         games: parsed.games
           .filter(
             (game) =>
@@ -47,6 +54,7 @@ export class LibraryStore {
           )
           .map((game) => ({
             ...game,
+            achievementStateId: game.achievementStateId ?? null,
             coverPath: game.coverPath ?? null,
             coverUrl:
               retainedArtwork(game.coverUrl) ??
@@ -75,12 +83,16 @@ export class LibraryStore {
 
   async importSteam(candidates: SteamCandidate[]): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
+    const excludedGameKeys = new Set(snapshot.excludedGameKeys ?? []);
     const games = new Map(
       snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
     );
 
     for (const candidate of candidates) {
-      if (excludedSteamAppIds.has(candidate.appId)) {
+      if (
+        excludedSteamAppIds.has(candidate.appId) ||
+        excludedGameKeys.has(`steam:${candidate.appId}`)
+      ) {
         continue;
       }
 
@@ -145,6 +157,7 @@ export class LibraryStore {
       version: 1,
       games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
       sessions: snapshot.sessions,
+      excludedGameKeys: snapshot.excludedGameKeys ?? [],
     };
     await this.write(next);
     return next;
@@ -152,12 +165,16 @@ export class LibraryStore {
 
   async importSteamAccount(ownedGames: SteamOwnedGame[]): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
+    const excludedGameKeys = new Set(snapshot.excludedGameKeys ?? []);
     const games = new Map(
       snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
     );
 
     for (const owned of ownedGames) {
-      if (excludedSteamAppIds.has(owned.appId)) {
+      if (
+        excludedSteamAppIds.has(owned.appId) ||
+        excludedGameKeys.has(`steam:${owned.appId}`)
+      ) {
         continue;
       }
 
@@ -238,6 +255,7 @@ export class LibraryStore {
         source: "local",
         sourceId: randomUUID(),
         steamAppId: input.steamAppId ?? null,
+        achievementStateId: null,
         ludusaviGameName: input.ludusaviGameName ?? null,
         title: input.title.trim(),
         installPath: normalizedPath,
@@ -345,6 +363,27 @@ export class LibraryStore {
     return snapshot;
   }
 
+  async setAchievementStateId(
+    gameId: string,
+    achievementStateId: string,
+  ): Promise<LibrarySnapshot> {
+    if (!/^\d+$/.test(achievementStateId)) {
+      return this.read();
+    }
+
+    const snapshot = await this.read();
+    const game = snapshot.games.find(
+      (item) => item.id === gameId && item.source === "local",
+    );
+
+    if (game && game.achievementStateId !== achievementStateId) {
+      game.achievementStateId = achievementStateId;
+      game.updatedAt = new Date().toISOString();
+      await this.write(snapshot);
+    }
+    return snapshot;
+  }
+
   async hideFromLibrary(gameId: string): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
     const game = snapshot.games.find((item) => item.id === gameId);
@@ -357,14 +396,44 @@ export class LibraryStore {
     return snapshot;
   }
 
+  async deleteForever(gameId: string): Promise<LibrarySnapshot> {
+    const snapshot = await this.read();
+    const game = snapshot.games.find((item) => item.id === gameId);
+
+    if (!game) {
+      throw new Error("No se encontró el juego");
+    }
+
+    const excludedGameKey = `${game.source}:${game.sourceId}`;
+    snapshot.games = snapshot.games.filter((item) => item.id !== gameId);
+    snapshot.sessions = snapshot.sessions.filter(
+      (session) => session.gameId !== gameId,
+    );
+    snapshot.excludedGameKeys = [
+      ...new Set([...(snapshot.excludedGameKeys ?? []), excludedGameKey]),
+    ];
+    await this.write(snapshot);
+    return snapshot;
+  }
+
   async mergeRemoteManual(remote: LibrarySnapshot): Promise<LibrarySnapshot> {
     const snapshot = await this.read();
+    const excludedGameKeys = new Set([
+      ...(snapshot.excludedGameKeys ?? []),
+      ...(remote.excludedGameKeys ?? []),
+    ]);
     const games = new Map(
       snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
     );
 
     for (const remoteGame of remote.games.filter((game) => game.source === "local")) {
       const key = `local:${remoteGame.sourceId}`;
+
+      if (excludedGameKeys.has(key)) {
+        games.delete(key);
+        continue;
+      }
+
       const localGame = games.get(key);
       const localUpdatedAt = localGame?.updatedAt ?? localGame?.importedAt ?? "";
       const remoteUpdatedAt = remoteGame.updatedAt ?? remoteGame.importedAt;
@@ -394,9 +463,18 @@ export class LibraryStore {
       });
     }
 
-    const sessions = new Map(snapshot.sessions.map((session) => [session.id, session]));
+    for (const excludedGameKey of excludedGameKeys) {
+      games.delete(excludedGameKey);
+    }
+
+    const retainedGameIds = new Set([...games.values()].map((game) => game.id));
+    const sessions = new Map(
+      snapshot.sessions
+        .filter((session) => retainedGameIds.has(session.gameId))
+        .map((session) => [session.id, session]),
+    );
     remote.sessions.forEach((session) => {
-      if (!sessions.has(session.id)) {
+      if (retainedGameIds.has(session.gameId) && !sessions.has(session.id)) {
         sessions.set(session.id, session);
       }
     });
@@ -406,6 +484,7 @@ export class LibraryStore {
       sessions: [...sessions.values()].sort((a, b) =>
         a.startedAt.localeCompare(b.startedAt),
       ),
+      excludedGameKeys: [...excludedGameKeys],
     };
     await this.write(next);
     return next;
@@ -427,6 +506,7 @@ export class LibraryStore {
       version: 1,
       games: manualGames,
       sessions: snapshot.sessions.filter((session) => ids.has(session.gameId)),
+      excludedGameKeys: snapshot.excludedGameKeys ?? [],
     };
   }
 

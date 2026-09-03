@@ -5,6 +5,7 @@ export interface LibraryGame {
   source: GameSource;
   sourceId: string;
   steamAppId?: string | null;
+  achievementStateId?: string | null;
   ludusaviGameName?: string | null;
   title: string;
   installPath: string;
@@ -36,6 +37,7 @@ export interface LibrarySnapshot {
   version: 1;
   games: LibraryGame[];
   sessions: GameSession[];
+  excludedGameKeys?: string[];
 }
 
 export interface GameSession {

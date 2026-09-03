@@ -100,3 +100,15 @@ export function useRemoveGameMutation() {
     },
   });
 }
+
+export function useDeleteGameForeverMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ gameId, confirmation }: { gameId: string; confirmation: string }) =>
+      window.launcher.deleteGameForever(gameId, confirmation),
+    onSuccess: (snapshot) => {
+      queryClient.setQueryData(queryKeys.library, snapshot);
+    },
+  });
+}

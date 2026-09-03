@@ -1,0 +1,1 @@
+export { GameCoverImage } from "./GameCoverImage";

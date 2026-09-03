@@ -33,12 +33,25 @@ const normalize = (value: string) =>
 
 export class LudusaviCatalog {
   private games: LudusaviGame[] | null = null;
+  private searchIndex: Array<{
+    game: LudusaviGame;
+    normalizedName: string;
+  }> | null = null;
   private loading: Promise<LudusaviGame[]> | null = null;
 
   constructor(
     private readonly cachePath: string,
     private readonly fetchText: (url: string) => Promise<string>,
   ) {}
+
+  private setGames(games: LudusaviGame[]) {
+    this.games = games;
+    this.searchIndex = games.map((game) => ({
+      game,
+      normalizedName: normalize(game.name),
+    }));
+    return games;
+  }
 
   private async readCache() {
     const raw = await fs.promises.readFile(this.cachePath, "utf8").catch(() => null);
@@ -66,12 +79,14 @@ export class LudusaviCatalog {
         cached && Date.now() - new Date(cached.updatedAt).getTime() < MAX_CACHE_AGE;
 
       if (fresh) {
-        return (this.games = cached.games.map((game) => ({
-          ...game,
-          files: (game.files ?? []).map((file) =>
-            typeof file === "string" ? { path: file, tags: [] } : file,
-          ),
-        })));
+        return this.setGames(
+          cached.games.map((game) => ({
+            ...game,
+            files: (game.files ?? []).map((file) =>
+              typeof file === "string" ? { path: file, tags: [] } : file,
+            ),
+          })),
+        );
       }
       try {
         const document = parse(await this.fetchText(MANIFEST_URL)) as Record<
@@ -94,15 +109,17 @@ export class LudusaviCatalog {
             games,
           } satisfies CacheFile),
         );
-        return (this.games = games);
+        return this.setGames(games);
       } catch (error) {
         if (cached) {
-          return (this.games = cached.games.map((game) => ({
-            ...game,
-            files: (game.files ?? []).map((file) =>
-              typeof file === "string" ? { path: file, tags: [] } : file,
-            ),
-          })));
+          return this.setGames(
+            cached.games.map((game) => ({
+              ...game,
+              files: (game.files ?? []).map((file) =>
+                typeof file === "string" ? { path: file, tags: [] } : file,
+              ),
+            })),
+          );
         }
         throw error;
       }
@@ -120,9 +137,9 @@ export class LudusaviCatalog {
     }
 
     const words = wanted.split(" ");
-    return (await this.load())
-      .map((game) => {
-        const candidate = normalize(game.name);
+    await this.load();
+    return (this.searchIndex ?? [])
+      .map(({ game, normalizedName: candidate }) => {
         const score =
           candidate === wanted
             ? 1000

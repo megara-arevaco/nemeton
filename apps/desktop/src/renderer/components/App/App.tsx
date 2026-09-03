@@ -8,6 +8,7 @@ import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Square } from "@phosphor-icons/react/Square";
 import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
 import { Trophy } from "@phosphor-icons/react/Trophy";
+import { Trash } from "@phosphor-icons/react/Trash";
 import { X } from "@phosphor-icons/react/X";
 import {
   formatLastPlayed,
@@ -16,6 +17,7 @@ import {
 } from "../../shared/presentation";
 import { AddGameModal } from "../AddGameModal";
 import { ArtworkModal } from "../ArtworkModal";
+import { DeleteGameModal } from "../DeleteGameModal";
 import { EditGameModal } from "../EditGameModal";
 import { GameLaunchButton } from "../GameLaunchButton";
 import { Button } from "../Button";
@@ -50,6 +52,7 @@ export function App() {
     showAddGame,
     artworkGame,
     editGame,
+    deleteGame,
     gameMenu,
     accentTheme,
     setAccentTheme,
@@ -81,6 +84,11 @@ export function App() {
     launchSelected,
     chooseCover,
     removeGame,
+    requestDeleteGame,
+    requestDeleteSelectedGame,
+    deleteGameForever,
+    deletingGame,
+    deleteGameError,
   } = useApp();
 
   return (
@@ -257,6 +265,13 @@ export function App() {
                   <Button onClick={chooseCover} variant="secondary">
                     <Image /> Carátula
                   </Button>
+                  <Button
+                    className="[color:#ee959b] [&:hover]:[background:#ff727d12]"
+                    onClick={requestDeleteSelectedGame}
+                    variant="secondary"
+                  >
+                    <Trash /> Eliminar
+                  </Button>
                 </div>
               </div>
               {metadata && <GameMetadata metadata={metadata} />}
@@ -429,14 +444,9 @@ export function App() {
               Importa los juegos instalados en Steam. Se guardarán únicamente en este
               ordenador.
             </p>
-            <button
-              className={
-                "play [background:linear-gradient(135deg,_var(--accent-a),_var(--accent-b))] [color:var(--accent-ink)] [box-shadow:0_12px_40px_color-mix(in_srgb,_var(--accent-a)_15%,_transparent)] [&:disabled]:[filter:grayscale(1)] [&:disabled]:[opacity:.45] [&:disabled]:[cursor:default] [&.running]:[filter:none] [&.running]:[opacity:1] [&.running]:[background:#a9fb7617] [&.running]:[color:#a9fb76] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running:disabled]:[filter:none] [&.running:disabled]:[opacity:1] [&.running:disabled]:[background:#a9fb7617] [&.running:disabled]:[color:#a9fb76] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_#a9fb7640,_0_0_30px_#83ef8412] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running]:[color:var(--accent-a)] [&.running]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)] [&.running:disabled]:[background:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [&.running:disabled]:[color:var(--accent-a)] [&.running:disabled]:[box-shadow:inset_0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_25%,_transparent)]"
-              }
-              onClick={openSettings}
-            >
+            <Button onClick={openSettings} variant="primary">
               <SteamLogo /> Configurar Steam
-            </button>
+            </Button>
           </section>
         )}
         <footer>
@@ -471,6 +481,15 @@ export function App() {
           onUpdated={(snapshot) => setGames(snapshot.games)}
         />
       )}
+      {deleteGame && (
+        <DeleteGameModal
+          game={deleteGame}
+          deleting={deletingGame}
+          error={deleteGameError}
+          onClose={closeGameMenu}
+          onConfirm={deleteGameForever}
+        />
+      )}
       {gameMenu && (
         <div
           className={
@@ -492,6 +511,10 @@ export function App() {
               {gameMenu.game.source === "steam" && gameMenu.game.installed
                 ? "Desinstalar"
                 : "Quitar de la biblioteca"}
+            </button>
+            <button onClick={requestDeleteGame}>
+              <Trash weight="bold" />
+              Eliminar para siempre
             </button>
           </div>
         </div>

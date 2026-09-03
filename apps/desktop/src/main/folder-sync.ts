@@ -73,7 +73,11 @@ export class FolderSyncService {
 
     await this.writeJsonAtomically(historyPath, await this.store.exportManualHistory());
 
-    await this.synchronizeAchievementHistory(resolved);
+    const snapshot = await this.store.read();
+    const excludedSourceIds = new Set(
+      (snapshot.excludedGameKeys ?? []).map((key) => key.slice(key.indexOf(":") + 1)),
+    );
+    await this.synchronizeAchievementHistory(resolved, excludedSourceIds);
 
     const lastSyncedAt = new Date().toISOString();
 
@@ -94,12 +98,17 @@ export class FolderSyncService {
     };
   }
 
-  private async synchronizeAchievementHistory(folderPath: string) {
+  private async synchronizeAchievementHistory(
+    folderPath: string,
+    excludedSourceIds: Set<string>,
+  ) {
     const remotePath = path.join(folderPath, "launcher-next-achievements.json");
     const localEntries = await this.achievementService.readHistory();
     const remoteRaw = await fs.promises.readFile(remotePath, "utf8").catch(() => null);
     const remoteEntries = parseAchievementHistory(remoteRaw);
-    const mergedEntries = mergeAchievementHistory(localEntries, remoteEntries);
+    const mergedEntries = mergeAchievementHistory(localEntries, remoteEntries).filter(
+      (entry) => !excludedSourceIds.has(entry.gameSourceId),
+    );
 
     await this.achievementService.writeHistory(mergedEntries);
     await this.writeJsonAtomically(remotePath, mergedEntries);

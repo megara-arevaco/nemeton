@@ -1,10 +1,16 @@
 import fs from "node:fs";
 import {
   discoverGoldbergAchievements,
+  findChangedGoldbergAchievementStateId,
   discoverLocalSteamAppId,
   discoverSteamAchievements,
+  snapshotGoldbergAchievementState,
 } from "@launcher/core";
-import type { GameAchievements, LibraryGame } from "@launcher/core";
+import type {
+  GameAchievements,
+  GoldbergAchievementStateSnapshot,
+  LibraryGame,
+} from "@launcher/core";
 import { getRoamingAppData } from "./platform.js";
 export interface AchievementHistoryEntry {
   gameSourceId: string;
@@ -16,16 +22,43 @@ export interface AchievementHistoryEntry {
 }
 
 export class AchievementService {
+  private roamingAppData: string | null = null;
+
   constructor(private readonly historyPath: string) {}
+
+  async captureGoldbergState(): Promise<GoldbergAchievementStateSnapshot> {
+    try {
+      return snapshotGoldbergAchievementState(await this.getRoamingDirectory());
+    } catch {
+      return new Map();
+    }
+  }
+
+  async findChangedGoldbergStateId(
+    before: GoldbergAchievementStateSnapshot,
+  ): Promise<string | null> {
+    try {
+      return findChangedGoldbergAchievementStateId(
+        before,
+        await this.getRoamingDirectory(),
+      );
+    } catch {
+      return null;
+    }
+  }
 
   async discover(game: LibraryGame): Promise<GameAchievements> {
     if (game.source === "steam") {
       return discoverSteamAchievements(game.sourceId);
     }
 
-    const appId = game.steamAppId ?? (await discoverLocalSteamAppId(game.installPath));
+    const appIds = [
+      game.achievementStateId,
+      game.steamAppId,
+      await discoverLocalSteamAppId(game.installPath),
+    ].filter((appId): appId is string => Boolean(appId));
 
-    if (!appId) {
+    if (appIds.length === 0) {
       return {
         total: 0,
         unlocked: 0,
@@ -36,11 +69,28 @@ export class AchievementService {
       };
     }
 
-    return discoverGoldbergAchievements(
-      appId,
-      game.installPath,
-      await getRoamingAppData(),
-    );
+    const roamingDirectory = await this.getRoamingDirectory();
+
+    for (const appId of new Set(appIds)) {
+      const result = await discoverGoldbergAchievements(
+        appId,
+        game.installPath,
+        roamingDirectory,
+      );
+
+      if (result.status !== "no-state") {
+        return result;
+      }
+    }
+
+    return {
+      total: 0,
+      unlocked: 0,
+      items: [],
+      source: null,
+      statePath: null,
+      status: "no-state",
+    };
   }
 
   async record(game: LibraryGame, result: GameAchievements) {
@@ -90,5 +140,21 @@ export class AchievementService {
 
   async writeHistory(entries: AchievementHistoryEntry[]) {
     await fs.promises.writeFile(this.historyPath, JSON.stringify(entries, null, 2));
+  }
+
+  async purgeGame(gameSourceId: string) {
+    const history = await this.readHistory();
+    const retained = history.filter((entry) => entry.gameSourceId !== gameSourceId);
+
+    if (retained.length !== history.length) {
+      await this.writeHistory(retained);
+    }
+  }
+
+  private async getRoamingDirectory(): Promise<string> {
+    if (!this.roamingAppData) {
+      this.roamingAppData = await getRoamingAppData();
+    }
+    return this.roamingAppData;
   }
 }

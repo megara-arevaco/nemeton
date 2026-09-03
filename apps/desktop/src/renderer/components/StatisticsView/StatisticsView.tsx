@@ -3,7 +3,8 @@ import { CalendarBlank } from "@phosphor-icons/react/CalendarBlank";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { Clock } from "@phosphor-icons/react/Clock";
 import { Trophy } from "@phosphor-icons/react/Trophy";
-import { formatPlaytime, gameCoverUrl } from "../../shared/presentation";
+import { formatPlaytime, gameLibraryCoverUrl } from "../../shared/presentation";
+import { GameCoverImage } from "../GameCoverImage";
 import { useStatisticsView } from "./StatisticsView.hook";
 
 export function StatisticsView({
@@ -159,7 +160,7 @@ export function StatisticsView({
                 game.source === "steam"
                   ? (game.platformPlaytimeMinutes ?? 0)
                   : game.trackedPlaytimeSeconds / 60;
-              const cover = gameCoverUrl(game);
+              const cover = gameLibraryCoverUrl(game);
               return (
                 <article
                   className={`podium-game [position:relative] [min-width:0] [padding:18px_16px] [border:1px_solid_#ffffff0d] [border-radius:18px] [background:linear-gradient(180deg,_#ffffff09,_#ffffff03)] [text-align:center] [&_>_strong]:[display:block] [&_>_strong]:[overflow:hidden] [&_>_strong]:[text-overflow:ellipsis] [&_>_strong]:[white-space:nowrap] [&_>_span]:[display:block] [&_>_span]:[overflow:hidden] [&_>_span]:[text-overflow:ellipsis] [&_>_span]:[white-space:nowrap] [&_>_small]:[display:block] [&_>_small]:[overflow:hidden] [&_>_small]:[text-overflow:ellipsis] [&_>_small]:[white-space:nowrap] [&_>_strong]:[font-size:14px] [&_>_span]:[margin-top:7px] [&_>_span]:[color:#a9fb76] [&_>_span]:[font-size:18px] [&_>_span]:[font-weight:750] [&_>_small]:[margin-top:4px] [&_>_small]:[color:#686b77] [&_>_small]:[font-size:9px] podium-game-${index + 1}`}
@@ -171,7 +172,7 @@ export function StatisticsView({
                     }
                   >
                     {cover ? (
-                      <img src={cover} alt="" />
+                      <GameCoverImage game={game} alt="" />
                     ) : (
                       <span>{game.title.slice(0, 1).toUpperCase()}</span>
                     )}
@@ -198,7 +199,7 @@ export function StatisticsView({
                   game.source === "steam"
                     ? (game.platformPlaytimeMinutes ?? 0)
                     : game.trackedPlaytimeSeconds / 60;
-                const cover = gameCoverUrl(game);
+                const cover = gameLibraryCoverUrl(game);
                 const percentage = Math.round(
                   (minutes / statistics.totalMinutes) * 100,
                 );
@@ -216,7 +217,7 @@ export function StatisticsView({
                       }
                     >
                       {cover ? (
-                        <img src={cover} alt="" />
+                        <GameCoverImage game={game} alt="" />
                       ) : (
                         <span>{game.title.slice(0, 1).toUpperCase()}</span>
                       )}
@@ -300,7 +301,7 @@ export function StatisticsView({
                 }
               >
                 {annualRanking.map(({ game, seconds }, index) => {
-                  const cover = gameCoverUrl(game);
+                  const cover = gameLibraryCoverUrl(game);
                   return (
                     <article
                       className={`podium-game [position:relative] [min-width:0] [padding:18px_16px] [border:1px_solid_#ffffff0d] [border-radius:18px] [background:linear-gradient(180deg,_#ffffff09,_#ffffff03)] [text-align:center] [&_>_strong]:[display:block] [&_>_strong]:[overflow:hidden] [&_>_strong]:[text-overflow:ellipsis] [&_>_strong]:[white-space:nowrap] [&_>_span]:[display:block] [&_>_span]:[overflow:hidden] [&_>_span]:[text-overflow:ellipsis] [&_>_span]:[white-space:nowrap] [&_>_small]:[display:block] [&_>_small]:[overflow:hidden] [&_>_small]:[text-overflow:ellipsis] [&_>_small]:[white-space:nowrap] [&_>_strong]:[font-size:14px] [&_>_span]:[margin-top:7px] [&_>_span]:[color:#a9fb76] [&_>_span]:[font-size:18px] [&_>_span]:[font-weight:750] [&_>_small]:[margin-top:4px] [&_>_small]:[color:#686b77] [&_>_small]:[font-size:9px] podium-game-${index + 1}`}
@@ -312,7 +313,7 @@ export function StatisticsView({
                         }
                       >
                         {cover ? (
-                          <img src={cover} alt="" />
+                          <GameCoverImage game={game} alt="" />
                         ) : (
                           <span>{game.title.slice(0, 1).toUpperCase()}</span>
                         )}
@@ -352,7 +353,7 @@ export function StatisticsView({
                     }
                   >
                     {month.entries.map(({ game, seconds }) => {
-                      const cover = gameCoverUrl(game);
+                      const cover = gameLibraryCoverUrl(game);
                       return (
                         <div key={game.id}>
                           <span
@@ -361,7 +362,7 @@ export function StatisticsView({
                             }
                           >
                             {cover ? (
-                              <img src={cover} alt="" />
+                              <GameCoverImage game={game} alt="" />
                             ) : (
                               game.title.slice(0, 1).toUpperCase()
                             )}

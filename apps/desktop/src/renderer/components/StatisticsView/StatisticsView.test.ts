@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { GameSession, LibraryGame } from "@launcher/core";
+import { gameLibraryCoverUrl } from "../../shared/presentation";
 import { buildMonthlyActivity } from "./StatisticsView.hook";
 
 const game = (id: string, title: string): LibraryGame => ({
@@ -65,4 +66,30 @@ test("ignora sesiones cuyo juego ya no existe", () => {
     },
   ] as GameSession[];
   assert.deepEqual(buildMonthlyActivity([], sessions, 2026)[0]!.entries, []);
+});
+
+test("usa la misma portada vertical que Biblioteca para juegos de Steam", () => {
+  const steamGame: LibraryGame = {
+    ...game("steam-1", "Steam game"),
+    source: "steam",
+    sourceId: "1234",
+    coverUrl: "https://example.com/header.jpg",
+  };
+
+  assert.equal(
+    gameLibraryCoverUrl(steamGame),
+    "https://cdn.cloudflare.steamstatic.com/steam/apps/1234/library_600x900_2x.jpg",
+  );
+});
+
+test("usa la portada de Steam para un juego local asociado mediante AppID", () => {
+  const associatedGame: LibraryGame = {
+    ...game("battlefield-1", "Battlefield 1"),
+    steamAppId: "1238840",
+  };
+
+  assert.equal(
+    gameLibraryCoverUrl(associatedGame),
+    "https://cdn.cloudflare.steamstatic.com/steam/apps/1238840/library_600x900_2x.jpg",
+  );
 });

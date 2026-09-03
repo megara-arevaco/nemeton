@@ -218,6 +218,27 @@ export class SavegameManager {
     return config.games[gameId]!;
   }
 
+  async purgeGame(
+    gameId: string,
+    gameTitle: string,
+    sourceId: string,
+    syncFolderPath?: string | null,
+  ) {
+    const config = await this.readConfig();
+    delete config.games[gameId];
+    delete config.policies?.[gameId];
+    delete config.learned?.[gameTitle];
+    await this.writeConfig(config);
+    this.suggestionCache.clear();
+
+    if (syncFolderPath) {
+      await fs.promises.rm(this.gameRoot(syncFolderPath, sourceId), {
+        recursive: true,
+        force: true,
+      });
+    }
+  }
+
   async captureActivity(roamingAppData: string) {
     const profile = path.dirname(path.dirname(roamingAppData));
     const roots = [

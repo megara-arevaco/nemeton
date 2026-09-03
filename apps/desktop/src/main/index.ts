@@ -663,6 +663,45 @@ app.whenReady().then(() => {
     scheduleAutoSync();
     return snapshot;
   });
+  ipcMain.handle(
+    "library:delete-forever",
+    async (_event, gameId: string, confirmation: string) => {
+      const game = (await store.read()).games.find((item) => item.id === gameId);
+
+      if (!game) {
+        throw new Error("No se encontró el juego");
+      }
+      if (
+        confirmation.trim().toLocaleLowerCase() !==
+        game.title.trim().toLocaleLowerCase()
+      ) {
+        throw new Error("El nombre de confirmación no coincide");
+      }
+
+      const settings = await settingsStore.read();
+      await savegameManager.purgeGame(
+        game.id,
+        game.title,
+        game.sourceId,
+        settings.syncFolderPath,
+      );
+      await achievementService.purgeGame(game.sourceId);
+
+      const coverFiles = await fs.promises.readdir(coversDirectory).catch(() => []);
+      await Promise.all(
+        coverFiles
+          .filter((fileName) => fileName.startsWith(`${game.id}.`))
+          .map((fileName) =>
+            fs.promises.unlink(path.join(coversDirectory, fileName)).catch(() => null),
+          ),
+      );
+
+      const snapshot = await store.deleteForever(gameId);
+      watchedSteamGames.delete(gameId);
+      scheduleAutoSync();
+      return snapshot;
+    },
+  );
   ipcMain.handle("library:launch", async (_event, gameId: string) => {
     const game = (await store.read()).games.find((item) => item.id === gameId);
 
@@ -691,14 +730,32 @@ app.whenReady().then(() => {
       );
     }
 
+    const stateBeforeLaunch = await achievementService.captureGoldbergState();
+    let achievementGame = game;
+    const refreshAchievements = async () => {
+      if (!achievementGame.achievementStateId) {
+        const stateId =
+          await achievementService.findChangedGoldbergStateId(stateBeforeLaunch);
+
+        if (stateId) {
+          const snapshot = await store.setAchievementStateId(game.id, stateId);
+          const updatedGame = snapshot.games.find((item) => item.id === game.id);
+
+          if (updatedGame) {
+            achievementGame = updatedGame;
+            await broadcastLibrary();
+            scheduleAutoSync();
+          }
+        }
+      }
+
+      const result = await achievementService.discover(achievementGame);
+      await achievementService.record(achievementGame, result);
+    };
+
     const startedAt = Date.now();
     const child = spawnLocalGame(game.installPath);
-    runBackground(
-      achievementService
-        .discover(game)
-        .then((result) => achievementService.record(game, result)),
-      "[achievements:initial]",
-    );
+    runBackground(refreshAchievements(), "[achievements:initial]");
     let pollingAchievements = false;
     const achievementTimer = setInterval(() => {
       if (pollingAchievements) {
@@ -706,12 +763,9 @@ app.whenReady().then(() => {
       }
       pollingAchievements = true;
       runBackground(
-        achievementService
-          .discover(game)
-          .then((result) => achievementService.record(game, result))
-          .finally(() => {
-            pollingAchievements = false;
-          }),
+        refreshAchievements().finally(() => {
+          pollingAchievements = false;
+        }),
         "[achievements:watch]",
       );
     }, 5_000);
@@ -729,10 +783,9 @@ app.whenReady().then(() => {
     });
     child.once("close", async () => {
       clearInterval(achievementTimer);
-      await achievementService
-        .discover(game)
-        .then((result) => achievementService.record(game, result))
-        .catch((error) => console.error("[achievements:final]", error));
+      await refreshAchievements().catch((error) =>
+        console.error("[achievements:final]", error),
+      );
       if (reportedRunning) {
         broadcastGameRunning(game.id, false);
       }
@@ -760,7 +813,7 @@ app.whenReady().then(() => {
   setTimeout(scheduleAutoSync, 10_000);
   setTimeout(() => {
     runBackground(ludusaviCatalog.warmup(), "[ludusavi:warmup]");
-  }, 20_000);
+  }, 1_000);
   setInterval(() => {
     scheduleAutoSync();
   }, 5 * 60_000);

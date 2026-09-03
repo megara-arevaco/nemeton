@@ -123,6 +123,73 @@ test("hides a game without deleting its history", async (context) => {
   assert.equal(hidden.sessions.length, 1);
   assert.equal(hidden.sessions[0]?.gameId, gameId);
 });
+
+test("deletes a game and all of its sessions permanently", async (context) => {
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-delete-game-"),
+  );
+  context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  const store = new LibraryStore(path.join(directory, "library.json"));
+  const created = await store.addLocal({
+    title: "Example",
+    executablePath: "/games/example",
+  });
+  const gameId = created.games[0]!.id;
+  await store.addPlaytime(gameId, 120);
+
+  const deleted = await store.deleteForever(gameId);
+
+  assert.equal(deleted.games.length, 0);
+  assert.equal(deleted.sessions.length, 0);
+  assert.deepEqual(deleted.excludedGameKeys, [`local:${created.games[0]!.sourceId}`]);
+});
+
+test("does not reimport a permanently deleted Steam game", async (context) => {
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-delete-steam-game-"),
+  );
+  context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  const store = new LibraryStore(path.join(directory, "library.json"));
+  const imported = await store.importSteam([
+    {
+      appId: "123",
+      title: "Example",
+      installPath: "/games/example",
+      libraryPath: "/games",
+      playtimeMinutes: 10,
+      lastPlayedAt: null,
+    },
+  ]);
+  await store.deleteForever(imported.games[0]!.id);
+
+  const rescanned = await store.importSteam([
+    {
+      appId: "123",
+      title: "Example",
+      installPath: "/games/example",
+      libraryPath: "/games",
+      playtimeMinutes: 20,
+      lastPlayedAt: null,
+    },
+  ]);
+
+  assert.equal(rescanned.games.length, 0);
+  assert.equal(
+    (
+      await store.importSteam([
+        {
+          appId: "123",
+          title: "Example",
+          installPath: "/games/example",
+          libraryPath: "/games",
+          playtimeMinutes: 30,
+          lastPlayedAt: null,
+        },
+      ])
+    ).games.length,
+    0,
+  );
+});
 test("merges remote manual history without copying another device executable", async (context) => {
   const firstDirectory = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-sync-first-"),

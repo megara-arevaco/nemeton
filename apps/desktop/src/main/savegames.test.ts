@@ -35,6 +35,39 @@ test("versions, deduplicates and restores manual save files", async () => {
     await fs.promises.rm(root, { recursive: true, force: true });
   }
 });
+test("purges a game's configuration and managed backups", async () => {
+  const root = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-next-purge-saves-"),
+  );
+
+  try {
+    const local = path.join(root, "local");
+    const remote = path.join(root, "remote");
+    await fs.promises.mkdir(local, { recursive: true });
+    await fs.promises.writeFile(path.join(local, "slot1.sav"), "progress");
+    const manager = new SavegameManager(path.join(root, "config.json"));
+    await manager.addPath("game-1", local);
+    await manager.setPolicy("game-1", { maxVersions: 5 });
+    await manager.backup("game-1", "stable-source", remote);
+
+    await manager.purgeGame("game-1", "Example", "stable-source", remote);
+
+    assert.deepEqual(await manager.getPaths("game-1"), []);
+    assert.equal((await manager.getPolicy("game-1")).maxVersions, 2);
+    assert.equal(
+      await fs.promises
+        .stat(path.join(remote, "launcher-next-saves", "stable-source"))
+        .catch(() => null),
+      null,
+    );
+    assert.equal(
+      await fs.promises.readFile(path.join(local, "slot1.sav"), "utf8"),
+      "progress",
+    );
+  } finally {
+    await fs.promises.rm(root, { recursive: true, force: true });
+  }
+});
 test("detects nested save folders and explains the confidence", async () => {
   const root = await fs.promises.mkdtemp(
     path.join(os.tmpdir(), "launcher-next-detection-"),

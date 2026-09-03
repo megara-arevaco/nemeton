@@ -91,8 +91,40 @@ export const formatBytes = (bytes: number) =>
 const localCoverUrl = (coverPath: string) =>
   `launcher-cover:///${encodeURIComponent(coverPath)}`;
 
+const associatedSteamAppId = (game: LibraryGame) =>
+  game.source === "steam" ? game.sourceId : game.steamAppId;
+
 export const gameCoverUrl = (game: LibraryGame) =>
-  game.coverPath ? localCoverUrl(game.coverPath) : game.coverUrl;
+  game.coverPath
+    ? localCoverUrl(game.coverPath)
+    : (game.coverUrl ??
+      (associatedSteamAppId(game)
+        ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${associatedSteamAppId(game)}/header.jpg`
+        : null));
+
+export const gameLibraryCoverUrl = (game: LibraryGame) => {
+  if (game.coverPath) {
+    return localCoverUrl(game.coverPath);
+  }
+
+  if (game.source === "steam") {
+    return `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.sourceId}/library_600x900_2x.jpg`;
+  }
+
+  if (game.coverUrl) {
+    return game.coverUrl;
+  }
+
+  return game.steamAppId
+    ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.steamAppId}/library_600x900_2x.jpg`
+    : null;
+};
 
 export const gameHeroUrl = (game: LibraryGame) =>
-  game.coverPath ? localCoverUrl(game.coverPath) : (game.heroUrl ?? game.coverUrl);
+  game.coverPath
+    ? localCoverUrl(game.coverPath)
+    : (game.heroUrl ??
+      game.coverUrl ??
+      (associatedSteamAppId(game)
+        ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${associatedSteamAppId(game)}/library_hero.jpg`
+        : null));

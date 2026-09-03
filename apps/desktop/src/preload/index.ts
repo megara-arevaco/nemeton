@@ -198,6 +198,8 @@ const api = {
     ipcRenderer.invoke("library:set-cover", gameId),
   uninstallOrHide: (gameId: string): Promise<LibrarySnapshot> =>
     ipcRenderer.invoke("library:uninstall-or-hide", gameId),
+  deleteGameForever: (gameId: string, confirmation: string): Promise<LibrarySnapshot> =>
+    ipcRenderer.invoke("library:delete-forever", gameId, confirmation),
   launchGame: (gameId: string): Promise<void> =>
     ipcRenderer.invoke("library:launch", gameId),
   onLibraryChanged: (callback: (snapshot: LibrarySnapshot) => void) => {

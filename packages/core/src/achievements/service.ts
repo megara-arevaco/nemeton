@@ -300,6 +300,73 @@ interface LocalAchievementCandidate {
   format: "json" | "ini";
 }
 
+export interface GoldbergAchievementState {
+  appId: string;
+  modifiedAt: number;
+}
+
+export type GoldbergAchievementStateSnapshot = Map<string, GoldbergAchievementState>;
+
+const goldbergStateDirectories = ["GSE Saves", "Goldberg SteamEmu Saves"];
+const goldbergStateFiles = ["achievements.json", "playtime.txt"];
+
+const stateModifiedAt = async (directory: string): Promise<number | null> => {
+  const files = await Promise.all(
+    goldbergStateFiles.map((file) =>
+      fs.promises.stat(path.join(directory, file)).catch(() => null),
+    ),
+  );
+  const timestamps = files
+    .filter((file): file is fs.Stats => file !== null)
+    .map((file) => file.mtimeMs);
+
+  return timestamps.length ? Math.max(...timestamps) : null;
+};
+
+export const snapshotGoldbergAchievementState = async (
+  roamingAppData: string,
+): Promise<GoldbergAchievementStateSnapshot> => {
+  const snapshot: GoldbergAchievementStateSnapshot = new Map();
+
+  await Promise.all(
+    goldbergStateDirectories.map(async (folder) => {
+      const root = path.join(roamingAppData, folder);
+      const directories = await fs.promises
+        .readdir(root, { withFileTypes: true })
+        .catch(() => []);
+
+      await Promise.all(
+        directories
+          .filter((entry) => entry.isDirectory() && /^\d+$/.test(entry.name))
+          .map(async (entry) => {
+            const modifiedAt = await stateModifiedAt(path.join(root, entry.name));
+
+            if (modifiedAt !== null) {
+              snapshot.set(`${folder}:${entry.name}`, {
+                appId: entry.name,
+                modifiedAt,
+              });
+            }
+          }),
+      );
+    }),
+  );
+  return snapshot;
+};
+
+export const findChangedGoldbergAchievementStateId = async (
+  before: GoldbergAchievementStateSnapshot,
+  roamingAppData: string,
+): Promise<string | null> => {
+  const after = await snapshotGoldbergAchievementState(roamingAppData);
+  const changed = [...after]
+    .filter(([key, state]) => state.modifiedAt > (before.get(key)?.modifiedAt ?? 0))
+    .map(([, state]) => state)
+    .sort((left, right) => right.modifiedAt - left.modifiedAt);
+
+  return changed[0]?.appId ?? null;
+};
+
 const localAchievementCandidates = (
   appId: string,
   gameDirectory: string,

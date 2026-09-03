@@ -4,7 +4,13 @@ import { GameController } from "@phosphor-icons/react/GameController";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Play } from "@phosphor-icons/react/Play";
 import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
-import { formatPlaytime, gameCoverUrl, gameHeroUrl } from "../../shared/presentation";
+import {
+  formatPlaytime,
+  gameCoverUrl,
+  gameHeroUrl,
+  gameLibraryCoverUrl,
+} from "../../shared/presentation";
+import { GameCoverImage } from "../GameCoverImage";
 
 export function LibraryCollection({
   games,
@@ -58,16 +64,11 @@ export function LibraryCollection({
           {games.map((game) => {
             const cover = gameCoverUrl(game);
             const hero = gameHeroUrl(game);
-            const steamAssetBase =
+            const libraryCover = gameLibraryCoverUrl(game);
+            const libraryHero =
               game.source === "steam" && !game.coverPath
-                ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.sourceId}`
-                : null;
-            const libraryCover = steamAssetBase
-              ? `${steamAssetBase}/library_600x900_2x.jpg`
-              : cover;
-            const libraryHero = steamAssetBase
-              ? `${steamAssetBase}/library_hero.jpg`
-              : hero;
+                ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${game.sourceId}/library_hero.jpg`
+                : hero;
             return (
               <button
                 className={`installed-card [position:relative] [min-width:0] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:17px] [padding:0] [background:#151720] [color:white] [text-align:left] [cursor:pointer] [transition:transform_.18s_ease,_border-color_.18s_ease,_box-shadow_.18s_ease] [&:hover]:[z-index:1] [&:hover]:[border-color:#a9fb7652] [&:hover]:[transform:translateY(-4px)] [&:hover]:[box-shadow:0_18px_38px_#00000055] [&.selected]:[border-color:#a9fb7645] [&.selected]:[box-shadow:inset_0_0_0_1px_#a9fb761b] [&.unavailable_.installed-play]:[background:#777b87] [&.unavailable_.installed-play]:[color:#15161d] [&:hover_.installed-cover]:[transform:scale(1.035)] [&:hover_.installed-play]:[opacity:1] [&:hover_.installed-play]:[transform:translateY(0)] [&.selected_.installed-play]:[opacity:1] [&.selected_.installed-play]:[transform:translateY(0)] [&.running]:[border-color:#a9fb765c] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb761a,_0_12px_35px_#68ee8110] [&.running::after]:[content:"JUGANDO"] [&.running::after]:[position:absolute] [&.running::after]:[z-index:4] [&.running::after]:[top:12px] [&.running::after]:[left:12px] [&.running::after]:[padding:5px_8px] [&.running::after]:[border-radius:20px] [&.running::after]:[background:#10150de8] [&.running::after]:[color:#a9fb76] [&.running::after]:[font-size:8px] [&.running::after]:[font-weight:800] [&.running::after]:[letter-spacing:1px] [&.running::after]:[box-shadow:0_0_0_1px_#a9fb7640] [&.running_.installed-copy_small]:[color:#9df37b] [&:hover]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] ${!game.installed ? "unavailable" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
@@ -92,15 +93,14 @@ export function LibraryCollection({
                     />
                   )}
                   {libraryCover ? (
-                    <img
+                    <GameCoverImage
+                      game={game}
                       className={
                         "installed-cover [position:relative] [z-index:1] [height:148px] [max-width:74%] [border-radius:9px] [object-fit:cover] [box-shadow:0_14px_35px_#0000008a] [transition:transform_.2s_ease]"
                       }
-                      src={libraryCover}
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      onError={(event) => useFallbackImage(event, cover)}
                     />
                   ) : (
                     <b>{game.title.slice(0, 1).toUpperCase()}</b>

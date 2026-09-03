@@ -19,6 +19,7 @@ import { useTheme } from "../ThemeProvider";
 import {
   useLibraryQuery,
   useLibrarySubscriptions,
+  useDeleteGameForeverMutation,
   useLaunchGameMutation,
   useRemoveGameMutation,
   useRunningGamesQuery,
@@ -88,6 +89,7 @@ export type AppView = "library" | "statistics" | "settings";
 type AppOverlay =
   | { type: "add-game" }
   | { type: "artwork"; game: LibraryGame }
+  | { type: "delete-game"; game: LibraryGame }
   | { type: "edit-game"; game: LibraryGame }
   | { type: "game-menu"; game: LibraryGame; x: number; y: number }
   | null;
@@ -143,6 +145,7 @@ function navigationReducer(
 }
 
 export function useApp() {
+  const queryClient = useQueryClient();
   const library = useLibraryController();
   const { accentTheme, setAccentTheme } = useTheme();
   const [navigation, dispatchNavigation] = useReducer(
@@ -152,11 +155,14 @@ export function useApp() {
   const [query, setQuery] = useState("");
   const launchGameMutation = useLaunchGameMutation();
   const removeGameMutation = useRemoveGameMutation();
+  const deleteGameForeverMutation = useDeleteGameForeverMutation();
   const showAddGame = navigation.overlay?.type === "add-game";
   const artworkGame =
     navigation.overlay?.type === "artwork" ? navigation.overlay.game : null;
   const editGame =
     navigation.overlay?.type === "edit-game" ? navigation.overlay.game : null;
+  const deleteGame =
+    navigation.overlay?.type === "delete-game" ? navigation.overlay.game : null;
   const gameMenu = navigation.overlay?.type === "game-menu" ? navigation.overlay : null;
   const view = navigation.view;
   const deferredQuery = useDeferredValue(query);
@@ -225,7 +231,7 @@ export function useApp() {
         type: "game-menu",
         game,
         x: Math.min(x, window.innerWidth - 230),
-        y: Math.min(y, window.innerHeight - 90),
+        y: Math.min(y, window.innerHeight - 150),
       },
     });
   }, []);
@@ -351,6 +357,62 @@ export function useApp() {
     }
   };
 
+  const requestDeleteGame = () => {
+    if (!gameMenu) {
+      return;
+    }
+
+    deleteGameForeverMutation.reset();
+    dispatchNavigation({
+      type: "open-overlay",
+      overlay: { type: "delete-game", game: gameMenu.game },
+    });
+  };
+
+  const requestDeleteSelectedGame = () => {
+    if (!selected) {
+      return;
+    }
+
+    deleteGameForeverMutation.reset();
+    dispatchNavigation({
+      type: "open-overlay",
+      overlay: { type: "delete-game", game: selected },
+    });
+  };
+
+  const deleteGameForever = async (confirmation: string) => {
+    if (!deleteGame) {
+      return;
+    }
+
+    try {
+      await deleteGameForeverMutation.mutateAsync({
+        gameId: deleteGame.id,
+        confirmation,
+      });
+
+      if (navigation.selectedId === deleteGame.id) {
+        dispatchNavigation({ type: "select-game", gameId: null });
+      } else {
+        closeOverlay();
+      }
+      queryClient.removeQueries({ queryKey: queryKeys.metadata(deleteGame.id) });
+      queryClient.removeQueries({ queryKey: queryKeys.achievements(deleteGame.id) });
+      queryClient.removeQueries({ queryKey: queryKeys.savegames(deleteGame.id) });
+      library.setMessage(`${deleteGame.title} eliminado definitivamente`);
+    } catch (error) {
+      library.setMessage(
+        error instanceof Error ? error.message : "No se pudo eliminar el juego",
+      );
+    }
+  };
+
+  const deleteGameError =
+    deleteGameForeverMutation.error instanceof Error
+      ? deleteGameForeverMutation.error.message
+      : "";
+
   return {
     ...library,
     selectedId: navigation.selectedId,
@@ -362,6 +424,7 @@ export function useApp() {
     showAddGame,
     artworkGame,
     editGame,
+    deleteGame,
     gameMenu,
     accentTheme,
     setAccentTheme,
@@ -393,5 +456,10 @@ export function useApp() {
     launchSelected,
     chooseCover,
     removeGame,
+    requestDeleteGame,
+    requestDeleteSelectedGame,
+    deleteGameForever,
+    deletingGame: deleteGameForeverMutation.isPending,
+    deleteGameError,
   };
 }

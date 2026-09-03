@@ -1,55 +1,110 @@
-# Nemeton
+<div align="center">
+  <img src="apps/desktop/resources/nemeton-mark.svg" width="132" height="132" alt="Nemeton logo">
+  <h1>Nemeton</h1>
+  <p><strong>Your games, play history, achievements, and saves — in one local-first library.</strong></p>
+  <p>
+    <img alt="Electron" src="https://img.shields.io/badge/Electron-40-47848F?logo=electron&logoColor=white">
+    <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=0B1320">
+    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
+    <img alt="License" src="https://img.shields.io/badge/License-MIT-B7FF64">
+    <img alt="Platform" src="https://img.shields.io/badge/Platform-Windows-0078D4?logo=windows&logoColor=white">
+  </p>
+</div>
 
-Nemeton is a local-first desktop game launcher for keeping games, play history,
-achievements, artwork, and save-game backups in one place. It can discover an
-existing Steam installation, import games from a Steam account, and manage local
-executables without requiring a Nemeton account or a hosted Nemeton service.
+Nemeton is a desktop game launcher that brings installed Steam games, account
+libraries, local executables, playtime, achievements, artwork, and save backups
+into one focused interface. It is designed to work without a Nemeton account or
+a hosted Nemeton service: your library and credentials remain on your computer.
 
-## Features
+> [!NOTE]
+> Nemeton is under active development. Windows is the primary supported desktop
+> platform, and current builds are unsigned development builds.
 
-- Steam library discovery on Windows, Linux, macOS, and WSL.
-- Steam account import through the official Steam Web API.
-- Local game entries with custom executables and artwork.
-- Launching through `steam://rungameid/<app-id>` or a local executable.
-- Local playtime, session history, recent activity, and statistics.
-- Local achievement detection for supported Steam-compatible formats.
-- Save-game discovery and versioned backups with Ludusavi integration.
-- Folder-based history and save synchronization, suitable for Google Drive,
-  OneDrive, Dropbox, Syncthing, or another folder synchronization provider.
-- A permanently dark interface with selectable accent themes.
-- Local, atomic persistence with stable internal game identifiers.
+## What Nemeton does
 
-## Technology
-
-Nemeton is a pnpm workspace containing:
-
-- `apps/desktop`: Electron, React 19, Vite, and TypeScript desktop application.
-- `packages/core`: platform-independent library, Steam, artwork, achievement,
-  and persistence logic.
+- Discovers installed Steam libraries on Windows, Linux, macOS, and WSL.
+- Imports owned games and Steam playtime through the official Steam Web API.
+- Adds local games with editable executables, artwork, playtime, and Steam AppIDs.
+- Launches games through Steam or directly from a local executable.
+- Tracks local sessions and presents recent, monthly, yearly, and all-time statistics.
+- Detects local achievements from Steam and supported Steam-compatible formats.
+- Discovers save locations using the Ludusavi manifest.
+- Creates versioned save backups, validates archives, and enforces retention.
+- Synchronizes manual history, achievement history, and saves through a folder you
+  control — including folders managed by OneDrive, Google Drive, Dropbox, or Syncthing.
+- Offers a dark interface with multiple accent themes and accessible primary actions.
+- Permanently excludes deleted games so a future Steam scan does not silently add
+  them back.
 
 ## Requirements
 
+### To use the Windows application
+
+- Windows 10 or Windows 11, x64.
+- A Steam installation is optional; it is only needed for local Steam discovery and
+  launching Steam games.
+- Internet access is optional for local games. It is required for Steam account
+  imports, metadata, remote artwork, and refreshing the Ludusavi manifest.
+- Importing every visible game from a Steam account requires:
+  - a 64-bit Steam ID;
+  - a personal [Steam Web API key](https://steamcommunity.com/dev/apikey); and
+  - Steam profile game details that the API is allowed to read.
+
+Nemeton encrypts the Steam Web API key with Electron `safeStorage` and Windows
+DPAPI when available. It never commits application data, credentials, save backups,
+or generated installers to this repository.
+
+### To develop Nemeton
+
 - [Node.js](https://nodejs.org/) 22 or newer.
-- [Corepack](https://nodejs.org/api/corepack.html), included with supported
-  Node.js releases.
-- Windows 10 or 11 when producing and testing the Windows installers.
+- [Corepack](https://nodejs.org/api/corepack.html), normally included with Node.js.
+- Git.
+- Windows 10 or 11 for final verification of Windows installers.
 
-The repository pins pnpm 10.15.0 through the `packageManager` field. You do not
-need to install pnpm globally.
+The workspace pins pnpm 10.15.0, so a separate global pnpm installation is not
+required.
 
-## Install dependencies
+## Using Nemeton
 
-From the repository root:
+### Import installed Steam games
 
-```bash
-corepack enable
-corepack pnpm install
-```
+Open **Settings → Steam → Find Steam**. Nemeton scans the local Steam libraries and
+imports installed titles without requiring an API key.
 
-If Corepack cannot modify the global Node.js installation, the commands below
-can still be run as `corepack pnpm <command>` without enabling its shims.
+### Import a complete Steam account library
+
+1. Open **Settings → Steam**.
+2. Enter your SteamID64 and personal Steam Web API key.
+3. Select **Connect Steam**.
+4. Refresh the account later to merge newly owned games and updated Steam playtime.
+
+Steam controls which library details the Web API exposes. A private game-details
+setting can prevent account-wide imports; local installed-game discovery continues
+to work independently.
+
+### Add a local game
+
+Choose **Add game**, select an executable, and optionally associate the title with a
+Ludusavi entry or Steam AppID. The association improves artwork, achievement, and
+save-location detection.
+
+### Back up and synchronize saves
+
+Open a game's save panel to review detected locations and create a versioned backup.
+In **Settings → Synchronization**, choose a local or cloud-synchronized folder.
+Nemeton uses atomic JSON writes, merges compatible history, and detects conflicting
+save versions instead of silently overwriting them.
 
 ## Development
+
+Clone the repository and install dependencies from its root:
+
+```bash
+git clone https://github.com/megara-arevaco/nemeton.git
+cd nemeton
+corepack enable
+corepack pnpm install --frozen-lockfile
+```
 
 Start Electron with hot reload:
 
@@ -57,10 +112,7 @@ Start Electron with hot reload:
 corepack pnpm dev
 ```
 
-The renderer and Electron main process are rebuilt automatically while the
-development process is running.
-
-Before submitting a change, run:
+Validate a change before committing it:
 
 ```bash
 corepack pnpm typecheck
@@ -68,143 +120,97 @@ corepack pnpm test
 corepack pnpm build
 ```
 
-`build` compiles the Electron main process, preload script, and React renderer
-into `apps/desktop/out/`. It does **not** create a distributable `.exe`.
+`build` compiles the Electron main process, preload bridge, and React renderer into
+`apps/desktop/out/`. It does not create a distributable executable.
 
-## Build Windows executables
+## Building Windows executables
 
-The most reliable environment for creating Windows artifacts is native Windows
-PowerShell. Clone the repository on a Windows drive, install Node.js, and run the
-following commands from the repository root.
-
-### Build both installer and portable editions
+For the most reproducible Windows artifacts, run the build in native Windows
+PowerShell:
 
 ```powershell
 corepack enable
 corepack pnpm install --frozen-lockfile
-corepack pnpm dist:win
-```
-
-This produces:
-
-```text
-apps/desktop/release/Nemeton Setup 0.1.0.exe
-apps/desktop/release/Nemeton Portable 0.1.0.exe
-apps/desktop/release/win-unpacked/
-```
-
-The exact version in each filename comes from `apps/desktop/package.json`.
-
-### Build only the NSIS installer
-
-```powershell
-corepack pnpm dist:win:installer
-```
-
-The NSIS installer:
-
-- Allows the user to choose an installation directory.
-- Installs for the current user rather than the entire machine.
-- Creates desktop and Start menu shortcuts.
-- Keeps application data when Nemeton is uninstalled.
-
-Output:
-
-```text
-apps/desktop/release/Nemeton Setup 0.1.0.exe
-```
-
-### Build only the portable executable
-
-```powershell
-corepack pnpm dist:win:portable
-```
-
-Output:
-
-```text
-apps/desktop/release/Nemeton Portable 0.1.0.exe
-```
-
-The portable package does not install Nemeton, but application data still uses
-Electron's normal per-user data directory. “Portable” describes distribution of
-the executable; it does not currently mean that the library database is stored
-beside the executable.
-
-### Build from WSL or Linux
-
-The regular application build works in WSL or Linux:
-
-```bash
-corepack pnpm install --frozen-lockfile
-corepack pnpm build
-```
-
-`electron-builder` can cross-build some Windows targets from Linux, but NSIS and
-Windows executable processing may require Wine and additional system packages.
-For reproducible `.exe` releases, use native Windows or a Windows CI runner.
-
-## Versioning a release
-
-Update the version in both the root package and the desktop package before
-building:
-
-```text
-package.json
-apps/desktop/package.json
-```
-
-Then reinstall to refresh the lockfile metadata, validate the project, and build
-the artifacts:
-
-```powershell
-corepack pnpm install
 corepack pnpm typecheck
 corepack pnpm test
 corepack pnpm dist:win
 ```
 
-The `apps/desktop/release/` directory is ignored by Git. Publish the generated
-executables as GitHub Release assets rather than committing them to the source
-repository.
-
-## Code signing and Windows SmartScreen
-
-The default build is unsigned. Windows may display a SmartScreen warning when an
-unsigned installer or portable executable is downloaded from the internet. A
-public release should be signed with an appropriate Windows code-signing
-certificate through `electron-builder`; no signing credentials belong in this
-repository.
-
-## Application data and credentials
-
-Nemeton stores its database and settings in Electron's per-user application data
-directory. The Steam Web API key is encrypted using Electron `safeStorage` (and
-Windows DPAPI when applicable) before it is written to disk.
-
-Application data, Steam credentials, synchronized histories, save backups, and
-generated release artifacts are not part of the Git repository.
-
-Folder synchronization deliberately retains the historical
-`launcher-next-*` internal filenames for compatibility with existing libraries.
-They are implementation details and do not affect the Nemeton product name.
-
-## Regenerate the application icon
-
-The vector source is located at:
+The current package version produces:
 
 ```text
-apps/desktop/resources/nemeton-mark.svg
+apps/desktop/release/Nemeton Setup 0.1.2.exe
+apps/desktop/release/Nemeton Portable 0.1.2.exe
+apps/desktop/release/win-unpacked/
 ```
 
-After changing it, regenerate the PNG consumed by `electron-builder`:
+Build only one distribution format when needed:
+
+```powershell
+# NSIS installer
+corepack pnpm dist:win:installer
+
+# Portable executable
+corepack pnpm dist:win:portable
+```
+
+The installer is per-user, lets the user select an installation directory, creates
+Desktop and Start menu shortcuts, and preserves Nemeton data after uninstalling.
+The portable artifact does not require installation, but currently stores data in
+Electron's standard per-user application-data directory rather than beside the EXE.
+
+Cross-building from WSL or Linux can work when Wine and the required packaging tools
+are installed. Native Windows or a Windows CI runner remains the recommended release
+environment.
+
+## Project structure
+
+```text
+nemeton/
+├── apps/desktop/          Electron main process, preload bridge, and React UI
+│   ├── resources/         Application icon and vector logo
+│   └── src/
+│       ├── main/          Native integration, IPC, saves, sync, and persistence
+│       ├── preload/       Typed renderer-to-main API
+│       └── renderer/      React interface and client-side queries
+├── packages/core/         Platform-independent library and Steam domain logic
+├── package.json           Workspace commands and pinned package manager
+└── pnpm-workspace.yaml    Workspace package boundaries
+```
+
+## Release versioning
+
+Before producing a release, update the version in both `package.json` and
+`apps/desktop/package.json`, refresh the lockfile, run the validation commands, and
+build the artifacts. The `apps/desktop/release/` directory is intentionally ignored;
+executables belong in GitHub Releases, not in source control.
+
+Current artifacts are not code-signed. Windows SmartScreen may warn when an unsigned
+installer or portable executable is downloaded. An official public release process
+should build in CI, publish checksums, and sign both artifacts without storing signing
+credentials in the repository.
+
+## Data locations and privacy
+
+Nemeton stores its database and settings in Electron's per-user application-data
+directory. A configured synchronization folder contains portable history and backup
+data intended for the user's own storage provider.
+
+Some synchronized files retain the historical `launcher-next-*` prefix for backward
+compatibility with existing libraries. These names are internal implementation
+details and do not affect the Nemeton product name.
+
+## Regenerating the icon
+
+The source artwork is
+[`apps/desktop/resources/nemeton-mark.svg`](apps/desktop/resources/nemeton-mark.svg).
+After editing it, regenerate the PNG consumed by `electron-builder`:
 
 ```bash
 node apps/desktop/scripts/render-icon.cjs
 ```
 
-The generated file is `apps/desktop/resources/icon.png`.
-
 ## License
 
-See [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Nemeton is available under the [MIT License](LICENSE). Third-party acknowledgements
+are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

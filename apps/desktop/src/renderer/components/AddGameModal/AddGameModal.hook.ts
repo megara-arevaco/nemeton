@@ -1,7 +1,7 @@
 import { useDeferredValue, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ArtworkSuggestion, LibrarySnapshot } from "@launcher/core";
-import { useLudusaviQuery } from "../../queries/game.queries";
+import { useDebouncedValue, useLudusaviQuery } from "../../queries/game.queries";
 import { queryKeys } from "../../queries/queryKeys";
 export type LudusaviSuggestion = {
   name: string;
@@ -26,7 +26,8 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
   const [error, setError] = useState("");
   const queryClient = useQueryClient();
   const deferredTitle = useDeferredValue(title);
-  const ludusaviQuery = useLudusaviQuery(deferredTitle, selectedLudusavi === null);
+  const searchedTitle = useDebouncedValue(deferredTitle, 250);
+  const ludusaviQuery = useLudusaviQuery(searchedTitle, selectedLudusavi === null);
   const createGameMutation = useMutation({
     mutationFn: window.launcher.addLocalGame,
   });

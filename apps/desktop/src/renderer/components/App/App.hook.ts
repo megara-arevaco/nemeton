@@ -69,11 +69,16 @@ export function useLibraryController() {
   };
 
   return {
+    libraryLoading: libraryQuery.isPending,
     games: snapshot.games,
     setGames,
     sessions: snapshot.sessions,
     setSessions,
-    message,
+    message: libraryQuery.error
+      ? "No se pudo cargar la biblioteca. Revisa el archivo de datos antes de continuar."
+      : libraryQuery.isPending
+        ? "Cargando biblioteca…"
+        : message,
     setMessage,
     steamSettings: steamSettingsQuery.data ?? null,
     setSteamSettings,
@@ -199,7 +204,7 @@ export function useApp() {
       : libraryGames;
   }, [libraryGames, deferredQuery]);
   const selected =
-    library.games.find((game) => game.id === navigation.selectedId) ?? null;
+    libraryGames.find((game) => game.id === navigation.selectedId) ?? null;
   const selectedIsRunning = selected ? library.runningGameIds.has(selected.id) : false;
   const achievementsQuery = useAchievementsQuery(
     selected?.id ?? null,
@@ -253,8 +258,7 @@ export function useApp() {
   };
 
   const updateLibrary = (snapshot: LibrarySnapshot) => {
-    library.setGames(snapshot.games);
-    library.setSessions(snapshot.sessions);
+    queryClient.setQueryData(queryKeys.library, snapshot);
   };
 
   const connectSteam = (snapshot: LibrarySnapshot, count: number) => {
@@ -297,8 +301,7 @@ export function useApp() {
   };
 
   const onLocalGameCreated = (snapshot: LibrarySnapshot) => {
-    library.setGames(snapshot.games);
-    library.setSessions(snapshot.sessions);
+    queryClient.setQueryData(queryKeys.library, snapshot);
     const newest = [...snapshot.games].sort((a, b) =>
       b.importedAt.localeCompare(a.importedAt),
     )[0];

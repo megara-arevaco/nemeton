@@ -244,3 +244,81 @@ test("keeps newer local artwork when an older remote snapshot arrives", async (c
   assert.equal(merged.games[0]?.coverUrl, "https://example.com/new-cover.jpg");
   assert.equal(merged.games[0]?.heroUrl, "https://example.com/new-hero.jpg");
 });
+
+test("serializes concurrent mutations across store instances", async (context) => {
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "nemeton-concurrent-"),
+  );
+  context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, "library.json");
+  const first = new LibraryStore(filePath);
+  const second = new LibraryStore(filePath);
+  await Promise.all([
+    first.addLocal({ title: "First", executablePath: "" }),
+    second.addLocal({ title: "Second", executablePath: "" }),
+  ]);
+  assert.equal((await first.read()).games.length, 2);
+});
+
+test("Steam scans hide uninstalled games and restore them on reinstall without losing history", async (context) => {
+  const directory = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), "launcher-steam-uninstall-"),
+  );
+  context.after(() => fs.promises.rm(directory, { recursive: true, force: true }));
+  const store = new LibraryStore(path.join(directory, "library.json"));
+  await store.addLocal({ title: "Manual game", executablePath: "/games/manual.exe" });
+  const candidate = {
+    appId: "123",
+    title: "Steam game",
+    installPath: "/steam/game",
+    libraryPath: "/steam",
+    playtimeMinutes: 100,
+    lastPlayedAt: null,
+  };
+  const other = {
+    ...candidate,
+    appId: "456",
+    title: "Still installed",
+    installPath: "/steam/other",
+  };
+  const installed = await store.importSteam([candidate, other]);
+  const original = installed.games.find((game) => game.sourceId === "123")!;
+  await store.addPlaytime(original.id, 60);
+  const before = await store.read();
+
+  // Account ownership is not evidence that a game is still installed locally.
+  await store.importSteamAccount([
+    { appId: "123", title: "Steam game", playtimeMinutes: 100, lastPlayedAt: null },
+  ]);
+  const synced = await store.importSteam([other]);
+  const removed = synced.games.find((game) => game.id === original.id)!;
+  assert.equal(removed.installed, false);
+  assert.equal(removed.installPath, "");
+  assert.equal(removed.hiddenFromLibrary, false);
+  assert.deepEqual(synced.sessions, before.sessions);
+  assert.equal(synced.games.find((game) => game.sourceId === "456")?.installed, true);
+  assert.equal(synced.games.find((game) => game.source === "local")?.installed, true);
+  assert.equal(
+    (await store.read()).games.find((game) => game.id === original.id)?.installed,
+    false,
+  );
+
+  const emptyScan = await store.importSteam([]);
+  assert.ok(
+    emptyScan.games
+      .filter((game) => game.source === "steam")
+      .every((game) => !game.installed),
+  );
+  assert.equal(
+    emptyScan.games.find((game) => game.source === "local")?.installed,
+    true,
+  );
+
+  const reinstalled = await store.importSteam([candidate]);
+  const restored = reinstalled.games.find((game) => game.sourceId === "123")!;
+  assert.equal(restored.id, original.id);
+  assert.equal(restored.installed, true);
+  assert.equal(restored.installPath, candidate.installPath);
+  assert.equal(restored.trackedPlaytimeSeconds, removed.trackedPlaytimeSeconds);
+  assert.deepEqual(reinstalled.sessions, before.sessions);
+});

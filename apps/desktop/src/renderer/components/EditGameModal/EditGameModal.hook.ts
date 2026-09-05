@@ -2,7 +2,7 @@ import { useDeferredValue, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import type { LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { useLudusaviQuery } from "../../queries/game.queries";
-type LudusaviMatch = Awaited<ReturnType<Window["launcher"]["searchLudusavi"]>>[number];
+import type { LudusaviSuggestion } from "../../types/ludusavi";
 
 export interface EditGameModalOptions {
   game: LibraryGame;
@@ -29,19 +29,29 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
       window.launcher.updateLocalGame(game.id, input),
   });
   const chooseExecutable = async () => {
-    const result = await window.launcher.selectExecutable();
+    try {
+      const result = await window.launcher.selectExecutable();
 
-    if (result) {
-      setExecutablePath(result.path);
+      if (result) {
+        setExecutablePath(result.path);
+      }
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo seleccionar el ejecutable",
+      );
     }
   };
-  const chooseLudusavi = (item: LudusaviMatch) => {
+
+  const chooseLudusavi = (item: LudusaviSuggestion) => {
     setLudusaviName(item.name);
 
     if (item.steamAppId) {
       setSteamAppId(item.steamAppId);
     }
   };
+
   const save = async () => {
     const numericHours = Number(hours.replace(",", "."));
 
@@ -68,6 +78,7 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
       setError(reason instanceof Error ? reason.message : "No se pudo actualizar");
     }
   };
+
   return {
     title,
     setTitle,

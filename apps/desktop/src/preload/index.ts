@@ -1,3 +1,9 @@
+import type {
+  SavegameState,
+  SavegamePolicy,
+  SavegameVersion,
+} from "../shared/savegames.js";
+import type { IpcArgs, IpcChannel } from "../shared/ipc-contracts.js";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   ArtworkSuggestion,
@@ -8,131 +14,51 @@ import type {
   SteamAccountSettings,
 } from "@launcher/core";
 
+const invoke = <K extends IpcChannel>(channel: K, ...args: IpcArgs<K>) =>
+  ipcRenderer.invoke(channel, ...args);
+
 const api = {
-  minimizeWindow: (): Promise<void> => ipcRenderer.invoke("window:minimize"),
-  toggleMaximizeWindow: (): Promise<void> =>
-    ipcRenderer.invoke("window:toggle-maximize"),
-  closeWindow: (): Promise<void> => ipcRenderer.invoke("window:close"),
-  listGames: (): Promise<LibrarySnapshot> => ipcRenderer.invoke("library:list"),
+  minimizeWindow: (): Promise<void> => invoke("window:minimize"),
+  toggleMaximizeWindow: (): Promise<void> => invoke("window:toggle-maximize"),
+  closeWindow: (): Promise<void> => invoke("window:close"),
+  listGames: (): Promise<LibrarySnapshot> => invoke("library:list"),
   getWorkspaceStatus: (): Promise<{ branch: string | null }> =>
-    ipcRenderer.invoke("workspace:status"),
+    invoke("workspace:status"),
   getGameMetadata: (gameId: string): Promise<GameMetadata | null> =>
-    ipcRenderer.invoke("library:metadata", gameId),
-  getSteamSettings: (): Promise<SteamAccountSettings> =>
-    ipcRenderer.invoke("steam:settings"),
-  getSyncSettings: (): Promise<FolderSyncSettings> =>
-    ipcRenderer.invoke("sync:settings"),
+    invoke("library:metadata", gameId),
+  getSteamSettings: (): Promise<SteamAccountSettings> => invoke("steam:settings"),
+  getSyncSettings: (): Promise<FolderSyncSettings> => invoke("sync:settings"),
   selectSyncFolder: (): Promise<{
     snapshot: LibrarySnapshot;
     settings: FolderSyncSettings;
-  } | null> => ipcRenderer.invoke("sync:select-folder"),
+  } | null> => invoke("sync:select-folder"),
   syncNow: (): Promise<{ snapshot: LibrarySnapshot; settings: FolderSyncSettings }> =>
-    ipcRenderer.invoke("sync:now"),
-  getSavegames: (
-    gameId: string,
-  ): Promise<{
-    paths: string[];
-    suggestions: Array<{
-      path: string;
-      confidence: "high" | "medium" | "low";
-      reason: string;
-    }>;
-    versions: Array<{
-      id: string;
-      createdAt: string;
-      deviceId: string;
-      deviceName: string;
-      sizeBytes: number;
-      fileCount: number;
-      pinned?: boolean;
-    }>;
-    policy: {
-      autoBackup: boolean;
-      backupBeforeLaunch: boolean;
-      maxVersions: number;
-      maxSizeMb: number;
-      excludedNames: string[];
-      exactRestore: boolean;
-      includeConfig: boolean;
-    };
-    syncConfigured: boolean;
-    syncState:
-      | "unconfigured"
-      | "path-missing"
-      | "not-detected"
-      | "waiting-backup"
-      | "synced"
-      | "conflict"
-      | "pending";
-    missingPaths: string[];
-    conflict: {
-      id: string;
-      createdAt: string;
-      deviceId: string;
-      deviceName: string;
-      sizeBytes: number;
-      fileCount: number;
-      pinned?: boolean;
-    } | null;
-  }> => ipcRenderer.invoke("savegames:get", gameId),
+    invoke("sync:now"),
+  getSavegames: (gameId: string): Promise<SavegameState> =>
+    invoke("savegames:get", gameId),
   setSavegamePolicy: (
     gameId: string,
-    policy: Partial<{
-      autoBackup: boolean;
-      backupBeforeLaunch: boolean;
-      maxVersions: number;
-      maxSizeMb: number;
-      excludedNames: string[];
-      exactRestore: boolean;
-      includeConfig: boolean;
-    }>,
-  ): Promise<{
-    autoBackup: boolean;
-    backupBeforeLaunch: boolean;
-    maxVersions: number;
-    maxSizeMb: number;
-    excludedNames: string[];
-    exactRestore: boolean;
-    includeConfig: boolean;
-  }> => ipcRenderer.invoke("savegames:set-policy", gameId, policy),
+    policy: Partial<SavegamePolicy>,
+  ): Promise<SavegamePolicy> => invoke("savegames:set-policy", gameId, policy),
   addSavegameFolder: (gameId: string): Promise<string[] | null> =>
-    ipcRenderer.invoke("savegames:add-folder", gameId),
+    invoke("savegames:add-folder", gameId),
   addSuggestedSavegameFolder: (gameId: string, folderPath: string): Promise<string[]> =>
-    ipcRenderer.invoke("savegames:add-suggested", gameId, folderPath),
+    invoke("savegames:add-suggested", gameId, folderPath),
   removeSavegameFolder: (gameId: string, folderPath: string): Promise<string[]> =>
-    ipcRenderer.invoke("savegames:remove-folder", gameId, folderPath),
-  backupSavegames: (
-    gameId: string,
-  ): Promise<
-    Array<{
-      id: string;
-      createdAt: string;
-      deviceId: string;
-      deviceName: string;
-      sizeBytes: number;
-      fileCount: number;
-    }>
-  > => ipcRenderer.invoke("savegames:backup", gameId),
+    invoke("savegames:remove-folder", gameId, folderPath),
+  backupSavegames: (gameId: string): Promise<SavegameVersion[]> =>
+    invoke("savegames:backup", gameId),
   setSavegamePinned: (
     gameId: string,
     versionId: string,
     pinned: boolean,
-  ): Promise<
-    Array<{
-      id: string;
-      createdAt: string;
-      deviceId: string;
-      deviceName: string;
-      sizeBytes: number;
-      fileCount: number;
-      pinned?: boolean;
-    }>
-  > => ipcRenderer.invoke("savegames:set-pinned", gameId, versionId, pinned),
+  ): Promise<SavegameVersion[]> =>
+    invoke("savegames:set-pinned", gameId, versionId, pinned),
   restoreSavegames: (
     gameId: string,
     versionId: string,
   ): Promise<{ restoredFiles: number } | null> =>
-    ipcRenderer.invoke("savegames:restore", gameId, versionId),
+    invoke("savegames:restore", gameId, versionId),
   connectSteam: (
     apiKey: string,
     steamId?: string,
@@ -140,21 +66,21 @@ const api = {
     settings: SteamAccountSettings;
     snapshot: LibrarySnapshot;
     ownedCount: number;
-  }> => ipcRenderer.invoke("steam:connect", apiKey, steamId),
+  }> => invoke("steam:connect", apiKey, steamId),
   refreshSteamAccount: (): Promise<{ snapshot: LibrarySnapshot; ownedCount: number }> =>
-    ipcRenderer.invoke("steam:refresh-account"),
+    invoke("steam:refresh-account"),
   getAchievements: (gameId: string): Promise<GameAchievements> =>
-    ipcRenderer.invoke("library:achievements", gameId),
-  scanSteam: (): Promise<LibrarySnapshot> => ipcRenderer.invoke("library:scan-steam"),
+    invoke("library:achievements", gameId),
+  scanSteam: (): Promise<LibrarySnapshot> => invoke("library:scan-steam"),
   selectExecutable: (): Promise<{ path: string; suggestedTitle: string } | null> =>
-    ipcRenderer.invoke("dialog:select-executable"),
+    invoke("dialog:select-executable"),
   selectArtwork: (): Promise<{
     path: string;
     name: string;
     previewUrl: string;
-  } | null> => ipcRenderer.invoke("dialog:select-artwork"),
+  } | null> => invoke("dialog:select-artwork"),
   searchArtwork: (query: string): Promise<ArtworkSuggestion[]> =>
-    ipcRenderer.invoke("artwork:search", query),
+    invoke("artwork:search", query),
   searchLudusavi: (
     query: string,
   ): Promise<
@@ -163,17 +89,13 @@ const api = {
       steamAppId: string | null;
       files: Array<{ path: string; tags: string[] }>;
     }>
-  > => ipcRenderer.invoke("ludusavi:search", query),
+  > => invoke("ludusavi:search", query),
   autoAssociateLudusavi: (): Promise<{ snapshot: LibrarySnapshot; count: number }> =>
-    ipcRenderer.invoke("ludusavi:auto-associate"),
+    invoke("ludusavi:auto-associate"),
   setRemoteArtwork: (
     gameId: string,
     artwork: ArtworkSuggestion,
-  ): Promise<LibrarySnapshot> =>
-    ipcRenderer.invoke("library:set-remote-artwork", gameId, {
-      ...artwork,
-      steamAppId: artwork.provider === "steam" ? artwork.providerId : null,
-    }),
+  ): Promise<LibrarySnapshot> => invoke("library:set-remote-artwork", gameId, artwork),
   addLocalGame: (input: {
     title: string;
     executablePath: string;
@@ -182,7 +104,7 @@ const api = {
     heroUrl?: string | null;
     steamAppId?: string | null;
     ludusaviGameName?: string | null;
-  }): Promise<LibrarySnapshot> => ipcRenderer.invoke("library:add-local", input),
+  }): Promise<LibrarySnapshot> => invoke("library:add-local", input),
   updateLocalGame: (
     gameId: string,
     input: {
@@ -192,16 +114,14 @@ const api = {
       steamAppId?: string | null;
       ludusaviGameName?: string | null;
     },
-  ): Promise<LibrarySnapshot> =>
-    ipcRenderer.invoke("library:update-local", gameId, input),
+  ): Promise<LibrarySnapshot> => invoke("library:update-local", gameId, input),
   setCover: (gameId: string): Promise<LibrarySnapshot | null> =>
-    ipcRenderer.invoke("library:set-cover", gameId),
+    invoke("library:set-cover", gameId),
   uninstallOrHide: (gameId: string): Promise<LibrarySnapshot> =>
-    ipcRenderer.invoke("library:uninstall-or-hide", gameId),
+    invoke("library:uninstall-or-hide", gameId),
   deleteGameForever: (gameId: string, confirmation: string): Promise<LibrarySnapshot> =>
-    ipcRenderer.invoke("library:delete-forever", gameId, confirmation),
-  launchGame: (gameId: string): Promise<void> =>
-    ipcRenderer.invoke("library:launch", gameId),
+    invoke("library:delete-forever", gameId, confirmation),
+  launchGame: (gameId: string): Promise<void> => invoke("library:launch", gameId),
   onLibraryChanged: (callback: (snapshot: LibrarySnapshot) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, snapshot: LibrarySnapshot) =>
       callback(snapshot);

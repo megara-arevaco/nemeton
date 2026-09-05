@@ -1,3 +1,5 @@
+import { LoadingState } from "../LoadingState";
+import { lazy, Suspense } from "react";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { Gear } from "@phosphor-icons/react/Gear";
 import { Image } from "@phosphor-icons/react/Image";
@@ -15,23 +17,45 @@ import {
   formatPlaytime,
   gameHeroUrl,
 } from "../../shared/presentation";
-import { AddGameModal } from "../AddGameModal";
-import { ArtworkModal } from "../ArtworkModal";
-import { DeleteGameModal } from "../DeleteGameModal";
-import { EditGameModal } from "../EditGameModal";
 import { GameLaunchButton } from "../GameLaunchButton";
 import { Button } from "../Button";
 import { GameMetadata } from "../GameMetadata";
 import { LibraryCollection } from "../LibraryCollection";
-import { SavegamesPanel } from "../SavegamesPanel";
-import { SettingsView } from "../SettingsView";
 import { Sidebar } from "../Sidebar";
-import { StatisticsView } from "../StatisticsView";
 import { useApp } from "./App.hook";
+
+const AddGameModal = lazy(() =>
+  import("../AddGameModal").then((module) => ({ default: module.AddGameModal })),
+);
+
+const ArtworkModal = lazy(() =>
+  import("../ArtworkModal").then((module) => ({ default: module.ArtworkModal })),
+);
+
+const DeleteGameModal = lazy(() =>
+  import("../DeleteGameModal").then((module) => ({ default: module.DeleteGameModal })),
+);
+
+const EditGameModal = lazy(() =>
+  import("../EditGameModal").then((module) => ({ default: module.EditGameModal })),
+);
+
+const SettingsView = lazy(() =>
+  import("../SettingsView").then((module) => ({ default: module.SettingsView })),
+);
+
+const StatisticsView = lazy(() =>
+  import("../StatisticsView").then((module) => ({ default: module.StatisticsView })),
+);
+
+const SavegamesPanel = lazy(() =>
+  import("../SavegamesPanel").then((module) => ({ default: module.SavegamesPanel })),
+);
 
 export function App() {
   const {
     games,
+    libraryLoading,
     setGames,
     sessions,
     setSessions,
@@ -172,18 +196,24 @@ export function App() {
           </div>
         </header>
 
-        {view === "statistics" ? (
-          <StatisticsView games={games} sessions={sessions} />
+        {libraryLoading ? (
+          <LoadingState variant="startup" label="Preparando tu biblioteca" />
+        ) : view === "statistics" ? (
+          <Suspense fallback={<LoadingState />}>
+            <StatisticsView games={games} sessions={sessions} />
+          </Suspense>
         ) : view === "settings" ? (
-          <SettingsView
-            settings={steamSettings}
-            syncSettings={syncSettings}
-            accentTheme={accentTheme}
-            onAccentThemeChange={setAccentTheme}
-            onLibraryUpdated={updateLibrary}
-            onConnected={connectSteam}
-            onSynced={syncLibrary}
-          />
+          <Suspense fallback={<LoadingState />}>
+            <SettingsView
+              settings={steamSettings}
+              syncSettings={syncSettings}
+              accentTheme={accentTheme}
+              onAccentThemeChange={setAccentTheme}
+              onLibraryUpdated={updateLibrary}
+              onConnected={connectSteam}
+              onSynced={syncLibrary}
+            />
+          </Suspense>
         ) : selected ? (
           <div
             className={
@@ -345,12 +375,16 @@ export function App() {
                           : ""}
                       </small>
                       <strong>
-                        {achievements.unlocked} de {achievements.total} desbloqueados
+                        {achievements.totalKnown === false
+                          ? `${achievements.unlocked} desbloqueados · total pendiente`
+                          : `${achievements.unlocked} de ${achievements.total} desbloqueados`}
                       </strong>
                     </span>
                   </div>
                   <b>
-                    {Math.round((achievements.unlocked / achievements.total) * 100)}%
+                    {achievements.totalKnown === false
+                      ? "—"
+                      : `${Math.round((achievements.unlocked / achievements.total) * 100)}%`}
                   </b>
                 </div>
                 <div
@@ -360,7 +394,10 @@ export function App() {
                 >
                   <span
                     style={{
-                      width: `${(achievements.unlocked / achievements.total) * 100}%`,
+                      width:
+                        achievements.totalKnown === false
+                          ? "0%"
+                          : `${(achievements.unlocked / achievements.total) * 100}%`,
                     }}
                   />
                 </div>
@@ -417,7 +454,13 @@ export function App() {
               </section>
             )}
             {selected.source === "local" && (
-              <SavegamesPanel key={selected.id} game={selected} />
+              <Suspense
+                fallback={
+                  <LoadingState variant="panel" label="Preparando tus partidas" />
+                }
+              >
+                <SavegamesPanel key={selected.id} game={selected} />
+              </Suspense>
             )}
           </div>
         ) : visibleGames.length > 0 ? (
@@ -449,7 +492,7 @@ export function App() {
             </Button>
           </section>
         )}
-        <footer>
+        <footer className="app-statusbar">
           {message}
           <div className="statusbar-meta">
             <span title="Branch Git actual">⎇ {workspaceStatus?.branch ?? "…"}</span>
@@ -465,30 +508,46 @@ export function App() {
         </footer>
       </section>
       {showAddGame && (
-        <AddGameModal onClose={closeAddGame} onCreated={onLocalGameCreated} />
+        <Suspense
+          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+        >
+          <AddGameModal onClose={closeAddGame} onCreated={onLocalGameCreated} />
+        </Suspense>
       )}
       {artworkGame && (
-        <ArtworkModal
-          game={artworkGame}
-          onClose={closeArtwork}
-          onUpdated={updateLibrary}
-        />
+        <Suspense
+          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+        >
+          <ArtworkModal
+            game={artworkGame}
+            onClose={closeArtwork}
+            onUpdated={updateLibrary}
+          />
+        </Suspense>
       )}
       {editGame && (
-        <EditGameModal
-          game={editGame}
-          onClose={closeEditor}
-          onUpdated={(snapshot) => setGames(snapshot.games)}
-        />
+        <Suspense
+          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+        >
+          <EditGameModal
+            game={editGame}
+            onClose={closeEditor}
+            onUpdated={(snapshot) => setGames(snapshot.games)}
+          />
+        </Suspense>
       )}
       {deleteGame && (
-        <DeleteGameModal
-          game={deleteGame}
-          deleting={deletingGame}
-          error={deleteGameError}
-          onClose={closeGameMenu}
-          onConfirm={deleteGameForever}
-        />
+        <Suspense
+          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+        >
+          <DeleteGameModal
+            game={deleteGame}
+            deleting={deletingGame}
+            error={deleteGameError}
+            onClose={closeGameMenu}
+            onConfirm={deleteGameForever}
+          />
+        </Suspense>
       )}
       {gameMenu && (
         <div

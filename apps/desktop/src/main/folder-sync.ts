@@ -1,6 +1,7 @@
+import { remoteLibrarySchema, achievementHistorySchema } from "./sync-validation.js";
 import fs from "node:fs";
 import path from "node:path";
-import { LibraryStore } from "@launcher/core";
+import { readTextIfExists, writeJsonAtomically, LibraryStore } from "@launcher/core";
 import type { LibrarySnapshot } from "@launcher/core";
 import { AchievementService, type AchievementHistoryEntry } from "./achievements.js";
 import { toLinuxPath } from "./platform.js";
@@ -15,6 +16,7 @@ export interface FolderSyncResult {
 
 export class FolderSyncService {
   private activeSync: Promise<FolderSyncResult> | null = null;
+  private readonly remoteContents = new Map<string, string>();
   private lastError: string | null = null;
 
   constructor(
@@ -57,21 +59,22 @@ export class FolderSyncService {
     }
 
     const historyPath = path.join(resolved, "launcher-next-history.json");
-    const remoteHistory = await fs.promises
-      .readFile(historyPath, "utf8")
-      .catch(() => null);
+    const remoteHistory = await readTextIfExists(historyPath);
 
-    if (remoteHistory) {
+    if (remoteHistory && this.remoteContents.get(historyPath) !== remoteHistory) {
       try {
         await this.store.mergeRemoteManual(
-          JSON.parse(remoteHistory) as LibrarySnapshot,
+          remoteLibrarySchema.parse(JSON.parse(remoteHistory)),
         );
       } catch {
         throw new Error("El historial remoto no tiene un formato válido");
       }
     }
 
-    await this.writeJsonAtomically(historyPath, await this.store.exportManualHistory());
+    const exported = await this.store.exportManualHistory();
+    await writeJsonAtomically(historyPath, exported);
+    this.remoteContents.clear();
+    this.remoteContents.set(historyPath, JSON.stringify(exported, null, 2));
 
     const snapshot = await this.store.read();
     const excludedSourceIds = new Set(
@@ -81,8 +84,7 @@ export class FolderSyncService {
 
     const lastSyncedAt = new Date().toISOString();
 
-    await this.settingsStore.write({
-      ...(await this.settingsStore.read()),
+    await this.settingsStore.update({
       syncFolderPath: resolved,
       lastSyncedAt,
     });
@@ -103,22 +105,13 @@ export class FolderSyncService {
     excludedSourceIds: Set<string>,
   ) {
     const remotePath = path.join(folderPath, "launcher-next-achievements.json");
-    const localEntries = await this.achievementService.readHistory();
-    const remoteRaw = await fs.promises.readFile(remotePath, "utf8").catch(() => null);
+    const remoteRaw = await readTextIfExists(remotePath);
     const remoteEntries = parseAchievementHistory(remoteRaw);
-    const mergedEntries = mergeAchievementHistory(localEntries, remoteEntries).filter(
-      (entry) => !excludedSourceIds.has(entry.gameSourceId),
+    const mergedEntries = await this.achievementService.mergeHistory(
+      remoteEntries,
+      excludedSourceIds,
     );
-
-    await this.achievementService.writeHistory(mergedEntries);
-    await this.writeJsonAtomically(remotePath, mergedEntries);
-  }
-
-  private async writeJsonAtomically(filePath: string, value: unknown) {
-    const temporaryPath = `${filePath}.tmp`;
-
-    await fs.promises.writeFile(temporaryPath, JSON.stringify(value, null, 2));
-    await fs.promises.rename(temporaryPath, filePath);
+    await writeJsonAtomically(remotePath, mergedEntries);
   }
 }
 
@@ -128,26 +121,8 @@ function parseAchievementHistory(raw: string | null) {
   }
 
   try {
-    return JSON.parse(raw) as AchievementHistoryEntry[];
+    return achievementHistorySchema.parse(JSON.parse(raw));
   } catch {
-    return [];
+    throw new Error("El historial remoto de logros no tiene un formato válido");
   }
-}
-
-function mergeAchievementHistory(
-  localEntries: AchievementHistoryEntry[],
-  remoteEntries: AchievementHistoryEntry[],
-) {
-  const mergedEntries = new Map<string, AchievementHistoryEntry>();
-
-  for (const entry of [...localEntries, ...remoteEntries]) {
-    const key = `${entry.gameSourceId}:${entry.achievementId}`;
-    const previous = mergedEntries.get(key);
-
-    if (!previous || entry.detectedAt < previous.detectedAt) {
-      mergedEntries.set(key, entry);
-    }
-  }
-
-  return [...mergedEntries.values()];
 }

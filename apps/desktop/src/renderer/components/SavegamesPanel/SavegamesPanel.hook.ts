@@ -107,6 +107,7 @@ export function useSavegamesPanel(game: LibraryGame) {
   };
 
   return {
+    loading: savegamesQuery.isPending,
     data,
     busy,
     status: status || errorMessage,

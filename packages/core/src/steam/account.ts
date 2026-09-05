@@ -71,6 +71,7 @@ export const fetchOwnedSteamGames = async (
     `https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/?${query}`,
     {
       headers: { "x-webapi-key": apiKey.trim() },
+      signal: AbortSignal.timeout(15_000),
     },
   );
 

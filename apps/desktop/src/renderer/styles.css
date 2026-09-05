@@ -240,14 +240,11 @@ h1 {
   color: var(--text-secondary);
   font-size: var(--text-body);
 }
-.add-game-modal > footer {
-  padding: 24px 16px;
-}
 .ludusavi-results {
   max-height: none;
   overflow: hidden;
 }
-footer {
+.app-statusbar {
   display: flex;
   justify-content: space-between;
   align-items: center;

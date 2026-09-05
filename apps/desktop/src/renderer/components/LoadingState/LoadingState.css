@@ -1,0 +1,183 @@
+.nemeton-loading {
+  --loading-accent: var(--accent-a, #a9fb76);
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 240px;
+  color: #e8eaf0;
+  font-family: Inter, "Segoe UI", sans-serif;
+  text-align: center;
+}
+.nemeton-loading__content {
+  display: grid;
+  justify-items: center;
+  gap: 22px;
+  padding: 32px;
+  animation: nemeton-loading-enter 240ms ease-out both;
+}
+.nemeton-loading__emblem {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 1px solid color-mix(in srgb, var(--loading-accent) 12%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--loading-accent) 10%, transparent),
+    transparent 70%
+  );
+}
+.nemeton-loading__orbit {
+  position: absolute;
+  inset: -1px;
+  border: 1px solid transparent;
+  border-top-color: var(--loading-accent);
+  border-right-color: color-mix(in srgb, var(--loading-accent) 25%, transparent);
+  border-radius: 50%;
+  animation: nemeton-loading-orbit 2s linear infinite;
+}
+.nemeton-loading__orbit::after {
+  content: "";
+  position: absolute;
+  top: 11px;
+  right: 11px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--loading-accent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--loading-accent) 50%, transparent);
+}
+.nemeton-loading__core {
+  display: grid;
+  place-items: center;
+  color: var(--loading-accent);
+  animation: nemeton-loading-breathe 2.4s ease-in-out infinite;
+}
+.nemeton-loading__core .nemeton-mark {
+  width: 40px;
+  height: 40px;
+}
+.nemeton-loading__copy {
+  display: grid;
+  gap: 9px;
+}
+.nemeton-loading__eyebrow {
+  color: var(--loading-accent);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 3px;
+}
+.nemeton-loading__label {
+  color: #8e93a5;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.nemeton-loading__track {
+  width: 96px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #ffffff0a;
+}
+.nemeton-loading__track > span {
+  display: block;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--loading-accent), transparent);
+  animation: nemeton-loading-sweep 1.8s ease-in-out infinite;
+}
+.nemeton-loading--view {
+  height: 100%;
+  min-height: 280px;
+}
+.nemeton-loading--startup {
+  height: 100%;
+  min-height: 320px;
+  background: radial-gradient(ellipse at center, #19221d 0%, #0b0c12 65%);
+}
+.nemeton-loading--panel {
+  min-height: 156px;
+  margin: 24px 34px 0;
+  border: 1px solid #ffffff0d;
+  border-radius: 20px;
+  background: #101119;
+}
+.nemeton-loading--panel .nemeton-loading__content {
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 24px;
+  text-align: left;
+  justify-items: start;
+}
+.nemeton-loading--panel .nemeton-loading__emblem {
+  grid-row: span 2;
+  width: 58px;
+  height: 58px;
+}
+.nemeton-loading--panel .nemeton-loading__core .nemeton-mark {
+  width: 28px;
+  height: 28px;
+}
+.nemeton-loading--panel .nemeton-loading__copy {
+  align-self: end;
+  gap: 5px;
+}
+.nemeton-loading--panel .nemeton-loading__track {
+  align-self: start;
+}
+.nemeton-loading--overlay {
+  position: fixed;
+  inset: 44px 0 0;
+  z-index: 100;
+  background: #090a0fe8;
+}
+@keyframes nemeton-loading-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes nemeton-loading-breathe {
+  0%,
+  100% {
+    opacity: 0.65;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes nemeton-loading-sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+@keyframes nemeton-loading-enter {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nemeton-loading__content,
+  .nemeton-loading__orbit,
+  .nemeton-loading__core,
+  .nemeton-loading__track > span {
+    animation: none;
+  }
+}
+#root > .nemeton-loading--startup {
+  position: fixed;
+  inset: 0;
+}

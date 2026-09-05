@@ -3,10 +3,40 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: data: launcher-cover:; font-src 'self' data:; connect-src 'self' ws://localhost:* ws://127.0.0.1:*; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <link rel="stylesheet" href="/components/LoadingState/LoadingState.css" />
     <title>Nemeton</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div
+        class="nemeton-loading nemeton-loading--startup"
+        role="status"
+        aria-live="polite"
+      >
+        <div class="nemeton-loading__content">
+          <div class="nemeton-loading__emblem" aria-hidden="true">
+            <span class="nemeton-loading__orbit"></span>
+            <span class="nemeton-loading__core"
+              ><svg class="nemeton-mark" viewBox="0 0 64 64">
+                <path
+                  d="M32 7C18.2 7 7 18.2 7 32c0 8.2 3.9 15.4 10 20l7.2-8.2A15 15 0 1 1 47 32c0 4.4-1.9 8.4-5 11.1L49.6 51A25 25 0 0 0 32 7Z"
+                  fill="currentColor"
+                />
+                <path d="m27 24 13 8-13 8Z" fill="currentColor" /></svg
+            ></span>
+          </div>
+          <div class="nemeton-loading__copy">
+            <span class="nemeton-loading__eyebrow">NEMETON</span
+            ><span class="nemeton-loading__label">Preparando tu biblioteca</span>
+          </div>
+          <div class="nemeton-loading__track" aria-hidden="true"><span></span></div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src.tsx"></script>
   </body>
 </html>

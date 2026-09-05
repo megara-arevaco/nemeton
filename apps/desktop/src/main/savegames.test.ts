@@ -168,3 +168,127 @@ test("detects changes that conflict with another device's latest version", async
     await fs.promises.rm(root, { recursive: true, force: true });
   }
 });
+
+async function safetyFixture(context: {
+  after: (callback: () => Promise<void>) => void;
+}) {
+  const root = await fs.promises.mkdtemp(path.join(os.tmpdir(), "nemeton-regression-"));
+  context.after(() => fs.promises.rm(root, { recursive: true, force: true }));
+  const local = path.join(root, "local");
+  const remote = path.join(root, "remote");
+  await fs.promises.mkdir(local);
+  const manager = new SavegameManager(path.join(root, "config.json"));
+  await manager.addPath("game", local);
+  return { root, local, remote, manager };
+}
+
+test("preserves distinct filenames that previously collided inside ZIP entries", async (context) => {
+  const { local, remote, manager } = await safetyFixture(context);
+  await fs.promises.writeFile(path.join(local, "slot 1.sav"), "one");
+  await fs.promises.writeFile(path.join(local, "slot_1.sav"), "two");
+  const version = await manager.backup("game", "source", remote);
+  await manager.setPolicy("game", { exactRestore: true });
+  await manager.restore("game", "source", remote, version!.id);
+  assert.equal(
+    await fs.promises.readFile(path.join(local, "slot 1.sav"), "utf8"),
+    "one",
+  );
+  assert.equal(
+    await fs.promises.readFile(path.join(local, "slot_1.sav"), "utf8"),
+    "two",
+  );
+});
+
+test("validates every file before changing current saves during exact restore", async (context) => {
+  const { local, remote, manager } = await safetyFixture(context);
+  await fs.promises.writeFile(path.join(local, "first.sav"), "old");
+  await fs.promises.writeFile(path.join(local, "last.sav"), "old");
+  const version = await manager.backup("game", "source", remote);
+  const archivePath = path.join(
+    remote,
+    "launcher-next-saves/source/versions",
+    `${version!.id}.zip`,
+  );
+  const archive = unzipSync(new Uint8Array(await fs.promises.readFile(archivePath)));
+  archive["files/1"] = strToU8("bad");
+  await fs.promises.writeFile(archivePath, zipSync(archive));
+  await fs.promises.writeFile(path.join(local, "first.sav"), "current first");
+  await fs.promises.writeFile(path.join(local, "last.sav"), "current last");
+  await manager.setPolicy("game", { exactRestore: true });
+  await assert.rejects(
+    () => manager.restore("game", "source", remote, version!.id),
+    /dañada/,
+  );
+  assert.equal(
+    await fs.promises.readFile(path.join(local, "first.sav"), "utf8"),
+    "current first",
+  );
+  assert.equal(
+    await fs.promises.readFile(path.join(local, "last.sav"), "utf8"),
+    "current last",
+  );
+});
+
+test("rejects version traversal before opening external files", async (context) => {
+  const { root, remote, manager } = await safetyFixture(context);
+  const outside = path.join(root, "outside.json");
+  await fs.promises.writeFile(outside, '{"pinned":false}');
+  for (const id of ["../../outside", "..\\outside", "/outside", "C:\\outside"]) {
+    await assert.rejects(() => manager.setPinned(remote, "source", id, true));
+    await assert.rejects(() => manager.restore("game", "source", remote, id));
+  }
+  assert.equal(await fs.promises.readFile(outside, "utf8"), '{"pinned":false}');
+});
+
+test("rejects hostile manifest paths without deleting current files", async (context) => {
+  const { local, remote, manager } = await safetyFixture(context);
+  await fs.promises.writeFile(path.join(local, "save.sav"), "progress");
+  const version = await manager.backup("game", "source", remote);
+  const manifestPath = path.join(
+    remote,
+    "launcher-next-saves/source/snapshots",
+    `${version!.id}.json`,
+  );
+  const manifest = JSON.parse(await fs.promises.readFile(manifestPath, "utf8"));
+  manifest.files[0].relativePath = "../outside.sav";
+  await fs.promises.writeFile(manifestPath, JSON.stringify(manifest));
+  await manager.setPolicy("game", { exactRestore: true });
+  await assert.rejects(
+    () => manager.restore("game", "source", remote, version!.id),
+    /ruta/,
+  );
+  assert.equal(
+    await fs.promises.readFile(path.join(local, "save.sav"), "utf8"),
+    "progress",
+  );
+});
+
+test("reads ZIP-only backups and preserves the requested version during safety backup", async (context) => {
+  const { local, remote, manager } = await safetyFixture(context);
+  await manager.setPolicy("game", { maxVersions: 1 });
+  await fs.promises.writeFile(path.join(local, "save.sav"), "old");
+  const version = await manager.backup("game", "source", remote);
+  await fs.promises.unlink(
+    path.join(remote, "launcher-next-saves/source/snapshots", `${version!.id}.json`),
+  );
+  assert.equal((await manager.listVersions(remote, "source"))[0]!.id, version!.id);
+  await fs.promises.writeFile(path.join(local, "save.sav"), "new");
+  await manager.backup("game", "source", remote, version!.id);
+  await manager.restore("game", "source", remote, version!.id);
+  assert.equal(await fs.promises.readFile(path.join(local, "save.sav"), "utf8"), "old");
+});
+
+test("serializes simultaneous configuration changes", async (context) => {
+  const { root, manager } = await safetyFixture(context);
+  const a = path.join(root, "a");
+  const b = path.join(root, "b");
+  await fs.promises.mkdir(a);
+  await fs.promises.mkdir(b);
+  await Promise.all([
+    manager.addPath("game", a),
+    manager.addPath("game", b),
+    manager.setPolicy("game", { maxVersions: 5 }),
+  ]);
+  assert.equal((await manager.getPaths("game")).length, 3);
+  assert.equal((await manager.getPolicy("game")).maxVersions, 5);
+});

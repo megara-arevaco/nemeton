@@ -1,3 +1,4 @@
+import { readTextIfExists, withFileLock, writeJsonAtomically } from "@launcher/core";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { safeStorage } from "electron";
@@ -21,7 +22,7 @@ export class SettingsStore {
   constructor(private readonly filePath: string) {}
 
   async read(): Promise<StoredSettings> {
-    const raw = await fs.promises.readFile(this.filePath, "utf8").catch(() => null);
+    const raw = await readTextIfExists(this.filePath);
 
     if (!raw) {
       return emptySettings;
@@ -30,12 +31,18 @@ export class SettingsStore {
     try {
       return JSON.parse(raw) as StoredSettings;
     } catch {
-      return emptySettings;
+      throw new Error("El archivo de ajustes está dañado");
     }
   }
 
   async write(settings: StoredSettings) {
-    await fs.promises.writeFile(this.filePath, JSON.stringify(settings, null, 2));
+    await writeJsonAtomically(this.filePath, settings);
+  }
+
+  async update(patch: Partial<StoredSettings>) {
+    return withFileLock(this.filePath, async () =>
+      this.write({ ...(await this.read()), ...patch }),
+    );
   }
 
   async readApiKey() {
@@ -67,18 +74,20 @@ export class SettingsStore {
   }
 
   async writeSteamCredentials(steamId: string, apiKey: string) {
-    this.sessionApiKey = apiKey;
+    return withFileLock(this.filePath, async () => {
+      this.sessionApiKey = apiKey;
 
-    const encryptedSteamApiKey = safeStorage.isEncryptionAvailable()
-      ? safeStorage.encryptString(apiKey).toString("base64")
-      : process.env.WSL_DISTRO_NAME
-        ? await protectWithWindows(apiKey)
-        : null;
+      const encryptedSteamApiKey = safeStorage.isEncryptionAvailable()
+        ? safeStorage.encryptString(apiKey).toString("base64")
+        : process.env.WSL_DISTRO_NAME
+          ? await protectWithWindows(apiKey)
+          : null;
 
-    await this.write({
-      ...(await this.read()),
-      steamId,
-      encryptedSteamApiKey,
+      await this.write({
+        ...(await this.read()),
+        steamId,
+        encryptedSteamApiKey,
+      });
     });
   }
 }

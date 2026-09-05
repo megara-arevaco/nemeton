@@ -37,6 +37,9 @@ export function toLinuxPath(input: string) {
 }
 
 export async function openExternal(target: string) {
+  if (!/^steam:\/\/(rungameid|uninstall)\/\d+$/.test(target)) {
+    throw new Error("Enlace de Steam no permitido");
+  }
   if (!process.env.WSL_DISTRO_NAME) {
     await shell.openExternal(target);
     return;

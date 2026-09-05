@@ -108,6 +108,7 @@ export interface GameAchievement {
 }
 
 export interface GameAchievements {
+  totalKnown?: boolean;
   total: number;
   unlocked: number;
   items: GameAchievement[];

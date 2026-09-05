@@ -21,5 +21,5 @@ try {
     </StrictMode>,
   );
 } catch (error) {
-  root.innerHTML = `<pre style="padding:32px;color:#ff8f8f;white-space:pre-wrap">${String(error)}</pre>`;
+  root.textContent = `No se pudo iniciar la interfaz: ${String(error)}`;
 }

@@ -34,12 +34,12 @@ export function SettingsView({
     apiKey,
     setApiKey,
     saving,
-    importingSteam,
+    syncingSteam,
     status,
     syncing,
     syncStatus,
     connect,
-    importSteam,
+    syncSteam,
     chooseSyncFolder,
     syncNow,
     associateLudusavi,
@@ -201,18 +201,21 @@ export function SettingsView({
         >
           <div>
             <strong>Instalaciones locales</strong>
-            <p>Busca juegos instalados sin conectar una cuenta.</p>
+            <p>
+              Actualiza los juegos instalados y retira los desinstalados. No requiere
+              conectar una cuenta.
+            </p>
           </div>
           <button
             type="button"
             className={
               "[display:inline-flex] [align-items:center] [gap:7px] [min-height:38px] [border:1px_solid_color-mix(in_srgb,_var(--accent-a)_40%,_transparent)] [border-radius:10px] [padding:0_13px] [background:color-mix(in_srgb,_var(--accent-a)_10%,_transparent)] [color:var(--accent-a)] [font-size:11px] [font-weight:700] [cursor:pointer] [transition:background_.16s_ease,_transform_.16s_ease] [&:hover:not(:disabled)]:[background:color-mix(in_srgb,_var(--accent-a)_18%,_transparent)] [&:hover:not(:disabled)]:[transform:translateY(-1px)] [&:focus-visible]:[outline:2px_solid_var(--accent-a)] [&:focus-visible]:[outline-offset:3px] [&:disabled]:[opacity:.5]"
             }
-            disabled={importingSteam}
-            onClick={importSteam}
+            disabled={syncingSteam}
+            onClick={syncSteam}
           >
             <SteamLogo weight="fill" />
-            {importingSteam ? "Buscando…" : "Buscar Steam"}
+            {syncingSteam ? "Sincronizando…" : "Sincronizar Steam"}
           </button>
         </div>
         <p

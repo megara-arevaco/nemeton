@@ -1,7 +1,8 @@
+import { handle } from "./handle.js";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { BrowserWindow, dialog, ipcMain } from "electron";
+import { app, BrowserWindow, dialog } from "electron";
 import type { MainContext } from "../context.js";
 const execFileAsync = promisify(execFile);
 
@@ -9,20 +10,25 @@ export const registerSystemHandlers = ({
   folderSyncService,
   settingsStore,
 }: MainContext) => {
-  ipcMain.handle("workspace:status", async () => {
+  handle("workspace:status", async () => {
+    if (app.isPackaged) {
+      return { branch: null };
+    }
     try {
       const { stdout } = await execFileAsync("git", ["branch", "--show-current"], {
         cwd: process.cwd(),
+        timeout: 2_000,
+        windowsHide: true,
       });
       return { branch: stdout.trim() || "HEAD" };
     } catch {
       return { branch: null };
     }
   });
-  ipcMain.handle("window:minimize", (event) =>
+  handle("window:minimize", (event) =>
     BrowserWindow.fromWebContents(event.sender)?.minimize(),
   );
-  ipcMain.handle("window:toggle-maximize", (event) => {
+  handle("window:toggle-maximize", (event) => {
     const target = BrowserWindow.fromWebContents(event.sender);
 
     if (target?.isMaximized()) {
@@ -31,10 +37,10 @@ export const registerSystemHandlers = ({
       target?.maximize();
     }
   });
-  ipcMain.handle("window:close", (event) =>
+  handle("window:close", (event) =>
     BrowserWindow.fromWebContents(event.sender)?.close(),
   );
-  ipcMain.handle("sync:settings", async () => {
+  handle("sync:settings", async () => {
     const settings = await settingsStore.read();
     const exists = settings.syncFolderPath
       ? Boolean(
@@ -58,7 +64,7 @@ export const registerSystemHandlers = ({
       error: folderSyncService.syncError,
     };
   });
-  ipcMain.handle("sync:select-folder", async () => {
+  handle("sync:select-folder", async () => {
     const settings = await settingsStore.read();
     const result = await dialog.showOpenDialog({
       title: "Selecciona la carpeta de sincronización",
@@ -72,7 +78,7 @@ export const registerSystemHandlers = ({
     }
     return folderSyncService.sync(folderPath);
   });
-  ipcMain.handle("sync:now", async () => {
+  handle("sync:now", async () => {
     const settings = await settingsStore.read();
 
     if (!settings.syncFolderPath) {

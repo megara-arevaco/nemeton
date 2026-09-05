@@ -4,3 +4,4 @@ export * from "./library/index.js";
 export * from "./metadata/index.js";
 export * from "./achievements/index.js";
 export * from "./artwork/index.js";
+export * from "./shared/persistence.js";

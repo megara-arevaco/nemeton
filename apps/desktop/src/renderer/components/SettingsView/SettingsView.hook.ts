@@ -36,7 +36,7 @@ export function useSettingsView(options: SettingsViewOptions) {
   const associateLudusaviMutation = useMutation({
     mutationFn: window.launcher.autoAssociateLudusavi,
   });
-  const importSteamMutation = useScanSteamMutation();
+  const syncSteamMutation = useScanSteamMutation();
 
   const connect = async () => {
     setStatus("Importando la biblioteca de la cuenta…");
@@ -98,13 +98,18 @@ export function useSettingsView(options: SettingsViewOptions) {
     }
   };
 
-  const importSteam = async () => {
-    setStatus("Buscando instalaciones locales de Steam…");
+  const syncSteam = async () => {
+    setStatus("Sincronizando instalaciones de Steam…");
 
     try {
-      const snapshot = await importSteamMutation.mutateAsync();
+      const snapshot = await syncSteamMutation.mutateAsync();
       onLibraryUpdated(snapshot);
-      setStatus(`${snapshot.games.length} juegos detectados en Steam`);
+      const installedCount = snapshot.games.filter(
+        (game) => game.source === "steam" && game.installed && !game.hiddenFromLibrary,
+      ).length;
+      setStatus(
+        `Steam sincronizado: ${installedCount} juegos instalados en tu biblioteca`,
+      );
     } catch (error) {
       setStatus(
         error instanceof Error
@@ -120,7 +125,7 @@ export function useSettingsView(options: SettingsViewOptions) {
     apiKey,
     setApiKey,
     saving: connectMutation.isPending,
-    importingSteam: importSteamMutation.isPending,
+    syncingSteam: syncSteamMutation.isPending,
     status: status || (settings?.hasApiKey ? "Cuenta conectada" : ""),
     syncing:
       chooseSyncFolderMutation.isPending ||
@@ -128,7 +133,7 @@ export function useSettingsView(options: SettingsViewOptions) {
       associateLudusaviMutation.isPending,
     syncStatus,
     connect,
-    importSteam,
+    syncSteam,
     chooseSyncFolder,
     syncNow,
     associateLudusavi,

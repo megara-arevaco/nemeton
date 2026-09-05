@@ -99,3 +99,13 @@
     background: color-mix(in srgb, var(--accent-a) 18%, transparent);
   }
 }
+
+.danger {
+  border-color: #ff747c;
+  background: #e85f68;
+  color: white;
+
+  &:hover:not(:disabled) {
+    background: #f06b74;
+  }
+}

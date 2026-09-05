@@ -218,6 +218,7 @@ export const parseGoldbergAchievements = (
     })
     .sort((left, right) => Number(right.achieved) - Number(left.achieved));
   return {
+    totalKnown: schemas.size > 0 && [...ids].every((id) => schemas.has(id)),
     total: items.length,
     unlocked: items.filter((item) => item.achieved).length,
     items,

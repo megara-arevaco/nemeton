@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 import styles from "./Button.module.scss";
-type ButtonVariant = "primary" | "secondary" | "ghost" | "setup";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "setup" | "danger";
 
 type ButtonSize = "small" | "medium" | "large";
 

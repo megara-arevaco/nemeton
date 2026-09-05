@@ -1,5 +1,5 @@
 import { Plus } from "@phosphor-icons/react/Plus";
-import type { LudusaviSuggestion } from "../AddGameModal/AddGameModal.hook";
+import type { LudusaviSuggestion } from "../../types/ludusavi";
 import { useLudusaviSuggestions } from "./LudusaviSuggestions.hook";
 
 export function LudusaviSuggestions({

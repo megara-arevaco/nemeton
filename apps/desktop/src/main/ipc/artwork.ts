@@ -1,9 +1,9 @@
+import { handle } from "./handle.js";
 import {
   fetchSteamStoreArtwork,
   searchSteamArtwork,
   type ArtworkSuggestion,
 } from "@launcher/core";
-import { ipcMain } from "electron";
 import type { MainContext } from "../context.js";
 
 export const registerArtworkHandlers = ({
@@ -11,13 +11,9 @@ export const registerArtworkHandlers = ({
   scheduleAutoSync,
   store,
 }: MainContext) => {
-  ipcMain.handle("artwork:search", (_event, query: string) =>
-    searchSteamArtwork(query),
-  );
-  ipcMain.handle("ludusavi:search", (_event, query: string) =>
-    ludusaviCatalog.search(query),
-  );
-  ipcMain.handle("ludusavi:auto-associate", async () => {
+  handle("artwork:search", (_event, query: string) => searchSteamArtwork(query));
+  handle("ludusavi:search", (_event, query: string) => ludusaviCatalog.search(query));
+  handle("ludusavi:auto-associate", async () => {
     const snapshot = await store.read();
     const updates = [];
 
@@ -42,7 +38,7 @@ export const registerArtworkHandlers = ({
     }
     return { snapshot: await store.updateLocalGames(updates), count: updates.length };
   });
-  ipcMain.handle(
+  handle(
     "library:set-remote-artwork",
     async (_event, gameId: string, artwork: ArtworkSuggestion) => {
       const resolvedArtwork =

@@ -1,3 +1,4 @@
+import { LoadingState } from "../LoadingState";
 import type { LibraryGame } from "@launcher/core";
 import { FloppyDisk } from "@phosphor-icons/react/FloppyDisk";
 import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
@@ -5,6 +6,7 @@ import { useSavegamesPanel } from "./SavegamesPanel.hook";
 
 export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
   const {
+    loading,
     data,
     busy,
     status,
@@ -15,6 +17,10 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
     backup,
     restoreLatest,
   } = useSavegamesPanel(game);
+
+  if (loading) {
+    return <LoadingState variant="panel" label="Preparando tus partidas" />;
+  }
 
   return (
     <section

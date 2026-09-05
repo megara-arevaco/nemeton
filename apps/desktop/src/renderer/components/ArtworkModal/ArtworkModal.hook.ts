@@ -15,31 +15,45 @@ export function useArtworkModal({ game, onClose, onUpdated }: ArtworkModalOption
   const remoteArtworkMutation = useMutation({
     mutationFn: (suggestion: ArtworkSuggestion) =>
       window.launcher.setRemoteArtwork(game.id, suggestion),
+    onSuccess: (snapshot) => {
+      onUpdated(snapshot);
+      onClose();
+    },
   });
   const uploadArtworkMutation = useMutation({
     mutationFn: () => window.launcher.setCover(game.id),
+    onSuccess: (snapshot) => {
+      if (snapshot) {
+        onUpdated(snapshot);
+        onClose();
+      }
+    },
   });
 
-  const applySuggestion = async (suggestion: ArtworkSuggestion) => {
-    const snapshot = await remoteArtworkMutation.mutateAsync(suggestion);
-    onUpdated(snapshot);
-    onClose();
-  };
-
-  const uploadArtwork = async () => {
-    const snapshot = await uploadArtworkMutation.mutateAsync();
-
-    if (snapshot) {
-      onUpdated(snapshot);
-      onClose();
+  const saving = remoteArtworkMutation.isPending || uploadArtworkMutation.isPending;
+  const mutationError = remoteArtworkMutation.error ?? uploadArtworkMutation.error;
+  const error = mutationError ?? artworkQuery.error;
+  const applySuggestion = (suggestion: ArtworkSuggestion) => {
+    if (!saving) {
+      uploadArtworkMutation.reset();
+      remoteArtworkMutation.mutate(suggestion);
     }
   };
+
+  const uploadArtwork = () => {
+    if (!saving) {
+      remoteArtworkMutation.reset();
+      uploadArtworkMutation.mutate();
+    }
+  };
+
   return {
     query,
     setQuery,
     suggestions: artworkQuery.data ?? [],
     loading: artworkQuery.isFetching,
-    error: artworkQuery.error instanceof Error ? artworkQuery.error.message : "",
+    saving,
+    error: error instanceof Error ? error.message : "",
     applySuggestion,
     uploadArtwork,
   };

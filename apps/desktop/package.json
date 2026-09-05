@@ -6,31 +6,39 @@
   "main": "out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
-    "dist:win": "electron-vite build && electron-builder --win nsis portable",
-    "dist:win:installer": "electron-vite build && electron-builder --win nsis",
-    "dist:win:portable": "electron-vite build && electron-builder --win portable",
+    "build": "node scripts/render-icon.cjs && electron-vite build",
+    "dist:win": "node scripts/render-icon.cjs && electron-vite build && electron-builder --win nsis portable",
+    "dist:win:installer": "node scripts/render-icon.cjs && electron-vite build && electron-builder --win nsis",
+    "dist:win:portable": "node scripts/render-icon.cjs && electron-vite build && electron-builder --win portable",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/main/**/*.test.ts src/renderer/**/*.test.ts"
+    "test": "node --import tsx --test 'src/**/*.test.ts'",
+    "icons": "node scripts/render-icon.cjs"
   },
   "dependencies": {
     "@launcher/core": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-query": "^5.102.8",
-    "fflate": "^0.8.3",
+    "js-yaml": "^5.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "yaml": "^2.8.1"
+    "yauzl": "^3.4.0",
+    "yazl": "^3.3.1",
+    "zod": "^4.5.4"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@tailwindcss/vite": "^4.3.3",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "@types/yauzl": "^3.4.0",
+    "@types/yazl": "^3.3.1",
     "@vitejs/plugin-react": "^4.7.0",
-    "electron": "^40.0.0",
+    "electron": "^44.2.0",
     "electron-builder": "^26.0.12",
     "electron-vite": "^4.0.0",
+    "fflate": "^0.8.3",
     "tailwindcss": "^4.3.3",
     "tsx": "^4.20.6",
     "typescript": "^5.8.3",
@@ -53,7 +61,7 @@
       }
     ],
     "win": {
-      "icon": "resources/icon.png",
+      "icon": "resources/icon.ico",
       "target": [
         "nsis",
         "portable"

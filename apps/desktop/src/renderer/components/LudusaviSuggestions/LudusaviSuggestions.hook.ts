@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { UIEvent } from "react";
-import type { LudusaviSuggestion } from "../AddGameModal/AddGameModal.hook";
+import type { LudusaviSuggestion } from "../../types/ludusavi";
 const itemHeight = 56;
 const overscan = 4;
 

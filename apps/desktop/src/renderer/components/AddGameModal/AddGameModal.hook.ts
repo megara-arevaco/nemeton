@@ -1,13 +1,12 @@
 import { useDeferredValue, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { ArtworkSuggestion, LibrarySnapshot } from "@launcher/core";
-import { useDebouncedValue, useLudusaviQuery } from "../../queries/game.queries";
-import { queryKeys } from "../../queries/queryKeys";
-export type LudusaviSuggestion = {
-  name: string;
-  steamAppId: string | null;
-  files: Array<{ path: string; tags: string[] }>;
-};
+import { useMutation } from "@tanstack/react-query";
+import type { LibrarySnapshot } from "@launcher/core";
+import {
+  useArtworkQuery,
+  useDebouncedValue,
+  useLudusaviQuery,
+} from "../../queries/game.queries";
+import type { LudusaviSuggestion } from "../../types/ludusavi";
 
 export interface AddGameModalOptions {
   onClose: () => void;
@@ -20,11 +19,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
   const [selectedLudusavi, setSelectedLudusavi] = useState<LudusaviSuggestion | null>(
     null,
   );
-  const [automaticArtwork, setAutomaticArtwork] = useState<ArtworkSuggestion | null>(
-    null,
-  );
   const [error, setError] = useState("");
-  const queryClient = useQueryClient();
   const deferredTitle = useDeferredValue(title);
   const searchedTitle = useDebouncedValue(deferredTitle, 250);
   const ludusaviQuery = useLudusaviQuery(searchedTitle, selectedLudusavi === null);
@@ -32,46 +27,52 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
     mutationFn: window.launcher.addLocalGame,
   });
 
-  const chooseExecutable = async () => {
-    const result = await window.launcher.selectExecutable();
+  const artworkQuery = useArtworkQuery(selectedLudusavi?.name ?? "");
+  const artwork = artworkQuery.data ?? [];
+  const exactSteamArtwork = selectedLudusavi?.steamAppId
+    ? artwork.find(
+        (candidate) =>
+          candidate.provider === "steam" &&
+          candidate.providerId === selectedLudusavi.steamAppId,
+      )
+    : null;
+  const automaticArtwork = selectedLudusavi
+    ? (exactSteamArtwork ?? artwork[0] ?? null)
+    : null;
 
-    if (!result) {
-      return;
+  const chooseExecutable = async () => {
+    try {
+      const result = await window.launcher.selectExecutable();
+
+      if (!result) {
+        return;
+      }
+      setExecutablePath(result.path);
+      setTitle((current) => current || result.suggestedTitle);
+      setError("");
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "No se pudo seleccionar el ejecutable",
+      );
     }
-    setExecutablePath(result.path);
-    setTitle((current) => current || result.suggestedTitle);
-    setError("");
   };
-  const chooseLudusaviSuggestion = async (item: LudusaviSuggestion) => {
+
+  const chooseLudusaviSuggestion = (item: LudusaviSuggestion) => {
     setTitle(item.name);
     setSelectedLudusavi(item);
-    setAutomaticArtwork(null);
-
-    try {
-      const artwork = await queryClient.fetchQuery({
-        queryKey: queryKeys.artwork(item.name),
-        queryFn: () => window.launcher.searchArtwork(item.name),
-      });
-      const exactSteam = item.steamAppId
-        ? artwork.find(
-            (candidate) =>
-              candidate.provider === "steam" &&
-              candidate.providerId === item.steamAppId,
-          )
-        : null;
-      setAutomaticArtwork(exactSteam ?? artwork[0] ?? null);
-    } catch {
-      /* El juego puede añadirse aunque no haya arte disponible. */
-    }
   };
+
   const clearLudusavi = () => {
     setSelectedLudusavi(null);
-    setAutomaticArtwork(null);
   };
+
   const updateTitle = (value: string) => {
     setTitle(value);
     clearLudusavi();
   };
+
   const createGame = async () => {
     if (!title.trim()) {
       setError("Escribe un nombre para el juego");
@@ -94,6 +95,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
       setError(reason instanceof Error ? reason.message : "No se pudo añadir el juego");
     }
   };
+
   return {
     title,
     executablePath,

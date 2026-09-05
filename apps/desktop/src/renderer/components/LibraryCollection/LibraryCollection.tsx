@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { LibraryGame } from "@launcher/core";
 import type { SyntheticEvent } from "react";
 import { GameController } from "@phosphor-icons/react/GameController";
@@ -12,7 +13,7 @@ import {
 } from "../../shared/presentation";
 import { GameCoverImage } from "../GameCoverImage";
 
-export function LibraryCollection({
+export const LibraryCollection = memo(function LibraryCollection({
   games,
   runningGameIds,
   onSelect,
@@ -71,7 +72,7 @@ export function LibraryCollection({
                 : hero;
             return (
               <button
-                className={`installed-card [position:relative] [min-width:0] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:17px] [padding:0] [background:#151720] [color:white] [text-align:left] [cursor:pointer] [transition:transform_.18s_ease,_border-color_.18s_ease,_box-shadow_.18s_ease] [&:hover]:[z-index:1] [&:hover]:[border-color:#a9fb7652] [&:hover]:[transform:translateY(-4px)] [&:hover]:[box-shadow:0_18px_38px_#00000055] [&.selected]:[border-color:#a9fb7645] [&.selected]:[box-shadow:inset_0_0_0_1px_#a9fb761b] [&.unavailable_.installed-play]:[background:#777b87] [&.unavailable_.installed-play]:[color:#15161d] [&:hover_.installed-cover]:[transform:scale(1.035)] [&:hover_.installed-play]:[opacity:1] [&:hover_.installed-play]:[transform:translateY(0)] [&.selected_.installed-play]:[opacity:1] [&.selected_.installed-play]:[transform:translateY(0)] [&.running]:[border-color:#a9fb765c] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb761a,_0_12px_35px_#68ee8110] [&.running::after]:[content:"JUGANDO"] [&.running::after]:[position:absolute] [&.running::after]:[z-index:4] [&.running::after]:[top:12px] [&.running::after]:[left:12px] [&.running::after]:[padding:5px_8px] [&.running::after]:[border-radius:20px] [&.running::after]:[background:#10150de8] [&.running::after]:[color:#a9fb76] [&.running::after]:[font-size:8px] [&.running::after]:[font-weight:800] [&.running::after]:[letter-spacing:1px] [&.running::after]:[box-shadow:0_0_0_1px_#a9fb7640] [&.running_.installed-copy_small]:[color:#9df37b] [&:hover]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] ${!game.installed ? "unavailable" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
+                className={`installed-card [content-visibility:auto] [contain-intrinsic-size:auto_248px] [position:relative] [min-width:0] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:17px] [padding:0] [background:#151720] [color:white] [text-align:left] [cursor:pointer] [transition:transform_.18s_ease,_border-color_.18s_ease,_box-shadow_.18s_ease] [&:hover]:[z-index:1] [&:hover]:[border-color:#a9fb7652] [&:hover]:[transform:translateY(-4px)] [&:hover]:[box-shadow:0_18px_38px_#00000055] [&.selected]:[border-color:#a9fb7645] [&.selected]:[box-shadow:inset_0_0_0_1px_#a9fb761b] [&.unavailable_.installed-play]:[background:#777b87] [&.unavailable_.installed-play]:[color:#15161d] [&:hover_.installed-cover]:[transform:scale(1.035)] [&:hover_.installed-play]:[opacity:1] [&:hover_.installed-play]:[transform:translateY(0)] [&.selected_.installed-play]:[opacity:1] [&.selected_.installed-play]:[transform:translateY(0)] [&.running]:[border-color:#a9fb765c] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb761a,_0_12px_35px_#68ee8110] [&.running::after]:[content:"JUGANDO"] [&.running::after]:[position:absolute] [&.running::after]:[z-index:4] [&.running::after]:[top:12px] [&.running::after]:[left:12px] [&.running::after]:[padding:5px_8px] [&.running::after]:[border-radius:20px] [&.running::after]:[background:#10150de8] [&.running::after]:[color:#a9fb76] [&.running::after]:[font-size:8px] [&.running::after]:[font-weight:800] [&.running::after]:[letter-spacing:1px] [&.running::after]:[box-shadow:0_0_0_1px_#a9fb7640] [&.running_.installed-copy_small]:[color:#9df37b] [&:hover]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] ${!game.installed ? "unavailable" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
                 key={game.id}
                 onClick={() => onSelect(game.id)}
               >
@@ -83,7 +84,7 @@ export function LibraryCollection({
                   {libraryHero && (
                     <img
                       className={
-                        "installed-backdrop [position:absolute] [inset:-12px] [width:calc(100%_+_24px)] [height:calc(100%_+_24px)] [object-fit:cover] [filter:blur(14px)_brightness(.38)_saturate(1.25)] [transform:scale(1.08)]"
+                        "installed-backdrop [position:absolute] [inset:-12px] [width:calc(100%_+_24px)] [height:calc(100%_+_24px)] [object-fit:cover] [filter:brightness(.38)] [transform:scale(1.08)]"
                       }
                       src={libraryHero}
                       alt=""
@@ -143,4 +144,4 @@ export function LibraryCollection({
       </section>
     </div>
   );
-}
+});

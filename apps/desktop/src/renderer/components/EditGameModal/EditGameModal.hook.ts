@@ -69,8 +69,8 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
         title,
         executablePath,
         playtimeMinutes: numericHours * 60,
-        steamAppId,
-        ludusaviGameName: ludusaviName,
+        steamAppId: steamAppId.trim() || null,
+        ludusaviGameName: ludusaviName.trim() || null,
       });
       onUpdated(snapshot);
       onClose();

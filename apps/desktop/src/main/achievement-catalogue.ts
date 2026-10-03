@@ -78,6 +78,7 @@ export function mergeAchievementCatalogue(
 }
 
 export class AchievementCatalogue {
+  private memory = new Map<string, { entries: Catalogue; expiresAt: number }>();
   private pending = new Map<string, Promise<Catalogue | null>>();
   private retryAfter = new Map<string, number>();
 
@@ -92,13 +93,35 @@ export class AchievementCatalogue {
       return Promise.resolve(null);
     }
 
+    const memory = this.memory.get(appId);
+
+    if (memory && memory.expiresAt > Date.now()) {
+      return Promise.resolve(structuredClone(memory.entries));
+    }
+
     const existing = this.pending.get(appId);
 
     if (existing) {
       return existing;
     }
 
-    const request = this.load(appId).finally(() => this.pending.delete(appId));
+    const request = this.load(appId)
+      .then((entries) => {
+        if (entries) {
+          if (this.memory.size >= 128) {
+            this.memory.delete(this.memory.keys().next().value!);
+          }
+          this.memory.set(appId, {
+            entries: structuredClone(entries),
+            expiresAt: Math.min(
+              Date.now() + lifetime,
+              this.retryAfter.get(appId) ?? Infinity,
+            ),
+          });
+        }
+        return entries;
+      })
+      .finally(() => this.pending.delete(appId));
     this.pending.set(appId, request);
     return request;
   }
@@ -114,6 +137,7 @@ export class AchievementCatalogue {
       /* Rebuild invalid cache. */
     }
     if (cached && Date.now() - cached.fetchedAt < lifetime) {
+      this.retryAfter.set(appId, cached.fetchedAt + lifetime);
       return cached.entries;
     }
     if (Date.now() < (this.retryAfter.get(appId) ?? 0)) {
@@ -123,6 +147,7 @@ export class AchievementCatalogue {
       const key = await this.readApiKey();
 
       if (!key) {
+        this.retryAfter.set(appId, Date.now() + 60_000);
         return cached?.entries ?? null;
       }
 

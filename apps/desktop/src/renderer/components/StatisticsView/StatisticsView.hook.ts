@@ -196,12 +196,17 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     }
 
     const byGameSessions = new Map<string, typeof valid>();
-    valid.forEach((session) =>
-      byGameSessions.set(session.gameId, [
-        ...(byGameSessions.get(session.gameId) ?? []),
-        session,
-      ]),
-    );
+
+    for (const session of valid) {
+      const items = byGameSessions.get(session.gameId);
+
+      if (items) {
+        items.push(session);
+      } else {
+        byGameSessions.set(session.gameId, [session]);
+      }
+    }
+
     let comeback: { gameId: string; days: number; ended: Date } | null = null;
     byGameSessions.forEach((items, gameId) => {
       const ordered = items.sort((a, b) => a.ended.getTime() - b.ended.getTime());

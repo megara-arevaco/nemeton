@@ -37,6 +37,9 @@ export function useSettingsView(options: SettingsViewOptions) {
     mutationFn: window.launcher.autoAssociateLudusavi,
   });
   const syncSteamMutation = useScanSteamMutation();
+  const refreshSteamMutation = useMutation({
+    mutationFn: window.launcher.refreshSteamAccount,
+  });
 
   const connect = async () => {
     setStatus("Importando la biblioteca de la cuenta…");
@@ -99,16 +102,34 @@ export function useSettingsView(options: SettingsViewOptions) {
   };
 
   const syncSteam = async () => {
-    setStatus("Sincronizando instalaciones de Steam…");
+    setStatus("Sincronizando la cuenta y las instalaciones de Steam…");
 
     try {
-      const snapshot = await syncSteamMutation.mutateAsync();
+      let result: Awaited<
+        ReturnType<typeof window.launcher.refreshSteamAccount>
+      > | null = null;
+      let accountError: string | null = null;
+
+      if (settings?.hasApiKey && settings.steamId) {
+        try {
+          result = await refreshSteamMutation.mutateAsync();
+        } catch (error) {
+          accountError =
+            error instanceof Error ? error.message : "No se pudo consultar la cuenta";
+        }
+      }
+
+      const snapshot = result?.snapshot ?? (await syncSteamMutation.mutateAsync());
       onLibraryUpdated(snapshot);
       const installedCount = snapshot.games.filter(
         (game) => game.source === "steam" && game.installed && !game.hiddenFromLibrary,
       ).length;
       setStatus(
-        `Steam sincronizado: ${installedCount} juegos instalados en tu biblioteca`,
+        accountError
+          ? `Instalaciones sincronizadas; cuenta pendiente: ${accountError}`
+          : result
+            ? `Steam sincronizado: ${result.ownedCount} juegos de la cuenta y ${installedCount} instalados`
+            : `Steam sincronizado: ${installedCount} juegos instalados en tu biblioteca`,
       );
     } catch (error) {
       setStatus(
@@ -125,7 +146,7 @@ export function useSettingsView(options: SettingsViewOptions) {
     apiKey,
     setApiKey,
     saving: connectMutation.isPending,
-    syncingSteam: syncSteamMutation.isPending,
+    syncingSteam: syncSteamMutation.isPending || refreshSteamMutation.isPending,
     status: status || (settings?.hasApiKey ? "Cuenta conectada" : ""),
     syncing:
       chooseSyncFolderMutation.isPending ||

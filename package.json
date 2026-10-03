@@ -17,13 +17,17 @@
     "dist:win:portable": "corepack pnpm --filter @launcher/desktop dist:win:portable",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "lint": "eslint apps packages",
-    "lint:fix": "eslint apps packages --fix",
+    "lint": "eslint apps packages e2e playwright.config.ts",
+    "lint:fix": "eslint apps packages e2e playwright.config.ts --fix",
     "prepare": "husky",
-    "typecheck": "corepack pnpm -r typecheck",
-    "test": "corepack pnpm -r test"
+    "typecheck": "corepack pnpm -r typecheck && corepack pnpm --filter @launcher/desktop exec tsc --noEmit -p ../../e2e/tsconfig.json",
+    "test": "corepack pnpm test:e2e",
+    "benchmark:performance": "corepack pnpm --filter @launcher/core exec tsx ../../scripts/benchmark-performance.mts",
+    "test:e2e": "corepack pnpm build && playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.20.1",
     "eslint": "^10.9.1",
     "husky": "^9.1.7",
     "prettier": "3.6.2",

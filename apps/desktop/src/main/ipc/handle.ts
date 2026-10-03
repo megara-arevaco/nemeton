@@ -1,3 +1,4 @@
+import { recordOperation } from "../operation-metrics.js";
 import { isTrustedDocument } from "./document.js";
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from "electron";
 import {
@@ -5,6 +6,12 @@ import {
   type IpcArgs,
   type IpcChannel,
 } from "../../shared/ipc-contracts.js";
+
+let decorateSnapshot: (value: unknown) => unknown = (value) => value;
+
+export function setSnapshotDecorator(decorate: typeof decorateSnapshot) {
+  decorateSnapshot = decorate;
+}
 
 const trustedDocuments = new Map<number, string>();
 
@@ -19,7 +26,7 @@ export function handle<K extends IpcChannel, T>(
   channel: K,
   listener: (event: IpcMainInvokeEvent, ...args: IpcArgs<K>) => T,
 ) {
-  ipcMain.handle(channel, (event, ...args: unknown[]) => {
+  ipcMain.handle(channel, async (event, ...args: unknown[]) => {
     const expected = trustedDocuments.get(event.sender.id);
 
     if (
@@ -35,6 +42,19 @@ export function handle<K extends IpcChannel, T>(
     if (!parsed.success) {
       throw new Error(`Argumentos no válidos para ${channel}`);
     }
-    return listener(event, ...(parsed.data as IpcArgs<K>));
+
+    const started = performance.now();
+    let failed = false;
+
+    try {
+      return decorateSnapshot(await listener(event, ...(parsed.data as IpcArgs<K>)));
+    } catch (error) {
+      failed = true;
+      throw error;
+    } finally {
+      if (channel !== "performance:record") {
+        recordOperation(`main:${channel}`, performance.now() - started, failed);
+      }
+    }
   });
 }

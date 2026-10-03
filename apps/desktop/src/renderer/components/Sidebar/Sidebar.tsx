@@ -1,3 +1,4 @@
+import { useVirtualCollection } from "../../shared/virtualCollection";
 import { memo } from "react";
 import type { LibraryGame } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
@@ -33,6 +34,13 @@ export const Sidebar = memo(function Sidebar({
   onSelect: (gameId: string) => void;
   onContextMenu: (game: LibraryGame, x: number, y: number) => void;
 }>) {
+  const { scrollRef, gridRef, range, virtual, activeIndex, setActiveId, onKeyDown } =
+    useVirtualCollection(games, {
+      itemHeight: 50,
+      gap: 3,
+      fixedColumns: 1,
+      selectedId,
+    });
   return (
     <aside
       className={
@@ -90,54 +98,81 @@ export const Sidebar = memo(function Sidebar({
         <span>{totalCount}</span>
       </div>
       <div
+        ref={scrollRef}
+        onKeyDown={onKeyDown}
+        role="group"
+        aria-label="Lista de juegos. Usa las flechas para recorrerla."
         className={
-          "game-list [min-height:0] [overflow-x:hidden] [overflow-y:auto] [display:grid] [align-content:start] [gap:3px]"
+          "game-list [min-height:0] [overflow-x:hidden] [overflow-y:auto] [display:block]"
         }
       >
-        {games.map((game) => {
-          const cover = gameCoverUrl(game);
-          return (
-            <button
-              style={{ contentVisibility: "auto", containIntrinsicSize: "auto 52px" }}
-              key={game.id}
-              className={`game-row [display:grid] [grid-template-columns:36px_minmax(0,_1fr)] [align-items:center] [gap:10px] [width:100%] [border:0] [background:transparent] [padding:7px] [border-radius:10px] [text-align:left] [cursor:pointer] [&_>_span:last-child]:[min-width:0] [&:hover]:[background:#ffffff0b] [&.selected]:[background:#ffffff0b] [&.selected]:[box-shadow:inset_2px_0_#9df37b] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[margin-top:1px] [&_strong]:[font-size:13px] [&_strong]:[font-weight:500] [&_small]:[margin-top:3px] [&_small]:[color:#686b77] [&_small]:[font-size:11px] [&.running]:[background:#a9fb760b] [&.running]:[box-shadow:inset_2px_0_#9df37b] [&.running_.game-avatar]:[overflow:visible] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_#9df37b55] [&.running_.game-avatar_img]:[border-radius:8px] [&.running_.game-avatar::after]:[content:""] [&.running_.game-avatar::after]:[position:absolute] [&.running_.game-avatar::after]:[z-index:2] [&.running_.game-avatar::after]:[right:-3px] [&.running_.game-avatar::after]:[bottom:-3px] [&.running_.game-avatar::after]:[width:9px] [&.running_.game-avatar::after]:[height:9px] [&.running_.game-avatar::after]:[border:2px_solid_#11121a] [&.running_.game-avatar::after]:[border-radius:50%] [&.running_.game-avatar::after]:[background:#9df37b] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_#9df37b] [&.running_.game-avatar::after]:[animation:running-pulse_1.6s_ease-in-out_infinite] [&.running_small]:[color:#9df37b] [&.running_small]:[font-weight:600] [&.selected]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_5%,_transparent)] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running_.game-avatar::after]:[background:var(--accent-a)] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_var(--accent-a)] ${selectedId === game.id ? "selected" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
-              onClick={() => onSelect(game.id)}
-              onContextMenu={(event) => {
-                event.preventDefault();
-                onContextMenu(game, event.clientX, event.clientY);
-              }}
-            >
-              <span
-                className={
-                  "game-avatar [position:relative] [display:grid] [place-items:center] [width:36px] [height:36px] [overflow:hidden] [border-radius:8px] [background:#242630] [color:#8c8f99] [font-size:12px] [font-weight:700] [&_img]:[position:absolute] [&_img]:[inset:0] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]"
+        <div
+          ref={gridRef}
+          style={{ paddingTop: range.top, paddingBottom: range.bottom }}
+          className="[display:grid] [align-content:start] [gap:3px]"
+        >
+          {games.slice(range.start, range.end).map((game, visibleIndex) => {
+            const gameIndex = range.start + visibleIndex;
+            const cover = gameCoverUrl(game);
+            return (
+              <button
+                data-game-index={gameIndex}
+                aria-label={`${game.title}, juego ${gameIndex + 1} de ${games.length}`}
+                tabIndex={
+                  virtual
+                    ? gameIndex === activeIndex ||
+                      (activeIndex < range.start && gameIndex === range.start) ||
+                      (activeIndex >= range.end && gameIndex === range.end - 1)
+                      ? 0
+                      : -1
+                    : 0
                 }
+                onFocus={() => setActiveId(game.id)}
+                style={{
+                  contentVisibility: "auto",
+                  containIntrinsicSize: "auto 50px",
+                  height: virtual ? 50 : undefined,
+                }}
+                key={game.id}
+                className={`game-row [display:grid] [grid-template-columns:36px_minmax(0,_1fr)] [align-items:center] [gap:10px] [width:100%] [border:0] [background:transparent] [padding:7px] [border-radius:10px] [text-align:left] [cursor:pointer] [&_>_span:last-child]:[min-width:0] [&:hover]:[background:#ffffff0b] [&.selected]:[background:#ffffff0b] [&.selected]:[box-shadow:inset_2px_0_#9df37b] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[margin-top:1px] [&_strong]:[font-size:13px] [&_strong]:[font-weight:500] [&_small]:[margin-top:3px] [&_small]:[color:#686b77] [&_small]:[font-size:11px] [&.running]:[background:#a9fb760b] [&.running]:[box-shadow:inset_2px_0_#9df37b] [&.running_.game-avatar]:[overflow:visible] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_#9df37b55] [&.running_.game-avatar_img]:[border-radius:8px] [&.running_.game-avatar::after]:[content:""] [&.running_.game-avatar::after]:[position:absolute] [&.running_.game-avatar::after]:[z-index:2] [&.running_.game-avatar::after]:[right:-3px] [&.running_.game-avatar::after]:[bottom:-3px] [&.running_.game-avatar::after]:[width:9px] [&.running_.game-avatar::after]:[height:9px] [&.running_.game-avatar::after]:[border:2px_solid_#11121a] [&.running_.game-avatar::after]:[border-radius:50%] [&.running_.game-avatar::after]:[background:#9df37b] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_#9df37b] [&.running_.game-avatar::after]:[animation:running-pulse_1.6s_ease-in-out_infinite] [&.running_small]:[color:#9df37b] [&.running_small]:[font-weight:600] [&.selected]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[box-shadow:inset_2px_0_var(--accent-a)] [&.running]:[background:color-mix(in_srgb,_var(--accent-a)_5%,_transparent)] [&.running_.game-avatar]:[box-shadow:0_0_0_1px_color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running_.game-avatar::after]:[background:var(--accent-a)] [&.running_.game-avatar::after]:[box-shadow:0_0_10px_var(--accent-a)] ${selectedId === game.id ? "selected" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
+                onClick={() => onSelect(game.id)}
+                onContextMenu={(event) => {
+                  event.preventDefault();
+                  onContextMenu(game, event.clientX, event.clientY);
+                }}
               >
-                {game.title.slice(0, 1).toUpperCase()}
-                {cover ? (
-                  <img
-                    src={cover}
-                    alt=""
-                    loading="lazy"
-                    decoding="async"
-                    onError={(event) => event.currentTarget.remove()}
-                  />
-                ) : null}
-              </span>
-              <span>
-                <strong>{game.title}</strong>
-                <small>
-                  {runningGameIds.has(game.id)
-                    ? "Jugando ahora"
-                    : game.installed
-                      ? formatPlaytime(
-                          game.platformPlaytimeMinutes ?? game.playtimeMinutes,
-                        )
-                      : "No instalado"}
-                </small>
-              </span>
-            </button>
-          );
-        })}
+                <span
+                  className={
+                    "game-avatar [position:relative] [display:grid] [place-items:center] [width:36px] [height:36px] [overflow:hidden] [border-radius:8px] [background:#242630] [color:#8c8f99] [font-size:12px] [font-weight:700] [&_img]:[position:absolute] [&_img]:[inset:0] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]"
+                  }
+                >
+                  {game.title.slice(0, 1).toUpperCase()}
+                  {cover ? (
+                    <img
+                      src={cover}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      onError={(event) => event.currentTarget.remove()}
+                    />
+                  ) : null}
+                </span>
+                <span>
+                  <strong>{game.title}</strong>
+                  <small>
+                    {runningGameIds.has(game.id)
+                      ? "Jugando ahora"
+                      : game.installed
+                        ? formatPlaytime(
+                            game.platformPlaytimeMinutes ?? game.playtimeMinutes,
+                          )
+                        : "No instalado"}
+                  </small>
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </aside>
   );

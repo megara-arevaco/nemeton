@@ -33,22 +33,85 @@ const retainedArtwork = (url: string | null | undefined) =>
 
 const steamArtwork = (appId: string) => steamFallbackArtwork(appId);
 
+interface LibraryCacheEntry {
+  stamp: string;
+  revision: number;
+  snapshot: LibrarySnapshot;
+  byId: Map<string, LibraryGame>;
+}
+
+// Shared between stores; callers always receive their own mutable objects.
+const libraryCache = new Map<string, LibraryCacheEntry>();
+const snapshotRevisions = new WeakMap<LibrarySnapshot, number>();
+let nextSnapshotRevision = 0;
+
 export class LibraryStore {
   constructor(private readonly filePath: string) {}
 
   async read(): Promise<LibrarySnapshot> {
-    const raw = await readTextIfExists(this.filePath);
+    return withFileLock(this.filePath, async () => {
+      const { snapshot, revision } = await this.loadCached();
+      const copy = {
+        ...snapshot,
+        games: snapshot.games.map((game) => ({ ...game })),
+        sessions: snapshot.sessions.map((session) => ({ ...session })),
+        excludedGameKeys: [...(snapshot.excludedGameKeys ?? [])],
+      };
+      snapshotRevisions.set(copy, revision);
+      return copy;
+    });
+  }
+
+  getSnapshotRevision(snapshot: LibrarySnapshot) {
+    return snapshotRevisions.get(snapshot);
+  }
+
+  async getGame(gameId: string): Promise<LibraryGame | null> {
+    return withFileLock(this.filePath, async () => {
+      const game = (await this.loadCached()).byId.get(gameId);
+      return game ? { ...game } : null;
+    });
+  }
+
+  private async loadCached(): Promise<LibraryCacheEntry> {
+    const key = path.resolve(this.filePath);
+    const info = await fs.promises.stat(key).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") {
+        return null;
+      }
+      throw error;
+    });
+
+    if (!info) {
+      libraryCache.delete(key);
+      return {
+        stamp: "missing",
+        revision: ++nextSnapshotRevision,
+        snapshot: emptySnapshot(),
+        byId: new Map(),
+      };
+    }
+
+    const stamp = `${info.dev}:${info.ino}:${info.size}:${info.mtimeMs}:${info.ctimeMs}`;
+    const cached = libraryCache.get(key);
+
+    if (cached?.stamp === stamp) {
+      return cached;
+    }
+
+    const raw = await readTextIfExists(key);
 
     if (!raw) {
-      return emptySnapshot();
+      throw new Error("La biblioteca está vacía o ha desaparecido");
     }
     try {
       const parsed = JSON.parse(raw) as LibrarySnapshot;
 
       if (parsed.version !== 1 || !Array.isArray(parsed.games)) {
-        return emptySnapshot();
+        throw new Error("Formato de biblioteca no válido");
       }
-      return {
+
+      const snapshot: LibrarySnapshot = {
         ...parsed,
         sessions: parsed.sessions ?? [],
         excludedGameKeys: parsed.excludedGameKeys ?? [],
@@ -81,182 +144,222 @@ export class LibraryStore {
             updatedAt: game.updatedAt ?? game.importedAt,
           })),
       };
+      const entry = {
+        stamp,
+        revision: ++nextSnapshotRevision,
+        snapshot,
+        byId: new Map(snapshot.games.map((game) => [game.id, game])),
+      };
+
+      if (libraryCache.size >= 32) {
+        libraryCache.delete(libraryCache.keys().next().value!);
+      }
+      libraryCache.set(key, entry);
+      return entry;
     } catch {
       throw new Error("La biblioteca está dañada; se conserva el archivo original");
     }
   }
 
   async importSteam(candidates: SteamCandidate[]): Promise<LibrarySnapshot> {
-    return withFileLock(this.filePath, async () => {
-      const snapshot = await this.read();
-      const excludedGameKeys = new Set(snapshot.excludedGameKeys ?? []);
-      const games = new Map(
-        snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
-      );
-
-      const installedAppIds = new Set(candidates.map((candidate) => candidate.appId));
-
-      for (const game of games.values()) {
-        if (
-          game.source === "steam" &&
-          !installedAppIds.has(game.sourceId) &&
-          (game.installed || game.installPath)
-        ) {
-          game.installed = false;
-          game.installPath = "";
-          game.updatedAt = new Date().toISOString();
-        }
-      }
-
-      for (const candidate of candidates) {
-        if (
-          excludedSteamAppIds.has(candidate.appId) ||
-          excludedGameKeys.has(`steam:${candidate.appId}`)
-        ) {
-          continue;
-        }
-
-        const key = `steam:${candidate.appId}`;
-        const previous = games.get(key);
-        const previousPlatformMinutes =
-          previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
-
-        if (
-          previous &&
-          previousPlatformMinutes !== undefined &&
-          candidate.playtimeMinutes > previousPlatformMinutes
-        ) {
-          const durationSeconds =
-            (candidate.playtimeMinutes - previousPlatformMinutes) * 60;
-          const endedAt = candidate.lastPlayedAt ?? new Date().toISOString();
-          snapshot.sessions.push({
-            id: randomUUID(),
-            gameId: previous.id,
-            startedAt: new Date(
-              new Date(endedAt).getTime() - durationSeconds * 1_000,
-            ).toISOString(),
-            endedAt,
-            durationSeconds,
-            origin: "steam-sync",
-          });
-        }
-
-        const game: LibraryGame = {
-          id: previous?.id ?? randomUUID(),
-          source: "steam",
-          sourceId: candidate.appId,
-          title: candidate.title,
-          installPath: candidate.installPath,
-          launchUri: `steam://rungameid/${candidate.appId}`,
-          coverPath: previous?.coverPath ?? null,
-          coverUrl:
-            retainedArtwork(previous?.coverUrl) ??
-            steamArtwork(candidate.appId).coverUrl,
-          heroUrl:
-            retainedArtwork(previous?.heroUrl) ?? steamArtwork(candidate.appId).heroUrl,
-          playtimeMinutes: Math.max(
-            previous?.playtimeMinutes ?? 0,
-            candidate.playtimeMinutes,
-          ),
-          playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
-          platformPlaytimeMinutes: Math.max(
-            previous?.platformPlaytimeMinutes ?? 0,
-            candidate.playtimeMinutes,
-          ),
-          trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
-          installed: true,
-          hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
-          lastPlayedAt: candidate.lastPlayedAt ?? previous?.lastPlayedAt ?? null,
-          importedAt: previous?.importedAt ?? new Date().toISOString(),
-          updatedAt:
-            previous?.updatedAt ?? previous?.importedAt ?? new Date().toISOString(),
-        };
-        games.set(key, game);
-      }
-
-      const next: LibrarySnapshot = {
-        version: 1,
-        games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
-        sessions: snapshot.sessions,
-        excludedGameKeys: snapshot.excludedGameKeys ?? [],
-      };
-      await this.write(next);
-      return next;
-    });
+    return this.importSteamSnapshot(null, candidates);
   }
 
   async importSteamAccount(ownedGames: SteamOwnedGame[]): Promise<LibrarySnapshot> {
+    return this.importSteamSnapshot(ownedGames, null);
+  }
+
+  async importSteamSnapshot(
+    ownedGames: SteamOwnedGame[] | null,
+    installedGames: SteamCandidate[] | null,
+  ): Promise<LibrarySnapshot> {
     return withFileLock(this.filePath, async () => {
-      const snapshot = await this.read();
-      const excludedGameKeys = new Set(snapshot.excludedGameKeys ?? []);
-      const games = new Map(
-        snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
-      );
+      let snapshot = await this.read();
 
-      for (const owned of ownedGames) {
-        if (
-          excludedSteamAppIds.has(owned.appId) ||
-          excludedGameKeys.has(`steam:${owned.appId}`)
-        ) {
-          continue;
-        }
+      if (ownedGames) {
+        snapshot = this.applySteamAccount(snapshot, ownedGames);
+      }
+      if (installedGames) {
+        snapshot = this.applySteamInstalled(snapshot, installedGames);
+      }
+      await this.write(snapshot);
+      return snapshot;
+    });
+  }
 
-        const key = `steam:${owned.appId}`;
-        const previous = games.get(key);
-        const previousPlatformMinutes =
-          previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+  private applySteamInstalled(
+    snapshot: LibrarySnapshot,
+    candidates: SteamCandidate[],
+  ): LibrarySnapshot {
+    const excludedGameKeys = new Set(snapshot.excludedGameKeys ?? []);
+    const games = new Map(
+      snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
+    );
 
-        if (
-          previous &&
-          previousPlatformMinutes !== undefined &&
-          owned.playtimeMinutes > previousPlatformMinutes
-        ) {
-          const durationSeconds =
-            (owned.playtimeMinutes - previousPlatformMinutes) * 60;
-          const endedAt = owned.lastPlayedAt ?? new Date().toISOString();
-          snapshot.sessions.push({
-            id: randomUUID(),
-            gameId: previous.id,
-            startedAt: new Date(
-              new Date(endedAt).getTime() - durationSeconds * 1_000,
-            ).toISOString(),
-            endedAt,
-            durationSeconds,
-            origin: "steam-sync",
-          });
-        }
-        games.set(key, {
-          id: previous?.id ?? randomUUID(),
-          source: "steam",
-          sourceId: owned.appId,
-          title: owned.title,
-          installPath: previous?.installPath ?? "",
-          launchUri: `steam://rungameid/${owned.appId}`,
-          coverPath: previous?.coverPath ?? null,
-          coverUrl:
-            retainedArtwork(previous?.coverUrl) ?? steamArtwork(owned.appId).coverUrl,
-          heroUrl:
-            retainedArtwork(previous?.heroUrl) ?? steamArtwork(owned.appId).heroUrl,
-          playtimeMinutes: owned.playtimeMinutes,
-          playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
-          platformPlaytimeMinutes: owned.playtimeMinutes,
-          trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
-          lastPlayedAt: owned.lastPlayedAt ?? previous?.lastPlayedAt ?? null,
-          importedAt: previous?.importedAt ?? new Date().toISOString(),
-          updatedAt:
-            previous?.updatedAt ?? previous?.importedAt ?? new Date().toISOString(),
-          installed: previous?.installed ?? false,
-          hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
+    const installedAppIds = new Set(candidates.map((candidate) => candidate.appId));
+
+    for (const game of games.values()) {
+      if (
+        game.source === "steam" &&
+        !installedAppIds.has(game.sourceId) &&
+        (game.installed || game.installPath)
+      ) {
+        game.installed = false;
+        game.installPath = "";
+        game.updatedAt = new Date().toISOString();
+      }
+    }
+
+    for (const candidate of candidates) {
+      if (
+        excludedSteamAppIds.has(candidate.appId) ||
+        excludedGameKeys.has(`steam:${candidate.appId}`)
+      ) {
+        continue;
+      }
+
+      const key = `steam:${candidate.appId}`;
+      const previous = games.get(key);
+      const previousPlatformMinutes =
+        previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+
+      if (
+        previous &&
+        previousPlatformMinutes !== undefined &&
+        candidate.playtimeMinutes > previousPlatformMinutes
+      ) {
+        const durationSeconds =
+          (candidate.playtimeMinutes - previousPlatformMinutes) * 60;
+        const endedAt = candidate.lastPlayedAt ?? new Date().toISOString();
+        snapshot.sessions.push({
+          id: randomUUID(),
+          gameId: previous.id,
+          startedAt: new Date(
+            new Date(endedAt).getTime() - durationSeconds * 1_000,
+          ).toISOString(),
+          endedAt,
+          durationSeconds,
+          origin: "steam-sync",
         });
       }
 
-      const next = {
-        ...snapshot,
-        games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
+      const game: LibraryGame = {
+        id: previous?.id ?? randomUUID(),
+        source: "steam",
+        sourceId: candidate.appId,
+        title: candidate.title,
+        installPath: candidate.installPath,
+        launchUri: `steam://rungameid/${candidate.appId}`,
+        coverPath: previous?.coverPath ?? null,
+        coverUrl:
+          retainedArtwork(previous?.coverUrl) ?? steamArtwork(candidate.appId).coverUrl,
+        heroUrl:
+          retainedArtwork(previous?.heroUrl) ?? steamArtwork(candidate.appId).heroUrl,
+        playtimeMinutes: Math.max(
+          previous?.playtimeMinutes ?? 0,
+          candidate.playtimeMinutes,
+        ),
+        playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
+        platformPlaytimeMinutes: Math.max(
+          previous?.platformPlaytimeMinutes ?? 0,
+          candidate.playtimeMinutes,
+        ),
+        trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
+        installed: true,
+        hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
+        lastPlayedAt: candidate.lastPlayedAt ?? previous?.lastPlayedAt ?? null,
+        importedAt: previous?.importedAt ?? new Date().toISOString(),
+        updatedAt:
+          previous?.updatedAt ?? previous?.importedAt ?? new Date().toISOString(),
       };
-      await this.write(next);
-      return next;
-    });
+      games.set(key, game);
+    }
+
+    const next: LibrarySnapshot = {
+      version: 1,
+      games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
+      sessions: snapshot.sessions,
+      excludedGameKeys: snapshot.excludedGameKeys ?? [],
+    };
+    return next;
+  }
+
+  private applySteamAccount(
+    snapshot: LibrarySnapshot,
+    ownedGames: SteamOwnedGame[],
+  ): LibrarySnapshot {
+    const excludedGameKeys = new Set(snapshot.excludedGameKeys ?? []);
+    const games = new Map(
+      snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
+    );
+
+    for (const owned of ownedGames) {
+      if (
+        excludedSteamAppIds.has(owned.appId) ||
+        excludedGameKeys.has(`steam:${owned.appId}`)
+      ) {
+        continue;
+      }
+
+      const key = `steam:${owned.appId}`;
+      const previous = games.get(key);
+      const previousPlatformMinutes =
+        previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+
+      if (
+        previous &&
+        previousPlatformMinutes !== undefined &&
+        owned.playtimeMinutes > previousPlatformMinutes
+      ) {
+        const durationSeconds = (owned.playtimeMinutes - previousPlatformMinutes) * 60;
+        const endedAt = owned.lastPlayedAt ?? new Date().toISOString();
+        snapshot.sessions.push({
+          id: randomUUID(),
+          gameId: previous.id,
+          startedAt: new Date(
+            new Date(endedAt).getTime() - durationSeconds * 1_000,
+          ).toISOString(),
+          endedAt,
+          durationSeconds,
+          origin: "steam-sync",
+        });
+      }
+      games.set(key, {
+        id: previous?.id ?? randomUUID(),
+        source: "steam",
+        sourceId: owned.appId,
+        title: owned.title,
+        installPath: previous?.installPath ?? "",
+        launchUri: `steam://rungameid/${owned.appId}`,
+        coverPath: previous?.coverPath ?? null,
+        coverUrl:
+          retainedArtwork(previous?.coverUrl) ?? steamArtwork(owned.appId).coverUrl,
+        heroUrl:
+          retainedArtwork(previous?.heroUrl) ?? steamArtwork(owned.appId).heroUrl,
+        playtimeMinutes: Math.max(
+          previous?.playtimeMinutes ?? 0,
+          owned.playtimeMinutes,
+        ),
+        playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
+        platformPlaytimeMinutes: Math.max(
+          previous?.platformPlaytimeMinutes ?? 0,
+          owned.playtimeMinutes,
+        ),
+        trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
+        lastPlayedAt: owned.lastPlayedAt ?? previous?.lastPlayedAt ?? null,
+        importedAt: previous?.importedAt ?? new Date().toISOString(),
+        updatedAt:
+          previous?.updatedAt ?? previous?.importedAt ?? new Date().toISOString(),
+        installed: previous?.installed ?? false,
+        hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
+      });
+    }
+
+    const next = {
+      ...snapshot,
+      games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
+    };
+    return next;
   }
 
   async addLocal(input: LocalGameInput): Promise<LibrarySnapshot> {
@@ -604,6 +707,9 @@ export class LibraryStore {
   }
 
   private async write(snapshot: LibrarySnapshot): Promise<void> {
-    await writeJsonAtomically(this.filePath, snapshot);
+    if (await writeJsonAtomically(this.filePath, snapshot)) {
+      libraryCache.delete(path.resolve(this.filePath));
+    }
+    snapshotRevisions.set(snapshot, ++nextSnapshotRevision);
   }
 }

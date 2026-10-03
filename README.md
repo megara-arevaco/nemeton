@@ -122,6 +122,17 @@ corepack pnpm test
 corepack pnpm build
 ```
 
+`test` (also available as `test:e2e`) builds the app and runs Playwright against
+real Electron windows, the preload bridge, IPC handlers, and temporary data files.
+The suite covers local-game creation/editing/deletion and persistence, keyboard
+navigation and filtering in a 1,000-game library, and save backup/verification/restore
+with a safety copy. Each test uses an isolated user-data directory and blocks HTTP
+traffic; only native file-selection and confirmation dialogs are replaced.
+No separate Playwright browser download is required: tests use the workspace Electron.
+On Linux, use a working desktop display or `xvfb-run --auto-servernum corepack pnpm test`.
+Failure traces and screenshots are available in `test-results/` and the HTML report
+in `playwright-report/` (`corepack pnpm exec playwright show-report`).
+
 `build` compiles the Electron main process, preload bridge, and React renderer into
 `apps/desktop/out/`. It does not create a distributable executable.
 

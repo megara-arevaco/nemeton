@@ -32,6 +32,9 @@ export class LudusaviCatalog {
     game: LudusaviGame;
     normalizedName: string;
   }> | null = null;
+  private byName = new Map<string, LudusaviGame>();
+  private byNormalizedName = new Map<string, LudusaviGame>();
+  private byAppId = new Map<string, LudusaviGame>();
   private loading: Promise<LudusaviGame[]> | null = null;
 
   constructor(
@@ -42,12 +45,35 @@ export class LudusaviCatalog {
     ) => Promise<LudusaviGame[]> = parseInWorker,
   ) {}
 
-  private setGames(games: LudusaviGame[]) {
+  private async setGames(games: LudusaviGame[]) {
+    const byName = new Map<string, LudusaviGame>();
+    const byNormalizedName = new Map<string, LudusaviGame>();
+    const byAppId = new Map<string, LudusaviGame>();
+    const searchIndex: NonNullable<typeof this.searchIndex> = [];
+
+    for (let index = 0; index < games.length; index++) {
+      const game = games[index]!;
+      const normalizedName = normalize(game.name);
+
+      if (!byName.has(game.name)) {
+        byName.set(game.name, game);
+      }
+      if (!byNormalizedName.has(normalizedName)) {
+        byNormalizedName.set(normalizedName, game);
+      }
+      if (game.steamAppId && !byAppId.has(game.steamAppId)) {
+        byAppId.set(game.steamAppId, game);
+      }
+      searchIndex.push({ game, normalizedName });
+      if (index && index % 1000 === 0) {
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      }
+    }
+    this.byName = byName;
+    this.byNormalizedName = byNormalizedName;
+    this.byAppId = byAppId;
+    this.searchIndex = searchIndex;
     this.games = games;
-    this.searchIndex = games.map((game) => ({
-      game,
-      normalizedName: normalize(game.name),
-    }));
     return games;
   }
 
@@ -58,40 +84,11 @@ export class LudusaviCatalog {
       return null;
     }
 
-    const raw = await fs.promises.readFile(this.cachePath, "utf8").catch(() => null);
-
-    if (!raw) {
-      return null;
-    }
     try {
-      const cached = JSON.parse(raw) as CacheFile;
-
-      if (
-        !Array.isArray(cached.games) ||
-        !Number.isFinite(Date.parse(cached.updatedAt))
-      ) {
-        return null;
-      }
-
-      const games = cached.games.map((game) => ({
-        ...game,
-        files: (game.files ?? []).map((file) =>
-          typeof file === "string" ? { path: file, tags: [] } : file,
-        ),
-      }));
-
-      if (
-        !games.every(
-          (game) =>
-            typeof game.name === "string" &&
-            game.files.every(
-              (file) => typeof file.path === "string" && Array.isArray(file.tags),
-            ),
-        )
-      ) {
-        return null;
-      }
-      return { ...cached, games };
+      return await runCatalogWorker<CacheFile>({
+        mode: "cache",
+        filePath: this.cachePath,
+      });
     } catch {
       return null;
     }
@@ -126,7 +123,7 @@ export class LudusaviCatalog {
       const cached = await this.readCache();
 
       if (cached) {
-        const games = this.setGames(cached.games);
+        const games = await this.setGames(cached.games);
 
         if (Date.now() - new Date(cached.updatedAt).getTime() >= MAX_CACHE_AGE) {
           this.refresh().catch((error) => console.warn("[ludusavi:refresh]", error));
@@ -149,24 +146,46 @@ export class LudusaviCatalog {
 
     const words = wanted.split(" ");
     await this.load();
-    return (this.searchIndex ?? [])
-      .map(({ game, normalizedName: candidate }) => {
-        const score =
-          candidate === wanted
-            ? 1000
-            : candidate.startsWith(wanted)
-              ? 700
-              : candidate.includes(wanted)
-                ? 500
-                : words.every((word) => candidate.includes(word))
-                  ? 300
-                  : 0;
-        return { game, score: score - Math.abs(candidate.length - wanted.length) };
-      })
-      .filter(({ score }) => score > 0)
-      .sort((a, b) => b.score - a.score || a.game.name.localeCompare(b.game.name))
-      .slice(0, 30)
-      .map(({ game }) => game);
+    const best: Array<{ game: LudusaviGame; score: number }> = [];
+    const compare = (a: (typeof best)[number], b: (typeof best)[number]) =>
+      b.score - a.score || a.game.name.localeCompare(b.game.name);
+
+    for (const { game, normalizedName: candidate } of this.searchIndex ?? []) {
+      const rawScore =
+        candidate === wanted
+          ? 1000
+          : candidate.startsWith(wanted)
+            ? 700
+            : candidate.includes(wanted)
+              ? 500
+              : words.every((word) => candidate.includes(word))
+                ? 300
+                : 0;
+      const score = rawScore - Math.abs(candidate.length - wanted.length);
+
+      if (score <= 0 || (best.length === 30 && score < best[29]!.score)) {
+        continue;
+      }
+
+      const item = { game, score };
+      let low = 0,
+        high = best.length;
+
+      while (low < high) {
+        const middle = (low + high) >>> 1;
+
+        if (compare(item, best[middle]!) < 0) {
+          high = middle;
+        } else {
+          low = middle + 1;
+        }
+      }
+      best.splice(low, 0, item);
+      if (best.length > 30) {
+        best.pop();
+      }
+    }
+    return best.map(({ game }) => game);
   }
 
   async warmup() {
@@ -174,37 +193,53 @@ export class LudusaviCatalog {
   }
 
   async find(name: string) {
-    return (await this.load()).find((game) => game.name === name) ?? null;
+    await this.load();
+    return this.byName.get(name) ?? null;
   }
 
   async match(title: string, steamAppId?: string | null) {
-    const games = await this.load();
-
-    if (steamAppId) {
-      const byId = games.find((game) => game.steamAppId === steamAppId);
-
-      if (byId) {
-        return byId;
-      }
-    }
-
-    const wanted = normalize(title);
-    return games.find((game) => normalize(game.name) === wanted) ?? null;
+    await this.load();
+    return (
+      (steamAppId ? this.byAppId.get(steamAppId) : null) ??
+      this.byNormalizedName.get(normalize(title)) ??
+      null
+    );
   }
 }
 
 function parseInWorker(text: string): Promise<LudusaviGame[]> {
+  return runCatalogWorker<LudusaviGame[]>(text);
+}
+
+function runCatalogWorker<T>(workerData: unknown): Promise<T> {
   return new Promise((resolve, reject) => {
-    const worker = new Worker(new URL("./ludusavi-worker.js", import.meta.url), {
-      workerData: text,
+    const sourceMode = import.meta.url.endsWith(".ts");
+    const target = new URL(
+      sourceMode ? "./ludusavi-worker.ts" : "./ludusavi-worker.js",
+      import.meta.url,
+    );
+    const entry = sourceMode
+      ? new URL(
+          `data:text/javascript,${encodeURIComponent(`import { register } from ${JSON.stringify(import.meta.resolve("tsx/esm/api"))}; register(); await import(${JSON.stringify(target.href)});`)}`,
+        )
+      : target;
+    const worker = new Worker(entry, {
+      workerData,
+      execArgv: sourceMode ? [] : undefined,
       resourceLimits: { maxOldGenerationSizeMb: 512 },
     });
     const timeout = setTimeout(() => {
       reject(new Error("El catálogo tardó demasiado en procesarse"));
-      worker.terminate().catch(reject);
+      void worker.terminate();
     }, 30_000);
-    worker.once("message", resolve);
-    worker.once("error", reject);
+    worker.once("message", (message) => {
+      clearTimeout(timeout);
+      resolve(message as T);
+    });
+    worker.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
     worker.once("exit", (code) => {
       clearTimeout(timeout);
       if (code !== 0) {

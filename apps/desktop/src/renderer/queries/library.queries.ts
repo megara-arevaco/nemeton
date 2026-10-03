@@ -1,10 +1,22 @@
 import { useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { LibrarySnapshot } from "@launcher/core";
+import {
+  applyLibraryChange,
+  type PublishedLibrary,
+} from "../../shared/library-updates";
 import { queryKeys } from "./queryKeys";
 
-async function loadLibrary(): Promise<LibrarySnapshot> {
-  return window.launcher.listGames();
+let newestRevision = 0;
+
+async function loadLibrary(): Promise<PublishedLibrary> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const snapshot = await window.launcher.listGames();
+
+    if (snapshot.revision >= newestRevision) {
+      return snapshot;
+    }
+  }
+  throw new Error("La biblioteca cambió durante la carga. Se volverá a consultar.");
 }
 
 export function useLibraryQuery() {
@@ -44,8 +56,22 @@ export function useLibrarySubscriptions() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const unsubscribeLibrary = window.launcher.onLibraryChanged((snapshot) => {
-      queryClient.setQueryData(queryKeys.library, snapshot);
+    const unsubscribeLibrary = window.launcher.onLibraryChanged((change) => {
+      newestRevision = Math.max(newestRevision, change.revision);
+      const current = queryClient.getQueryData<PublishedLibrary>(queryKeys.library);
+
+      // A response may already contain this revision; older events are harmless.
+      if (current && current.revision >= change.revision) {
+        return;
+      }
+
+      const next = current ? applyLibraryChange(current, change) : null;
+
+      if (next) {
+        queryClient.setQueryData(queryKeys.library, next);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.library });
+      }
     });
     const unsubscribeRunning = window.launcher.onGameRunningChanged(
       ({ gameId, running }) => {

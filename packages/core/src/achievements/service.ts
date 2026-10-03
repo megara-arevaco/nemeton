@@ -196,9 +196,11 @@ export const parseGoldbergAchievements = (
       const earnedTime = typeof state.earned_time === "number" ? state.earned_time : 0;
       const icon =
         typeof schema.icon === "string" && schema.icon
-          ? schemaDirectory
-            ? path.join(schemaDirectory, schema.icon)
-            : schema.icon
+          ? /^https:\/\//i.test(schema.icon)
+            ? schema.icon
+            : schemaDirectory
+              ? path.join(schemaDirectory, schema.icon)
+              : schema.icon
           : null;
       return {
         id,

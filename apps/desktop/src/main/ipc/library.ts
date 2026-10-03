@@ -6,16 +6,21 @@ import { handle } from "./handle.js";
 import { fetchSteamGameMetadata } from "@launcher/core";
 import { openExternal } from "../platform.js";
 export function registerLibraryHandlers({
+  awaitStartupReady,
   store,
+  publishLibrarySnapshot,
   achievementService,
   coversDirectory,
   savegameManager,
   settingsStore,
   scheduleAutoSync,
 }: MainContext) {
-  handle("library:list", () => store.read());
+  handle("library:list", async () => {
+    await awaitStartupReady();
+    return publishLibrarySnapshot(await store.read());
+  });
   handle("library:metadata", async (_event, gameId: string) => {
-    const game = (await store.read()).games.find((item) => item.id === gameId);
+    const game = await store.getGame(gameId);
 
     if (!game) {
       return null;
@@ -30,7 +35,7 @@ export function registerLibraryHandlers({
     return fetchSteamGameMetadata(appId);
   });
   handle("library:achievements", async (_event, gameId: string) => {
-    const game = (await store.read()).games.find((item) => item.id === gameId);
+    const game = await store.getGame(gameId);
 
     if (!game) {
       return { total: 0, unlocked: 0, items: [] };
@@ -226,7 +231,7 @@ export function registerLibraryHandlers({
     return snapshot;
   });
   handle("library:uninstall-or-hide", async (_event, gameId: string) => {
-    const game = (await store.read()).games.find((item) => item.id === gameId);
+    const game = await store.getGame(gameId);
 
     if (!game) {
       throw new Error("No se encontró el juego");
@@ -242,7 +247,7 @@ export function registerLibraryHandlers({
   handle(
     "library:delete-forever",
     async (_event, gameId: string, confirmation: string) => {
-      const game = (await store.read()).games.find((item) => item.id === gameId);
+      const game = await store.getGame(gameId);
 
       if (!game) {
         throw new Error("No se encontró el juego");

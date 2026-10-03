@@ -92,7 +92,7 @@ export class FolderSyncService {
     this.lastError = null;
 
     return {
-      snapshot: await this.store.read(),
+      snapshot,
       settings: {
         folderPath: resolved,
         lastSyncedAt,

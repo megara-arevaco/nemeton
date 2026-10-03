@@ -12,7 +12,9 @@ export const accountIdToSteamId64 = (accountId: string): string | null => {
 };
 
 export const detectLocalSteamId = async (): Promise<string | null> => {
-  const steamRoot = defaultSteamRoots().find(fs.existsSync);
+  const steamRoot = defaultSteamRoots().find((root) =>
+    fs.existsSync(path.join(root, "userdata")),
+  );
 
   if (!steamRoot) {
     return null;

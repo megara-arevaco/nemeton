@@ -12,7 +12,11 @@ export function createSteamSessionWatcher({
   store,
   broadcastLibrary,
   broadcastGameRunning,
-}: Pick<MainContext, "store" | "broadcastLibrary" | "broadcastGameRunning">) {
+  scheduleSteamRefresh,
+}: Pick<
+  MainContext,
+  "store" | "broadcastLibrary" | "broadcastGameRunning" | "scheduleSteamRefresh"
+>) {
   const watchedSteamGames = new Set<string>();
   const watchSteamSession = async (gameId: string, installPath: string) => {
     if (!installPath || watchedSteamGames.has(gameId)) {
@@ -45,12 +49,12 @@ export function createSteamSessionWatcher({
       const durationSeconds = Math.round((Date.now() - startedAt) / 1_000);
 
       if (durationSeconds >= 10) {
-        await store.addPlaytime(gameId, durationSeconds);
-        await broadcastLibrary();
+        await broadcastLibrary(await store.addPlaytime(gameId, durationSeconds));
       }
     } finally {
       if (reportedRunning) {
         broadcastGameRunning(gameId, false);
+        scheduleSteamRefresh();
       }
       watchedSteamGames.delete(gameId);
     }
@@ -71,7 +75,7 @@ export function registerLaunchHandlers({
   watchSteamSession,
 }: MainContext) {
   handle("library:launch", async (_event, gameId: string) => {
-    const game = (await store.read()).games.find((item) => item.id === gameId);
+    const game = await store.getGame(gameId);
 
     if (!game) {
       throw new Error("Game not found");
@@ -111,7 +115,7 @@ export function registerLaunchHandlers({
 
           if (updatedGame) {
             achievementGame = updatedGame;
-            await broadcastLibrary();
+            await broadcastLibrary(snapshot);
             scheduleAutoSync();
           }
         }
@@ -119,38 +123,53 @@ export function registerLaunchHandlers({
 
       const result = await achievementService.discover(achievementGame);
       await achievementService.record(achievementGame, result);
+      return JSON.stringify(result);
     };
 
     const startedAt = Date.now();
     const child = spawnLocalGame(game.installPath);
-    runBackground(refreshAchievements(), "[achievements:initial]");
-    let pollingAchievements = false;
-    const achievementTimer = setInterval(() => {
-      if (pollingAchievements) {
-        return;
+    let stopped = false;
+    let pollDelay = 5_000;
+    let lastState: string | null = null;
+    let achievementTimer: ReturnType<typeof setTimeout> | null = null;
+    let pendingAchievements: Promise<void> | null = null;
+    const pollAchievements = () => {
+      pendingAchievements = refreshAchievements()
+        .then((state) => {
+          pollDelay = state === lastState ? Math.min(30_000, pollDelay * 2) : 5_000;
+          lastState = state;
+        })
+        .finally(() => {
+          pendingAchievements = null;
+          if (!stopped) {
+            achievementTimer = setTimeout(pollAchievements, pollDelay);
+          }
+        });
+      runBackground(pendingAchievements, "[achievements:watch]");
+    };
+    pollAchievements();
+    const stopPolling = () => {
+      stopped = true;
+      if (achievementTimer) {
+        clearTimeout(achievementTimer);
       }
-      pollingAchievements = true;
-      runBackground(
-        refreshAchievements().finally(() => {
-          pollingAchievements = false;
-        }),
-        "[achievements:watch]",
-      );
-    }, 5_000);
+    };
     let reportedRunning = false;
     child.once("spawn", () => {
       reportedRunning = true;
       broadcastGameRunning(game.id, true);
     });
     child.once("error", (error) => {
-      clearInterval(achievementTimer);
+      stopPolling();
       if (reportedRunning) {
         broadcastGameRunning(game.id, false);
       }
       console.error("[launch:local]", error);
     });
     child.once("close", async () => {
-      clearInterval(achievementTimer);
+      const endedAt = Date.now();
+      stopPolling();
+      await pendingAchievements?.catch(() => undefined);
       await refreshAchievements().catch((error) =>
         console.error("[achievements:final]", error),
       );
@@ -166,13 +185,12 @@ export function registerLaunchHandlers({
           .catch((error) => console.error("[savegames:auto]", error));
       }
 
-      const durationSeconds = Math.round((Date.now() - startedAt) / 1_000);
+      const durationSeconds = Math.round((endedAt - startedAt) / 1_000);
 
       if (durationSeconds < 5) {
         return;
       }
-      await store.addPlaytime(game.id, durationSeconds);
-      await broadcastLibrary();
+      await broadcastLibrary(await store.addPlaytime(game.id, durationSeconds));
       await autoSync().catch((error) => console.error("[sync:auto]", error));
     });
   });

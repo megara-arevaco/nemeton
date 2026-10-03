@@ -4,6 +4,7 @@ import {
   useEffect,
   useMemo,
   useReducer,
+  useRef,
   useState,
 } from "react";
 import type { ChangeEvent, MouseEvent, SyntheticEvent } from "react";
@@ -33,6 +34,24 @@ import { useWorkspaceStatusQuery } from "../../queries/workspace.queries";
 export function useLibraryController() {
   const queryClient = useQueryClient();
   const libraryQuery = useLibraryQuery();
+  const libraryStarted = useRef(performance.now());
+  const recordedReady = useRef(false);
+  useEffect(() => {
+    if (!libraryQuery.data || recordedReady.current) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      recordedReady.current = true;
+      void window.launcher
+        .recordPerformance(
+          "ui:library-ready",
+          performance.now() - libraryStarted.current,
+        )
+        .catch(() => undefined);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [libraryQuery.data]);
   const steamSettingsQuery = useSteamSettingsQuery();
   const syncSettingsQuery = useSyncSettingsQuery();
   const runningGamesQuery = useRunningGamesQuery();
@@ -171,6 +190,7 @@ export function useApp() {
   const gameMenu = navigation.overlay?.type === "game-menu" ? navigation.overlay : null;
   const view = navigation.view;
   const deferredQuery = useDeferredValue(query);
+  const selectionStarted = useRef<number | null>(null);
 
   useEffect(() => {
     if (!gameMenu) {
@@ -214,6 +234,26 @@ export function useApp() {
   const metadataQuery = useGameMetadataQuery(selected?.id ?? null);
   const metadata = metadataQuery.data ?? null;
 
+  useEffect(() => {
+    if (
+      !selected ||
+      achievementsQuery.isPending ||
+      metadataQuery.isPending ||
+      selectionStarted.current === null
+    ) {
+      return;
+    }
+
+    const started = selectionStarted.current;
+    const frame = requestAnimationFrame(() => {
+      selectionStarted.current = null;
+      void window.launcher
+        .recordPerformance("ui:game-ready", performance.now() - started)
+        .catch(() => undefined);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected, achievementsQuery.isPending, metadataQuery.isPending]);
+
   const openLibrary = useCallback(() => {
     dispatchNavigation({ type: "select-game", gameId: null });
   }, []);
@@ -227,6 +267,7 @@ export function useApp() {
     dispatchNavigation({ type: "open-overlay", overlay: { type: "add-game" } });
   }, []);
   const selectGame = useCallback((gameId: string) => {
+    selectionStarted.current = performance.now();
     dispatchNavigation({ type: "select-game", gameId });
   }, []);
   const openGameMenu = useCallback((game: LibraryGame, x: number, y: number) => {

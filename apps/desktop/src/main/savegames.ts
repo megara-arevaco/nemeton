@@ -20,6 +20,7 @@ import {
 } from "./savegames/validation.js";
 import { restoreDirectories, recoverRestore } from "./savegames/restore.js";
 import type {
+  SavegameVerification,
   SavegameVersion,
   SavegameConflict,
   SavegameSuggestion,
@@ -93,6 +94,7 @@ const rootKey = (root: string) => {
 };
 
 export class SavegameManager {
+  private readonly verifications = new Map<string, Promise<SavegameVerification>>();
   private readonly discovery: SavegameDiscovery;
 
   constructor(private readonly configPath: string) {
@@ -360,21 +362,33 @@ export class SavegameManager {
     return versions.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
-  private async currentSignature(gameId: string) {
-    const roots = await this.getPaths(gameId);
+  private async verificationInputs(gameId: string) {
+    const config = await this.readConfig();
+    return {
+      paths: config.games[gameId] ?? [],
+      policy: savegamePolicySchema.parse({
+        ...defaultPolicy(),
+        ...config.policies?.[gameId],
+      }),
+      deviceId: config.deviceId,
+    };
+  }
 
+  private async currentSignature(gameId: string) {
+    const inputs = await this.verificationInputs(gameId);
+    return this.signatureFor(inputs.paths, inputs.policy);
+  }
+
+  private async signatureFor(roots: string[], policy: SavegamePolicy) {
     if (!roots.length) {
       return null;
     }
 
-    const policy = await this.getPolicy(gameId);
     const files: Array<{ rootIndex: number; relativePath: string; hash: string }> = [];
 
     for (const [rootIndex, root] of roots.entries()) {
       const walk = async (directory: string): Promise<void> => {
-        const entries = await fs.promises
-          .readdir(directory, { withFileTypes: true })
-          .catch(() => []);
+        const entries = await fs.promises.readdir(directory, { withFileTypes: true });
 
         for (const entry of entries) {
           if (policy.excludedNames.includes(entry.name.toLocaleLowerCase())) {
@@ -413,12 +427,80 @@ export class SavegameManager {
     return signature;
   }
 
-  async currentMatchesLatest(gameId: string, latestVersion?: SavegameVersion) {
+  async verify(
+    gameId: string,
+    sourceId: string,
+    syncFolder: string,
+  ): Promise<SavegameVerification> {
+    const inputs = await this.verificationInputs(gameId);
+    const latest = (await this.listVersions(syncFolder, sourceId))[0];
+    const versionId = latest?.id ?? null;
+    const key = JSON.stringify([
+      gameId,
+      sourceId,
+      path.resolve(syncFolder),
+      inputs,
+      versionId,
+    ]);
+    const existing = this.verifications.get(key);
+
+    if (existing) {
+      return existing;
+    }
+
+    const request = (async (): Promise<SavegameVerification> => {
+      if (!inputs.paths.length) {
+        return { syncState: "not-detected", conflict: null, versionId };
+      }
+      for (const folder of inputs.paths) {
+        if (!(await fs.promises.stat(folder).catch(() => null))?.isDirectory()) {
+          return { syncState: "path-missing", conflict: null, versionId };
+        }
+      }
+      if (!latest) {
+        return { syncState: "waiting-backup", conflict: null, versionId };
+      }
+
+      // Hash without holding the shared configuration lock.
+      const synchronized = await this.currentMatchesLatest(gameId, latest, inputs);
+      const currentInputs = await this.verificationInputs(gameId);
+      const currentLatest = (await this.listVersions(syncFolder, sourceId))[0];
+
+      if (
+        JSON.stringify(inputs) !== JSON.stringify(currentInputs) ||
+        currentLatest?.id !== latest.id
+      ) {
+        return {
+          syncState: "checking",
+          conflict: null,
+          versionId: currentLatest?.id ?? null,
+        };
+      }
+
+      const conflict =
+        !synchronized && latest.deviceId !== inputs.deviceId ? latest : null;
+      return {
+        syncState: synchronized ? "synced" : conflict ? "conflict" : "pending",
+        conflict,
+        versionId,
+      };
+    })().finally(() => this.verifications.delete(key));
+    this.verifications.set(key, request);
+    return request;
+  }
+
+  async currentMatchesLatest(
+    gameId: string,
+    latestVersion?: SavegameVersion,
+    inputs?: { paths: string[]; policy: SavegamePolicy },
+  ) {
     if (!latestVersion) {
       return false;
     }
 
-    const signature = await this.currentSignature(gameId);
+    const signature = inputs
+      ? await this.signatureFor(inputs.paths, inputs.policy)
+      : await this.currentSignature(gameId);
     return Boolean(signature && latestVersion.id.endsWith(signature));
   }
 
@@ -461,6 +543,12 @@ export class SavegameManager {
 
       if (roots.length === 0) {
         return null;
+      }
+
+      const latest = (await this.listVersions(syncFolder, sourceId))[0];
+
+      if (latest && (await this.currentMatchesLatest(gameId, latest))) {
+        return latest;
       }
 
       const gameRoot = this.gameRoot(syncFolder, sourceId);
@@ -626,8 +714,8 @@ export class SavegameManager {
     return manifest;
   }
 
-  async recoverRestore() {
-    await recoverRestore(`${this.configPath}.restore.json`);
+  async recoverRestore(onReady?: () => void) {
+    await recoverRestore(`${this.configPath}.restore.json`, onReady);
   }
 
   async restore(

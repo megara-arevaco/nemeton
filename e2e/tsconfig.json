@@ -1,0 +1,5 @@
+{
+  "extends": "../apps/desktop/tsconfig.json",
+  "compilerOptions": { "types": ["node"], "rootDir": ".." },
+  "include": ["./*.ts", "../playwright.config.ts"]
+}

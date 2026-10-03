@@ -16,6 +16,8 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
     chooseFolder,
     backup,
     restoreLatest,
+    verificationFailed,
+    retryVerification,
   } = useSavegamesPanel(game);
 
   if (loading) {
@@ -109,6 +111,15 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
             <FloppyDisk /> Sincronizar ahora
           </button>
         )}
+      {verificationFailed && (
+        <button
+          className="cover-button"
+          disabled={busy}
+          onClick={() => void retryVerification()}
+        >
+          Volver a comprobar
+        </button>
+      )}
       {status && (
         <p className={"savegame-status [background:#a9fb760d] [color:#a9fb76]"}>
           {status}

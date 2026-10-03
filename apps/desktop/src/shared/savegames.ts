@@ -41,7 +41,12 @@ export interface SavegameState {
     | "waiting-backup"
     | "synced"
     | "conflict"
-    | "pending";
+    | "pending"
+    | "checking";
   missingPaths: string[];
   conflict: SavegameVersion | null;
 }
+
+export type SavegameVerification = Pick<SavegameState, "syncState" | "conflict"> & {
+  versionId: string | null;
+};

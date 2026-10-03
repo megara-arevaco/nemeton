@@ -1,3 +1,5 @@
+import { readSavegameState } from "../savegame-state.js";
+import type { SavegameState } from "../../shared/savegames.js";
 import fs from "node:fs";
 import path from "node:path";
 import { BrowserWindow, dialog } from "electron";
@@ -5,131 +7,53 @@ import type { MainContext } from "../context.js";
 import { handle } from "./handle.js";
 import { getRoamingAppData, toLinuxPath } from "../platform.js";
 import { SavegameManager } from "../savegames.js";
-const resolveSavegameSyncState = ({
-  syncConfigured,
-  hasMissingPaths,
-  hasPaths,
-  hasVersions,
-  synchronized,
-  hasConflict,
-}: {
-  syncConfigured: boolean;
-  hasMissingPaths: boolean;
-  hasPaths: boolean;
-  hasVersions: boolean;
-  synchronized: boolean;
-  hasConflict: boolean;
-}) => {
-  if (!syncConfigured) {
-    return "unconfigured";
-  }
-  if (hasMissingPaths) {
-    return "path-missing";
-  }
-  if (!hasPaths) {
-    return "not-detected";
-  }
-  if (!hasVersions) {
-    return "waiting-backup";
-  }
-  if (synchronized) {
-    return "synced";
-  }
-  return hasConflict ? "conflict" : "pending";
-};
-
 export function registerSavegameHandlers({
+  awaitStartupRecovery,
   store,
   savegameManager,
   settingsStore,
   ludusaviCatalog,
   reportSlowOperation,
 }: MainContext) {
-  handle("savegames:get", async (_event, gameId: string) =>
-    reportSlowOperation("savegames:get", async () => {
-      const game = (await store.read()).games.find(
-        (item) => item.id === gameId && item.source === "local",
-      );
+  const loadState = (gameId: string, discover = false) =>
+    readSavegameState(
+      { store, settingsStore, savegameManager, ludusaviCatalog },
+      gameId,
+      discover,
+      getRoamingAppData,
+    );
+  handle("savegames:get", (_event, gameId) =>
+    reportSlowOperation("savegames:get", () => loadState(gameId)),
+  );
+  const discovering = new Map<string, Promise<SavegameState>>();
+  handle("savegames:discover", (_event, gameId) => {
+    const existing = discovering.get(gameId);
 
-      if (!game) {
-        throw new Error(
-          "Las partidas sincronizadas solo están disponibles para juegos manuales",
-        );
+    if (existing) {
+      return existing;
+    }
+
+    const request = reportSlowOperation("savegames:discover", () =>
+      loadState(gameId, true),
+    ).finally(() => discovering.delete(gameId));
+    discovering.set(gameId, request);
+    return request;
+  });
+  handle("savegames:verify", async (_event, gameId: string) =>
+    reportSlowOperation("savegames:verify", async () => {
+      await awaitStartupRecovery();
+      const game = await store.getGame(gameId);
+
+      if (!game || game.source !== "local") {
+        throw new Error("No se encontró el juego local");
       }
 
       const settings = await settingsStore.read();
-      let paths = await savegameManager.removeInstallRoot(gameId, game.installPath);
-      const ludusavi = game.ludusaviGameName
-        ? await ludusaviCatalog.find(game.ludusaviGameName)
-        : null;
-      const policy = await savegameManager.getPolicy(gameId);
-      const suggestions = await savegameManager.suggestPaths(
-        game.title,
-        await getRoamingAppData(),
-        game.installPath,
-        game.steamAppId,
-        ludusavi,
-        policy.includeConfig,
-        false,
-      );
 
-      for (const suggestion of suggestions.filter(
-        (item) => item.confidence === "high" && !paths.includes(item.path),
-      )) {
-        paths = await savegameManager.addPath(gameId, suggestion.path);
+      if (!settings.syncFolderPath) {
+        return { syncState: "unconfigured" as const, conflict: null, versionId: null };
       }
-
-      const versions = settings.syncFolderPath
-        ? await savegameManager.listVersions(settings.syncFolderPath, game.sourceId)
-        : [];
-      const missingPaths = (
-        await Promise.all(
-          paths.map(async (folderPath) => ({
-            folderPath,
-            exists: Boolean(
-              (await fs.promises.stat(folderPath).catch(() => null))?.isDirectory(),
-            ),
-          })),
-        )
-      )
-        .filter((item) => !item.exists)
-        .map((item) => item.folderPath);
-      const latestVersion = versions[0];
-      const synchronized =
-        settings.syncFolderPath &&
-        paths.length &&
-        !missingPaths.length &&
-        versions.length
-          ? await savegameManager.currentMatchesLatest(gameId, latestVersion)
-          : false;
-      const conflict =
-        settings.syncFolderPath && paths.length && !missingPaths.length && !synchronized
-          ? await savegameManager.detectExternalConflict(
-              gameId,
-              game.sourceId,
-              settings.syncFolderPath,
-              latestVersion,
-              synchronized,
-            )
-          : null;
-      const syncState = resolveSavegameSyncState({
-        syncConfigured: Boolean(settings.syncFolderPath),
-        hasMissingPaths: missingPaths.length > 0,
-        hasPaths: paths.length > 0,
-        hasVersions: versions.length > 0,
-        synchronized,
-        hasConflict: Boolean(conflict),
-      });
-      return {
-        paths,
-        suggestions: suggestions.filter((item) => !paths.includes(item.path)),
-        versions,
-        policy,
-        syncConfigured: Boolean(settings.syncFolderPath),
-        syncState,
-        missingPaths,
-        conflict: conflict?.remoteVersion ?? null,
-      };
+      return savegameManager.verify(gameId, game.sourceId, settings.syncFolderPath);
     }),
   );
   handle(
@@ -157,12 +81,10 @@ export function registerSavegameHandlers({
   );
   handle("savegames:backup", async (_event, gameId: string) =>
     reportSlowOperation("savegames:backup", async () => {
-      const game = (await store.read()).games.find(
-        (item) => item.id === gameId && item.source === "local",
-      );
+      const game = await store.getGame(gameId);
       const settings = await settingsStore.read();
 
-      if (!game) {
+      if (!game || game.source !== "local") {
         throw new Error("No se encontró el juego manual");
       }
       if (!settings.syncFolderPath) {
@@ -175,9 +97,7 @@ export function registerSavegameHandlers({
   handle(
     "savegames:set-pinned",
     async (_event, gameId: string, versionId: string, pinned: boolean) => {
-      const game = (await store.read()).games.find(
-        (item) => item.id === gameId && item.source === "local",
-      );
+      const game = await store.getGame(gameId);
       const settings = await settingsStore.read();
 
       if (!game || !settings.syncFolderPath) {
@@ -192,9 +112,8 @@ export function registerSavegameHandlers({
     },
   );
   handle("savegames:restore", async (event, gameId: string, versionId: string) => {
-    const game = (await store.read()).games.find(
-      (item) => item.id === gameId && item.source === "local",
-    );
+    await awaitStartupRecovery();
+    const game = await store.getGame(gameId);
     const settings = await settingsStore.read();
 
     if (!game || !settings.syncFolderPath) {

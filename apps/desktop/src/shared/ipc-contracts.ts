@@ -43,6 +43,19 @@ export const savegamePolicySchema = z.object({
 });
 
 export const ipcContracts = {
+  "performance:record": z.tuple([
+    z.enum([
+      "library:list",
+      "library:metadata",
+      "library:achievements",
+      "library:launch",
+      "savegames:get",
+      "savegames:verify",
+      "ui:library-ready",
+      "ui:game-ready",
+    ]),
+    z.number().finite().min(0).max(3_600_000),
+  ]),
   "window:minimize": z.tuple([]),
   "window:toggle-maximize": z.tuple([]),
   "window:close": z.tuple([]),
@@ -69,6 +82,8 @@ export const ipcContracts = {
   "sync:select-folder": z.tuple([]),
   "sync:now": z.tuple([]),
   "savegames:get": z.tuple([id]),
+  "savegames:discover": z.tuple([id]),
+  "savegames:verify": z.tuple([id]),
   "savegames:set-policy": z.tuple([id, savegamePolicySchema.partial().strict()]),
   "savegames:add-folder": z.tuple([id]),
   "savegames:add-suggested": z.tuple([id, text.min(1)]),

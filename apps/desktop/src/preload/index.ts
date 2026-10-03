@@ -1,8 +1,10 @@
 import type {
+  SavegameVerification,
   SavegameState,
   SavegamePolicy,
   SavegameVersion,
 } from "../shared/savegames.js";
+import type { LibraryChange, PublishedLibrary } from "../shared/library-updates.js";
 import type { IpcArgs, IpcChannel } from "../shared/ipc-contracts.js";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
@@ -14,14 +16,38 @@ import type {
   SteamAccountSettings,
 } from "@launcher/core";
 
-const invoke = <K extends IpcChannel>(channel: K, ...args: IpcArgs<K>) =>
-  ipcRenderer.invoke(channel, ...args);
+const measuredChannels = new Set<string>([
+  "library:list",
+  "library:metadata",
+  "library:achievements",
+  "library:launch",
+  "savegames:get",
+  "savegames:verify",
+]);
+
+const invoke = async <K extends IpcChannel>(channel: K, ...args: IpcArgs<K>) => {
+  const started = performance.now();
+
+  try {
+    return await ipcRenderer.invoke(channel, ...args);
+  } finally {
+    if (measuredChannels.has(channel)) {
+      void ipcRenderer
+        .invoke("performance:record", channel, performance.now() - started)
+        .catch(() => undefined);
+    }
+  }
+};
 
 const api = {
+  recordPerformance: (
+    name: "ui:library-ready" | "ui:game-ready",
+    elapsedMs: number,
+  ): Promise<void> => invoke("performance:record", name, elapsedMs),
   minimizeWindow: (): Promise<void> => invoke("window:minimize"),
   toggleMaximizeWindow: (): Promise<void> => invoke("window:toggle-maximize"),
   closeWindow: (): Promise<void> => invoke("window:close"),
-  listGames: (): Promise<LibrarySnapshot> => invoke("library:list"),
+  listGames: (): Promise<PublishedLibrary> => invoke("library:list"),
   getWorkspaceStatus: (): Promise<{ branch: string | null }> =>
     invoke("workspace:status"),
   getGameMetadata: (gameId: string): Promise<GameMetadata | null> =>
@@ -36,6 +62,10 @@ const api = {
     invoke("sync:now"),
   getSavegames: (gameId: string): Promise<SavegameState> =>
     invoke("savegames:get", gameId),
+  discoverSavegames: (gameId: string): Promise<SavegameState> =>
+    invoke("savegames:discover", gameId),
+  verifySavegames: (gameId: string): Promise<SavegameVerification> =>
+    invoke("savegames:verify", gameId),
   setSavegamePolicy: (
     gameId: string,
     policy: Partial<SavegamePolicy>,
@@ -122,8 +152,8 @@ const api = {
   deleteGameForever: (gameId: string, confirmation: string): Promise<LibrarySnapshot> =>
     invoke("library:delete-forever", gameId, confirmation),
   launchGame: (gameId: string): Promise<void> => invoke("library:launch", gameId),
-  onLibraryChanged: (callback: (snapshot: LibrarySnapshot) => void) => {
-    const listener = (_event: Electron.IpcRendererEvent, snapshot: LibrarySnapshot) =>
+  onLibraryChanged: (callback: (snapshot: LibraryChange) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: LibraryChange) =>
       callback(snapshot);
     ipcRenderer.on("library:changed", listener);
     return () => ipcRenderer.removeListener("library:changed", listener);

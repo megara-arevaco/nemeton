@@ -10,7 +10,7 @@ const journalSchema = z.object({
   ),
 });
 
-export async function recoverRestore(journalPath: string) {
+export async function recoverRestore(journalPath: string, onReady?: () => void) {
   const raw = await fs
     .readFile(journalPath, "utf8")
     .catch((error: NodeJS.ErrnoException) => {
@@ -21,6 +21,7 @@ export async function recoverRestore(journalPath: string) {
     });
 
   if (!raw) {
+    onReady?.();
     return;
   }
 
@@ -38,12 +39,33 @@ export async function recoverRestore(journalPath: string) {
       throw new Error("Registro de restauración no válido");
     }
   }
-  for (const entry of [...journal.directories].reverse()) {
-    if (!journal.committed && (await fs.stat(entry.previous).catch(() => null))) {
-      await fs.rm(entry.root, { recursive: true, force: true });
-      await fs.rename(entry.previous, entry.root);
+  if (!journal.committed) {
+    for (const entry of [...journal.directories].reverse()) {
+      if (await fs.stat(entry.previous).catch(() => null)) {
+        const discarded = `${entry.stage}.discarded`;
+        const rootExists = await fs.lstat(entry.root).catch(() => null);
+
+        if (rootExists) {
+          if (await fs.lstat(discarded).catch(() => null)) {
+            throw new Error("La recuperación encontró dos copias temporales");
+          }
+          await fs.rename(entry.root, discarded);
+        }
+        try {
+          await fs.rename(entry.previous, entry.root);
+        } catch (error) {
+          if (rootExists) {
+            await fs.rename(discarded, entry.root);
+          }
+          throw error;
+        }
+      }
     }
+  }
+  onReady?.();
+  for (const entry of [...journal.directories].reverse()) {
     await fs.rm(entry.stage, { recursive: true, force: true });
+    await fs.rm(`${entry.stage}.discarded`, { recursive: true, force: true });
     if (journal.committed) {
       await fs.rm(entry.previous, { recursive: true, force: true });
     }

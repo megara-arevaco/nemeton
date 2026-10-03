@@ -244,7 +244,9 @@ const discoverPlaytimes = async (steamRoot: string) => {
 };
 
 export const discoverSteamGames = async (): Promise<SteamCandidate[]> => {
-  const steamRoot = defaultSteamRoots().find(fs.existsSync);
+  const steamRoot = defaultSteamRoots().find((root) =>
+    fs.existsSync(path.join(root, "steamapps")),
+  );
 
   if (!steamRoot) {
     return [];

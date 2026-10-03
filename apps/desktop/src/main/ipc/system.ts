@@ -1,3 +1,4 @@
+import { recordOperation } from "../operation-metrics.js";
 import { handle } from "./handle.js";
 import fs from "node:fs";
 import { execFile } from "node:child_process";
@@ -10,6 +11,9 @@ export const registerSystemHandlers = ({
   folderSyncService,
   settingsStore,
 }: MainContext) => {
+  handle("performance:record", (_event, name, elapsedMs) => {
+    recordOperation(`renderer:${name}`, elapsedMs);
+  });
   handle("workspace:status", async () => {
     if (app.isPackaged) {
       return { branch: null };

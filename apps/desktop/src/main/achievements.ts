@@ -1,5 +1,7 @@
 import { readTextIfExists, withFileLock, writeJsonAtomically } from "@launcher/core";
 import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
 import {
   mergeAchievementCatalogue,
   type AchievementCatalogue,
@@ -28,6 +30,7 @@ export interface AchievementHistoryEntry {
 
 export class AchievementService {
   private roamingAppData: string | null = null;
+  private localImages = new Map<string, string>();
 
   constructor(
     private readonly historyPath: string,
@@ -56,24 +59,68 @@ export class AchievementService {
   }
 
   async discover(game: LibraryGame): Promise<GameAchievements> {
-    const appId = game.source === "steam" ? game.sourceId : game.steamAppId;
+    const discoveredAppId =
+      game.source === "local" ? await discoverLocalSteamAppId(game.installPath) : null;
+    const appId =
+      game.source === "steam"
+        ? game.sourceId
+        : (game.achievementStateId ?? game.steamAppId ?? discoveredAppId);
     const [local, catalogue] = await Promise.all([
-      this.discoverLocal(game),
+      this.discoverLocal(game, discoveredAppId),
       appId ? this.catalogue?.get(appId) : null,
     ]);
-    return catalogue ? mergeAchievementCatalogue(local, catalogue) : local;
+    return this.registerLocalImages(
+      game,
+      catalogue ? mergeAchievementCatalogue(local, catalogue) : local,
+    );
   }
 
-  private async discoverLocal(game: LibraryGame): Promise<GameAchievements> {
+  resolveLocalImage(token: string): string | null {
+    return this.localImages.get(token) ?? null;
+  }
+
+  private registerLocalImages(
+    game: LibraryGame,
+    result: GameAchievements,
+  ): GameAchievements {
+    if (game.source !== "local" || !game.installPath) {
+      return result;
+    }
+
+    const allowedRoot = path.dirname(path.dirname(path.resolve(game.installPath)));
+    return {
+      ...result,
+      items: result.items.map((item) => {
+        const image = item.imageUrl;
+
+        if (!image || !path.isAbsolute(image) || !/\.(png|jpe?g|webp)$/i.test(image)) {
+          return item;
+        }
+
+        const relative = path.relative(allowedRoot, image);
+
+        if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+          return { ...item, imageUrl: null };
+        }
+
+        const token = createHash("sha256").update(image).digest("hex");
+        this.localImages.set(token, image);
+        return { ...item, imageUrl: `launcher-achievement:///${token}` };
+      }),
+    };
+  }
+
+  private async discoverLocal(
+    game: LibraryGame,
+    discoveredAppId: string | null,
+  ): Promise<GameAchievements> {
     if (game.source === "steam") {
       return discoverSteamAchievements(game.sourceId);
     }
 
-    const appIds = [
-      game.achievementStateId,
-      game.steamAppId,
-      await discoverLocalSteamAppId(game.installPath),
-    ].filter((appId): appId is string => Boolean(appId));
+    const appIds = [game.achievementStateId, game.steamAppId, discoveredAppId].filter(
+      (appId): appId is string => Boolean(appId),
+    );
 
     if (appIds.length === 0) {
       return {

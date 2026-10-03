@@ -23,6 +23,7 @@ export default defineConfig({
   renderer: {
     plugins: [react(), tailwindcss()],
     build: {
+      minify: "esbuild",
       rollupOptions: {
         output: {
           manualChunks(id) {

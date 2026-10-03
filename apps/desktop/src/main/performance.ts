@@ -1,3 +1,4 @@
+import { operationMetrics } from "./operation-metrics.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { monitorEventLoopDelay } from "node:perf_hooks";
@@ -27,6 +28,7 @@ export function startPerformanceLog() {
   delay.enable();
   const sample = () => {
     log("resources", {
+      operations: operationMetrics(),
       eventLoopMaxMs: Math.round(delay.max / 1e6),
       eventLoopP99Ms: Math.round(delay.percentile(99) / 1e6),
       processes: app.getAppMetrics().map((process) => ({

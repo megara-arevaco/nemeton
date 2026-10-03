@@ -56,7 +56,6 @@ export function App() {
   const {
     games,
     libraryLoading,
-    setGames,
     sessions,
     setSessions,
     selectedId,
@@ -532,7 +531,7 @@ export function App() {
           <EditGameModal
             game={editGame}
             onClose={closeEditor}
-            onUpdated={(snapshot) => setGames(snapshot.games)}
+            onUpdated={updateLibrary}
           />
         </Suspense>
       )}

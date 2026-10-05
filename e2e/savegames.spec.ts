@@ -42,7 +42,10 @@ test("backs up, verifies and restores saves while preserving the previous state"
     page.getByText("Partidas sincronizadas", { exact: true }).first(),
   ).toBeVisible();
   const gameId = await page.evaluate(
-    async () => (await window.launcher.listGames()).games[0]!.id,
+    async () =>
+      (await window.launcher.listGames()).games.find(
+        (game) => game.title === "E2E Saves",
+      )!.id,
   );
   const versions = await page.evaluate(
     async (id) => (await window.launcher.getSavegames(id)).versions,

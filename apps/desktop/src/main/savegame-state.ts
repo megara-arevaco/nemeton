@@ -79,6 +79,12 @@ export async function readSavegameState(
       )
     : [];
 
+  // Discovery may overlap with a manually selected folder. Read current paths
+  // after discovery so its earlier snapshot cannot hide the new selection.
+  if (discover) {
+    paths = await savegameManager.getPaths(gameId);
+  }
+
   for (const suggestion of suggestions.filter(
     (item) => item.confidence === "high" && !paths.includes(item.path),
   )) {

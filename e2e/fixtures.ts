@@ -18,7 +18,10 @@ export const test = base.extend<{
 }>({
   gameCount: [0, { option: true }],
   desktop: async ({ gameCount }, use, testInfo) => {
-    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "nemeton-e2e-"));
+    // Windows runners may expose an 8.3 alias in TEMP. Restore validation
+    // requires canonical paths so it can reject redirected directories.
+    const temporaryRoot = await fs.realpath(os.tmpdir());
+    const directory = await fs.mkdtemp(path.join(temporaryRoot, "nemeton-e2e-"));
     const data = path.join(directory, "data");
     await fs.mkdir(data);
     await fs.writeFile(

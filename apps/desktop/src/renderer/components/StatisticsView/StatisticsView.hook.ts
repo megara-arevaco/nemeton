@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GameSession, LibraryGame } from "@launcher/core";
 import { formatPlaytime } from "../../shared/presentation";
 export interface MonthlyActivity {
@@ -14,7 +14,7 @@ interface ActivityEntry {
 function buildActivity(
   games: LibraryGame[],
   sessions: GameSession[],
-  year: number,
+  includesDate: (date: Date) => boolean,
   count: number,
   bucketFor: (date: Date) => number,
 ): ActivityEntry[][] {
@@ -27,7 +27,7 @@ function buildActivity(
   for (const session of sessions) {
     const date = new Date(session.endedAt);
 
-    if (date.getFullYear() !== year) {
+    if (!includesDate(date)) {
       continue;
     }
 
@@ -52,7 +52,7 @@ function buildActivity(
 
     const date = new Date(game.lastPlayedAt);
 
-    if (date.getFullYear() === year && !buckets[bucketFor(date)]!.has(game.id)) {
+    if (includesDate(date) && !buckets[bucketFor(date)]!.has(game.id)) {
       buckets[bucketFor(date)]!.set(game.id, {
         launcherSeconds: 0,
         steamSeconds: 0,
@@ -79,44 +79,72 @@ export function buildMonthlyActivity(
   sessions: GameSession[],
   year: number,
 ): MonthlyActivity[] {
-  return buildActivity(games, sessions, year, 12, (date) => date.getMonth()).map(
-    (entries, month) => ({ month, entries }),
-  );
+  return buildActivity(
+    games,
+    sessions,
+    (date) => date.getFullYear() === year,
+    12,
+    (date) => date.getMonth(),
+  ).map((entries, month) => ({ month, entries }));
 }
 
-export function buildWeeklyActivity(
+export function buildCurrentActivity(
   games: LibraryGame[],
   sessions: GameSession[],
-  year: number,
+  period: "week" | "month",
+  now: Date,
 ) {
-  const januaryFirst = new Date(year, 0, 1);
-  const firstMonday = new Date(januaryFirst);
-  firstMonday.setDate(1 - ((firstMonday.getDay() + 6) % 7));
-  // Calendar dates avoid daylight-saving changes shifting a day into another week.
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === "week") {
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  } else {
+    start.setDate(1);
+  }
+
+  const end = new Date(start);
+
+  if (period === "week") {
+    end.setDate(end.getDate() + 7);
+  } else {
+    end.setMonth(end.getMonth() + 1);
+  }
+
+  const includesDate = (date: Date) => date >= start && date < end;
+  // Calendar dates keep the day boundaries correct across daylight-saving changes.
   const calendarDay = (date: Date) =>
     Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
-  const bucketFor = (date: Date) =>
-    Math.floor((calendarDay(date) - calendarDay(firstMonday)) / 7);
-  const count = bucketFor(new Date(year, 11, 31)) + 1;
-  return buildActivity(games, sessions, year, count, bucketFor).map(
-    (entries, index) => {
-      const monday = new Date(firstMonday);
-      monday.setDate(monday.getDate() + index * 7);
-      const sunday = new Date(monday);
-      sunday.setDate(sunday.getDate() + 6);
-      return {
-        week: index + 1,
-        start: monday < januaryFirst ? januaryFirst : monday,
-        end: sunday.getFullYear() > year ? new Date(year, 11, 31) : sunday,
-        entries,
-      };
-    },
+  const count = calendarDay(end) - calendarDay(start);
+  const days = buildActivity(
+    games,
+    sessions,
+    includesDate,
+    count,
+    (date) => calendarDay(date) - calendarDay(start),
+  ).map((entries, index) => {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+    return { date, entries };
+  });
+  const ranking = buildActivity(games, sessions, includesDate, 1, () => 0)[0]!.filter(
+    (entry) => entry.seconds > 0,
   );
+  return { start, end, days, ranking };
 }
 
-export type StatisticsPeriod = "all" | "2026" | "weekly-2026";
+export type StatisticsPeriod = "all" | "2026" | "week" | "month";
 
 export function useStatisticsView(games: LibraryGame[], sessions: GameSession[]) {
+  const [today, setToday] = useState(() => new Date());
+  useEffect(() => {
+    const now = new Date();
+    const nextDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timer = setTimeout(
+      () => setToday(new Date()),
+      nextDay.getTime() - now.getTime(),
+    );
+    return () => clearTimeout(timer);
+  }, [today]);
   const [period, setPeriod] = useState<StatisticsPeriod>("all");
   const [historyView, setHistoryView] = useState<"calendar" | "ranking">("calendar");
   const [summaryPeriod, setSummaryPeriod] = useState<"week" | "month">("week");
@@ -141,17 +169,36 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       entries,
     }));
   }, [games, sessions]);
-  const weeks = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat("es-ES", {
-      day: "numeric",
-      month: "short",
-    });
-    return buildWeeklyActivity(games, sessions, 2026).map((week) => ({
-      name: `Semana ${week.week}`,
-      dates: formatter.formatRange(week.start, week.end),
-      entries: week.entries,
-    }));
-  }, [games, sessions]);
+  const currentActivity = useMemo(
+    () =>
+      buildCurrentActivity(
+        games,
+        sessions,
+        period === "month" ? "month" : "week",
+        today,
+      ),
+    [games, sessions, period, today],
+  );
+  const dayFormatter = new Intl.DateTimeFormat("es-ES", { weekday: "long" });
+  const dateFormatter = new Intl.DateTimeFormat("es-ES", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const activityPeriods =
+    period === "2026"
+      ? months
+      : currentActivity.days.map(({ date, entries }) => ({
+          name: dayFormatter.format(date),
+          dates: dateFormatter.format(date),
+          entries,
+        }));
+  const lastDay = new Date(currentActivity.end);
+  lastDay.setDate(lastDay.getDate() - 1);
+  const periodDates =
+    period === "2026"
+      ? "2026"
+      : dateFormatter.formatRange(currentActivity.start, lastDay);
   const annualSeconds = months.reduce(
     (total, month) =>
       total +
@@ -175,8 +222,13 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
         (a, b) => b.seconds - a.seconds || a.game.title.localeCompare(b.game.title),
       );
   }, [games, months]);
+  const periodRanking = period === "2026" ? yearRanking : currentActivity.ranking;
+  const periodSeconds =
+    period === "2026"
+      ? annualSeconds
+      : periodRanking.reduce((total, entry) => total + entry.seconds, 0);
   const automaticSummary = useMemo(() => {
-    const now = new Date();
+    const now = today;
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const currentMonday = new Date(startOfToday);
     currentMonday.setDate(currentMonday.getDate() - ((currentMonday.getDay() + 6) % 7));
@@ -186,13 +238,23 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const periodStart = summaryPeriod === "week" ? currentMonday : currentMonth;
     const previousStart = summaryPeriod === "week" ? previousMonday : previousMonth;
+    const periodEnd = new Date(periodStart);
+
+    if (summaryPeriod === "week") {
+      periodEnd.setDate(periodEnd.getDate() + 7);
+    } else {
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    }
+
     const valid = sessions
       .map((session) => ({ ...session, ended: new Date(session.endedAt) }))
       .filter(
         (session) =>
           !Number.isNaN(session.ended.getTime()) && session.durationSeconds > 0,
       );
-    const current = valid.filter((session) => session.ended >= periodStart);
+    const current = valid.filter(
+      (session) => session.ended >= periodStart && session.ended < periodEnd,
+    );
     const previous = valid.filter(
       (session) => session.ended >= previousStart && session.ended < periodStart,
     );
@@ -271,7 +333,12 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
           (ended.getTime() - ordered[index - 1]!.ended.getTime()) / 86_400_000,
         );
 
-        if (ended >= periodStart && days >= 30 && (!comeback || days > comeback.days)) {
+        if (
+          ended >= periodStart &&
+          ended < periodEnd &&
+          days >= 30 &&
+          (!comeback || days > comeback.days)
+        ) {
           comeback = { gameId, days, ended };
         }
       }
@@ -333,7 +400,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       });
     }
     return cards;
-  }, [games, sessions, summaryPeriod]);
+  }, [games, sessions, summaryPeriod, today]);
 
   return {
     period,
@@ -345,10 +412,11 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     statistics,
     totalHours,
     months,
-    weeks,
-    annualSeconds,
+    activityPeriods,
+    periodDates,
+    periodSeconds,
+    periodRanking,
     annualRanking: yearRanking.slice(0, 3),
-    yearRanking,
     automaticSummary,
   };
 }

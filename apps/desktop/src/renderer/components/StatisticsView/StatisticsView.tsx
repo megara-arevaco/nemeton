@@ -21,15 +21,13 @@ export function StatisticsView({
     setHistoryView,
     statistics,
     totalHours,
-    months,
-    weeks,
-    annualSeconds,
+    activityPeriods,
+    periodDates,
+    periodSeconds,
+    periodRanking,
     annualRanking,
-    yearRanking,
     automaticSummary,
   } = useStatisticsView(games, sessions);
-
-  const activityPeriods = period === "weekly-2026" ? weeks : months;
 
   return (
     <div
@@ -117,11 +115,19 @@ export function StatisticsView({
           <article>
             <Clock />
             <span>
-              <small>{period === "all" ? "TIEMPO TOTAL" : "TIEMPO EN 2026"}</small>
+              <small>
+                {period === "all"
+                  ? "TIEMPO TOTAL"
+                  : period === "week"
+                    ? "TIEMPO ESTA SEMANA"
+                    : period === "month"
+                      ? "TIEMPO ESTE MES"
+                      : "TIEMPO EN 2026"}
+              </small>
               <strong>
                 {period === "all"
                   ? `${totalHours} h`
-                  : formatPlaytime(Math.round(annualSeconds / 60))}
+                  : formatPlaytime(Math.round(periodSeconds / 60))}
               </strong>
             </span>
           </article>
@@ -139,7 +145,8 @@ export function StatisticsView({
           >
             <option value="all">Total histórico</option>
             <option value="2026">Anual · 2026</option>
-            <option value="weekly-2026">Semanal · 2026</option>
+            <option value="month">Mensual · mes actual</option>
+            <option value="week">Semanal · semana actual</option>
           </select>
         </label>
       </div>
@@ -288,13 +295,21 @@ export function StatisticsView({
           >
             <div>
               <small>
-                {period === "weekly-2026" ? "ACTIVIDAD SEMANAL" : "ACTIVIDAD ANUAL"}
+                {period === "week"
+                  ? "ACTIVIDAD SEMANAL"
+                  : period === "month"
+                    ? "ACTIVIDAD MENSUAL"
+                    : "ACTIVIDAD ANUAL"}
               </small>
               <h2>
-                {period === "weekly-2026" ? "Tu 2026 por semanas" : "Tu año jugando"}
+                {period === "week"
+                  ? "Esta semana"
+                  : period === "month"
+                    ? "Este mes"
+                    : "Tu año jugando"}
               </h2>
             </div>
-            <span>2026</span>
+            <span>{periodDates}</span>
           </div>
           <div
             role="group"
@@ -305,7 +320,7 @@ export function StatisticsView({
               aria-pressed={historyView === "calendar"}
               onClick={() => setHistoryView("calendar")}
             >
-              {period === "weekly-2026" ? "Por semana" : "Por mes"}
+              {period === "2026" ? "Por mes" : "Por día"}
             </button>
             <button
               aria-pressed={historyView === "ranking"}
@@ -314,7 +329,18 @@ export function StatisticsView({
               Ranking por horas
             </button>
           </div>
-          {historyView === "ranking" && <YearRanking entries={yearRanking} />}
+          {historyView === "ranking" && (
+            <PeriodRanking
+              entries={periodRanking}
+              label={
+                period === "week"
+                  ? "esta semana"
+                  : period === "month"
+                    ? "este mes"
+                    : "2026"
+              }
+            />
+          )}
           {historyView === "calendar" &&
             period === "2026" &&
             annualRanking.length > 0 && (
@@ -372,7 +398,7 @@ export function StatisticsView({
               {activityPeriods.map((month, index) => (
                 <article
                   className={`month-card [min-width:0] [min-height:178px] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:15px] [padding:15px] [background:#ffffff05] [&_>_header]:[display:grid] [&_>_header]:[grid-template-columns:27px_minmax(0,_1fr)_auto] [&_>_header]:[align-items:center] [&_>_header]:[gap:8px] [&_>_header]:[padding-bottom:12px] [&_>_header]:[border-bottom:1px_solid_#ffffff0b] [&_>_header_>_span]:[color:#a9fb76] [&_>_header_>_span]:[font-size:10px] [&_>_header_>_span]:[font-weight:800] [&_>_header_>_strong]:[overflow:hidden] [&_>_header_>_strong]:[font-size:13px] [&_>_header_>_strong]:[text-transform:capitalize] [&_>_header_>_strong]:[text-overflow:ellipsis] [&_>_header_>_strong]:[white-space:nowrap] [&_>_header_>_small]:[color:#626570] [&_>_header_>_small]:[font-size:9px] [&_>_p]:[margin:34px_0_0] [&_>_p]:[color:#51545f] [&_>_p]:[font-size:10px] [&_>_p]:[text-align:center] [&.empty]:[opacity:.65] ${month.entries.length === 0 ? "empty" : ""}`}
-                  key={month.name}
+                  key={month.dates ?? month.name}
                 >
                   <header>
                     <span>{String(index + 1).padStart(2, "0")}</span>
@@ -433,24 +459,26 @@ export function StatisticsView({
   );
 }
 
-function YearRanking({
+function PeriodRanking({
   entries,
+  label,
 }: {
   entries: Array<{ game: LibraryGame; seconds: number }>;
+  label: string;
 }) {
   const totalSeconds = entries.reduce((total, entry) => total + entry.seconds, 0);
 
   if (!entries.length) {
     return (
       <p className="[padding:30px_0] [color:#9295a0]">
-        No hay horas registradas en 2026.
+        No hay horas registradas en {label}.
       </p>
     );
   }
 
   return (
     <ol
-      aria-label="Ranking por horas de 2026"
+      aria-label={`Ranking por horas de ${label}`}
       className="[list-style:none] [padding:0] [margin:20px_0_0]"
     >
       {entries.map(({ game, seconds }, index) => (

@@ -6,14 +6,21 @@ export interface MonthlyActivity {
   entries: Array<{ game: LibraryGame; seconds: number }>;
 }
 
-export function buildMonthlyActivity(
+interface ActivityEntry {
+  game: LibraryGame;
+  seconds: number;
+}
+
+function buildActivity(
   games: LibraryGame[],
   sessions: GameSession[],
   year: number,
-): MonthlyActivity[] {
+  count: number,
+  bucketFor: (date: Date) => number,
+): ActivityEntry[][] {
   const gamesById = new Map(games.map((game) => [game.id, game]));
-  const activityByMonth = Array.from(
-    { length: 12 },
+  const buckets = Array.from(
+    { length: count },
     () => new Map<string, { launcherSeconds: number; steamSeconds: number }>(),
   );
 
@@ -24,7 +31,7 @@ export function buildMonthlyActivity(
       continue;
     }
 
-    const activity = activityByMonth[date.getMonth()]!;
+    const activity = buckets[bucketFor(date)]!;
     const previous = activity.get(session.gameId) ?? {
       launcherSeconds: 0,
       steamSeconds: 0,
@@ -45,39 +52,73 @@ export function buildMonthlyActivity(
 
     const date = new Date(game.lastPlayedAt);
 
-    if (
-      date.getFullYear() === year &&
-      !activityByMonth[date.getMonth()]!.has(game.id)
-    ) {
-      activityByMonth[date.getMonth()]!.set(game.id, {
+    if (date.getFullYear() === year && !buckets[bucketFor(date)]!.has(game.id)) {
+      buckets[bucketFor(date)]!.set(game.id, {
         launcherSeconds: 0,
         steamSeconds: 0,
       });
     }
   }
 
-  return activityByMonth.map((activity, month) => ({
-    month,
-    entries: [...activity.entries()]
+  return buckets.map((activity) =>
+    [...activity.entries()]
       .flatMap(([gameId, data]) => {
         const game = gamesById.get(gameId);
         return game
-          ? [
-              {
-                game,
-                seconds: Math.max(data.launcherSeconds, data.steamSeconds),
-              },
-            ]
+          ? [{ game, seconds: Math.max(data.launcherSeconds, data.steamSeconds) }]
           : [];
       })
       .sort(
         (a, b) => b.seconds - a.seconds || a.game.title.localeCompare(b.game.title),
       ),
-  }));
+  );
 }
 
+export function buildMonthlyActivity(
+  games: LibraryGame[],
+  sessions: GameSession[],
+  year: number,
+): MonthlyActivity[] {
+  return buildActivity(games, sessions, year, 12, (date) => date.getMonth()).map(
+    (entries, month) => ({ month, entries }),
+  );
+}
+
+export function buildWeeklyActivity(
+  games: LibraryGame[],
+  sessions: GameSession[],
+  year: number,
+) {
+  const januaryFirst = new Date(year, 0, 1);
+  const firstMonday = new Date(januaryFirst);
+  firstMonday.setDate(1 - ((firstMonday.getDay() + 6) % 7));
+  // Calendar dates avoid daylight-saving changes shifting a day into another week.
+  const calendarDay = (date: Date) =>
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
+  const bucketFor = (date: Date) =>
+    Math.floor((calendarDay(date) - calendarDay(firstMonday)) / 7);
+  const count = bucketFor(new Date(year, 11, 31)) + 1;
+  return buildActivity(games, sessions, year, count, bucketFor).map(
+    (entries, index) => {
+      const monday = new Date(firstMonday);
+      monday.setDate(monday.getDate() + index * 7);
+      const sunday = new Date(monday);
+      sunday.setDate(sunday.getDate() + 6);
+      return {
+        week: index + 1,
+        start: monday < januaryFirst ? januaryFirst : monday,
+        end: sunday.getFullYear() > year ? new Date(year, 11, 31) : sunday,
+        entries,
+      };
+    },
+  );
+}
+
+export type StatisticsPeriod = "all" | "2026" | "weekly-2026";
+
 export function useStatisticsView(games: LibraryGame[], sessions: GameSession[]) {
-  const [period, setPeriod] = useState<"all" | "2026">("all");
+  const [period, setPeriod] = useState<StatisticsPeriod>("all");
+  const [historyView, setHistoryView] = useState<"calendar" | "ranking">("calendar");
   const [summaryPeriod, setSummaryPeriod] = useState<"week" | "month">("week");
   const statistics = useMemo(() => {
     const minutesFor = (game: LibraryGame) =>
@@ -96,7 +137,19 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     const formatter = new Intl.DateTimeFormat("es-ES", { month: "long" });
     return buildMonthlyActivity(games, sessions, 2026).map(({ month, entries }) => ({
       name: formatter.format(new Date(2026, month, 1)),
+      dates: undefined,
       entries,
+    }));
+  }, [games, sessions]);
+  const weeks = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat("es-ES", {
+      day: "numeric",
+      month: "short",
+    });
+    return buildWeeklyActivity(games, sessions, 2026).map((week) => ({
+      name: `Semana ${week.week}`,
+      dates: formatter.formatRange(week.start, week.end),
+      entries: week.entries,
     }));
   }, [games, sessions]);
   const annualSeconds = months.reduce(
@@ -105,7 +158,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       month.entries.reduce((monthTotal, entry) => monthTotal + entry.seconds, 0),
     0,
   );
-  const annualRanking = useMemo(() => {
+  const yearRanking = useMemo(() => {
     const totals = new Map<string, number>();
     months.forEach((month) =>
       month.entries.forEach((entry) =>
@@ -118,8 +171,9 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
         const game = gamesById.get(gameId);
         return game && seconds > 0 ? [{ game, seconds }] : [];
       })
-      .sort((a, b) => b.seconds - a.seconds)
-      .slice(0, 3);
+      .sort(
+        (a, b) => b.seconds - a.seconds || a.game.title.localeCompare(b.game.title),
+      );
   }, [games, months]);
   const automaticSummary = useMemo(() => {
     const now = new Date();
@@ -286,11 +340,15 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     setPeriod,
     summaryPeriod,
     setSummaryPeriod,
+    historyView,
+    setHistoryView,
     statistics,
     totalHours,
     months,
+    weeks,
     annualSeconds,
-    annualRanking,
+    annualRanking: yearRanking.slice(0, 3),
+    yearRanking,
     automaticSummary,
   };
 }

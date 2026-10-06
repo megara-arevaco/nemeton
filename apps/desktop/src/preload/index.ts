@@ -48,7 +48,7 @@ const api = {
   toggleMaximizeWindow: (): Promise<void> => invoke("window:toggle-maximize"),
   closeWindow: (): Promise<void> => invoke("window:close"),
   listGames: (): Promise<PublishedLibrary> => invoke("library:list"),
-  getWorkspaceStatus: (): Promise<{ branch: string | null }> =>
+  getWorkspaceStatus: (): Promise<{ branch: string | null; version: string }> =>
     invoke("workspace:status"),
   getGameMetadata: (gameId: string): Promise<GameMetadata | null> =>
     invoke("library:metadata", gameId),

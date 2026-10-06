@@ -495,8 +495,8 @@ export function App() {
           {message}
           <div className="statusbar-meta">
             <span title="Branch Git actual">⎇ {workspaceStatus?.branch ?? "…"}</span>
-            <span title="Escribe /status en Codex para ver tus límites de 5 horas y semanales">
-              Codex · /status
+            <span title="Versión de Nemeton">
+              {workspaceStatus ? `v${workspaceStatus.version}` : "…"}
             </span>
             <span>
               {syncSettings?.folderPath

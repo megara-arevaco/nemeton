@@ -15,8 +15,10 @@ export const registerSystemHandlers = ({
     recordOperation(`renderer:${name}`, elapsedMs);
   });
   handle("workspace:status", async () => {
+    const version = app.getVersion();
+
     if (app.isPackaged) {
-      return { branch: null };
+      return { branch: null, version };
     }
     try {
       const { stdout } = await execFileAsync("git", ["branch", "--show-current"], {
@@ -24,9 +26,9 @@ export const registerSystemHandlers = ({
         timeout: 2_000,
         windowsHide: true,
       });
-      return { branch: stdout.trim() || "HEAD" };
+      return { branch: stdout.trim() || "HEAD", version };
     } catch {
-      return { branch: null };
+      return { branch: null, version };
     }
   });
   handle("window:minimize", (event) =>

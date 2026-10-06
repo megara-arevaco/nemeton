@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import type { LibraryGame } from "../packages/core/src/shared/types";
+import type { GameSession, LibraryGame } from "../packages/core/src/shared/types";
 import type { LauncherApi } from "../apps/desktop/src/preload/index";
 
 export const test = base.extend<{
@@ -15,9 +15,11 @@ export const test = base.extend<{
     restart: () => Promise<Page>;
   };
   gameCount: number;
+  sessionData: { sessions: GameSession[] };
 }>({
   gameCount: [0, { option: true }],
-  desktop: async ({ gameCount }, use, testInfo) => {
+  sessionData: [{ sessions: [] }, { option: true }],
+  desktop: async ({ gameCount, sessionData }, use, testInfo) => {
     // Windows runners may expose an 8.3 alias in TEMP. Restore validation
     // requires canonical paths so it can reject redirected directories.
     const temporaryRoot = await fs.realpath(os.tmpdir());
@@ -48,7 +50,12 @@ export const test = base.extend<{
     }));
     await fs.writeFile(
       path.join(data, "library.json"),
-      JSON.stringify({ version: 1, games, sessions: [], excludedGameKeys: [] }),
+      JSON.stringify({
+        version: 1,
+        games,
+        sessions: sessionData.sessions,
+        excludedGameKeys: [],
+      }),
     );
     const require = createRequire(path.resolve("apps/desktop/package.json"));
     let app: ElectronApplication | undefined;

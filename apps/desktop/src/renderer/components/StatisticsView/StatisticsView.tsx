@@ -6,6 +6,7 @@ import { Trophy } from "@phosphor-icons/react/Trophy";
 import { formatPlaytime, gameLibraryCoverUrl } from "../../shared/presentation";
 import { GameCoverImage } from "../GameCoverImage";
 import { useStatisticsView } from "./StatisticsView.hook";
+import type { StatisticsPeriod } from "./StatisticsView.hook";
 
 export function StatisticsView({
   games,
@@ -16,13 +17,19 @@ export function StatisticsView({
     setPeriod,
     summaryPeriod,
     setSummaryPeriod,
+    historyView,
+    setHistoryView,
     statistics,
     totalHours,
     months,
+    weeks,
     annualSeconds,
     annualRanking,
+    yearRanking,
     automaticSummary,
   } = useStatisticsView(games, sessions);
+
+  const activityPeriods = period === "weekly-2026" ? weeks : months;
 
   return (
     <div
@@ -43,7 +50,6 @@ export function StatisticsView({
           TU HISTÓRICO DE JUEGO
         </span>
         <h1>Estadísticas</h1>
-        <p>Steam completo y sesiones de los juegos añadidos manualmente.</p>
       </div>
       <section
         className={
@@ -56,7 +62,6 @@ export function StatisticsView({
           }
         >
           <div>
-            <small>RESUMEN AUTOMÁTICO</small>
             <h2>Lo más destacado</h2>
           </div>
           <div
@@ -96,9 +101,12 @@ export function StatisticsView({
           ))}
         </div>
       </section>
+      <h2 className="[margin:32px_0_0] [padding-top:24px] [border-top:1px_solid_#ffffff12] [font-size:22px]">
+        Histórico de juego
+      </h2>
       <div
         className={
-          "statistics-toolbar [display:flex] [justify-content:space-between] [align-items:center] [gap:18px] [margin:28px_0_16px]"
+          "statistics-toolbar [display:flex] [justify-content:space-between] [align-items:center] [gap:18px] [margin:16px_0_16px]"
         }
       >
         <div
@@ -125,11 +133,13 @@ export function StatisticsView({
         >
           <CalendarBlank />
           <select
+            aria-label="Periodo del histórico"
             value={period}
-            onChange={(event) => setPeriod(event.target.value as "all" | "2026")}
+            onChange={(event) => setPeriod(event.target.value as StatisticsPeriod)}
           >
             <option value="all">Total histórico</option>
             <option value="2026">Anual · 2026</option>
+            <option value="weekly-2026">Semanal · 2026</option>
           </select>
         </label>
       </div>
@@ -265,7 +275,7 @@ export function StatisticsView({
           <span>Importa Steam o inicia un juego local desde el launcher.</span>
         </div>
       )}
-      {period === "2026" && (
+      {period !== "all" && (
         <section
           className={
             "annual-card [padding:26px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119]"
@@ -277,116 +287,196 @@ export function StatisticsView({
             }
           >
             <div>
-              <small>ACTIVIDAD ANUAL</small>
-              <h2>Tu año jugando</h2>
+              <small>
+                {period === "weekly-2026" ? "ACTIVIDAD SEMANAL" : "ACTIVIDAD ANUAL"}
+              </small>
+              <h2>
+                {period === "weekly-2026" ? "Tu 2026 por semanas" : "Tu año jugando"}
+              </h2>
             </div>
             <span>2026</span>
           </div>
-          {annualRanking.length > 0 && (
-            <>
-              <div
-                className={
-                  "annual-ranking-heading [display:flex] [align-items:center] [gap:10px] [margin:25px_0_0] [color:#a9fb76] [&_>_svg]:[width:28px] [&_>_svg]:[height:28px] [&_span]:[display:block] [&_small]:[display:block] [&_strong]:[display:block] [&_small]:[color:#6c6f7a] [&_small]:[font-size:8px] [&_small]:[font-weight:700] [&_small]:[letter-spacing:1.2px] [&_strong]:[margin-top:3px] [&_strong]:[color:#e9eaed] [&_strong]:[font-size:12px]"
-                }
-              >
-                <Trophy weight="fill" />
-                <span>
-                  <small>TOP DE 2026</small>
-                  <strong>Los más jugados del año</strong>
-                </span>
-              </div>
-              <div
-                className={
-                  "ranking-podium [display:grid] [grid-template-columns:repeat(3,_minmax(0,_1fr))] [align-items:end] [gap:12px] [max-width:820px] [margin:32px_auto_30px] annual-podium [margin-top:24px] [border-bottom:1px_solid_#ffffff0b] [padding-bottom:24px]"
-                }
-              >
-                {annualRanking.map(({ game, seconds }, index) => {
-                  const cover = gameLibraryCoverUrl(game);
-                  return (
-                    <article
-                      className={`podium-game [position:relative] [min-width:0] [padding:18px_16px] [border:1px_solid_#ffffff0d] [border-radius:18px] [background:linear-gradient(180deg,_#ffffff09,_#ffffff03)] [text-align:center] [&_>_strong]:[display:block] [&_>_strong]:[overflow:hidden] [&_>_strong]:[text-overflow:ellipsis] [&_>_strong]:[white-space:nowrap] [&_>_span]:[display:block] [&_>_span]:[overflow:hidden] [&_>_span]:[text-overflow:ellipsis] [&_>_span]:[white-space:nowrap] [&_>_small]:[display:block] [&_>_small]:[overflow:hidden] [&_>_small]:[text-overflow:ellipsis] [&_>_small]:[white-space:nowrap] [&_>_strong]:[font-size:14px] [&_>_span]:[margin-top:7px] [&_>_span]:[color:#a9fb76] [&_>_span]:[font-size:18px] [&_>_span]:[font-weight:750] [&_>_small]:[margin-top:4px] [&_>_small]:[color:#686b77] [&_>_small]:[font-size:9px] podium-game-${index + 1}`}
-                      key={game.id}
-                    >
-                      <div
-                        className={
-                          "podium-cover [position:relative] [width:82px] [aspect-ratio:2_/_2.75] [overflow:visible] [margin:0_auto_14px] [border-radius:12px] [background:linear-gradient(135deg,_#292c39,_#171923)] [box-shadow:0_12px_28px_#00000066] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover] [&_img]:[border-radius:inherit] [&_>_span]:[display:grid] [&_>_span]:[place-items:center] [&_>_span]:[width:100%] [&_>_span]:[height:100%] [&_>_span]:[color:#a9fb76] [&_>_span]:[font-size:30px] [&_>_span]:[font-weight:800] [&_b]:[position:absolute] [&_b]:[right:-10px] [&_b]:[bottom:-8px] [&_b]:[display:grid] [&_b]:[place-items:center] [&_b]:[width:30px] [&_b]:[height:30px] [&_b]:[border:3px_solid_#101119] [&_b]:[border-radius:50%] [&_b]:[background:#737783] [&_b]:[color:#15161d] [&_b]:[font-size:13px]"
-                        }
-                      >
-                        {cover ? (
-                          <GameCoverImage game={game} alt="" />
-                        ) : (
-                          <span>{game.title.slice(0, 1).toUpperCase()}</span>
-                        )}
-                        <b>{index + 1}</b>
-                      </div>
-                      <strong>{game.title}</strong>
-                      <span>{formatPlaytime(Math.round(seconds / 60))}</span>
-                      <small>Jugado en 2026</small>
-                    </article>
-                  );
-                })}
-              </div>
-            </>
-          )}
           <div
-            className={
-              "months-grid [display:grid] [grid-template-columns:repeat(3,_minmax(0,_1fr))] [gap:12px] [margin-top:24px]"
-            }
+            role="group"
+            aria-label="Vista del histórico"
+            className="[display:flex] [gap:4px] [width:fit-content] [margin-top:20px] [padding:4px] [border:1px_solid_#ffffff14] [border-radius:10px] [background:#090a0f80] [&_button]:[border:0] [&_button]:[border-radius:7px] [&_button]:[padding:9px_14px] [&_button]:[background:transparent] [&_button]:[color:#9295a0] [&_button]:[cursor:pointer] [&_button]:[font-size:11px] [&_button[aria-pressed=true]]:[color:var(--accent-a)] [&_button[aria-pressed=true]]:[background:color-mix(in_srgb,_var(--accent-a)_12%,_transparent)]"
           >
-            {months.map((month, index) => (
-              <article
-                className={`month-card [min-width:0] [min-height:178px] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:15px] [padding:15px] [background:#ffffff05] [&_>_header]:[display:grid] [&_>_header]:[grid-template-columns:27px_minmax(0,_1fr)_auto] [&_>_header]:[align-items:center] [&_>_header]:[gap:8px] [&_>_header]:[padding-bottom:12px] [&_>_header]:[border-bottom:1px_solid_#ffffff0b] [&_>_header_>_span]:[color:#a9fb76] [&_>_header_>_span]:[font-size:10px] [&_>_header_>_span]:[font-weight:800] [&_>_header_>_strong]:[overflow:hidden] [&_>_header_>_strong]:[font-size:13px] [&_>_header_>_strong]:[text-transform:capitalize] [&_>_header_>_strong]:[text-overflow:ellipsis] [&_>_header_>_strong]:[white-space:nowrap] [&_>_header_>_small]:[color:#626570] [&_>_header_>_small]:[font-size:9px] [&_>_p]:[margin:34px_0_0] [&_>_p]:[color:#51545f] [&_>_p]:[font-size:10px] [&_>_p]:[text-align:center] [&.empty]:[opacity:.65] ${month.entries.length === 0 ? "empty" : ""}`}
-                key={month.name}
-              >
-                <header>
-                  <span>{String(index + 1).padStart(2, "0")}</span>
-                  <strong>{month.name}</strong>
-                  <small>
-                    {month.entries.length}{" "}
-                    {month.entries.length === 1 ? "juego" : "juegos"}
-                  </small>
-                </header>
-                {month.entries.length > 0 ? (
-                  <div
-                    className={
-                      "month-games [display:grid] [gap:8px] [margin-top:11px] [&_>_div]:[display:grid] [&_>_div]:[grid-template-columns:34px_minmax(0,_1fr)] [&_>_div]:[align-items:center] [&_>_div]:[gap:9px] [&_>_div]:[min-width:0] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[font-size:11px] [&_small]:[margin-top:3px] [&_small]:[color:#696c77] [&_small]:[font-size:9px]"
-                    }
-                  >
-                    {month.entries.map(({ game, seconds }) => {
-                      const cover = gameLibraryCoverUrl(game);
-                      return (
-                        <div key={game.id}>
-                          <span
-                            className={
-                              "month-cover [display:grid] [place-items:center] [width:34px] [height:40px] [overflow:hidden] [border-radius:7px] [background:#22242f] [color:#a9fb76] [font-size:11px] [font-weight:700] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]"
-                            }
-                          >
-                            {cover ? (
-                              <GameCoverImage game={game} alt="" />
-                            ) : (
-                              game.title.slice(0, 1).toUpperCase()
-                            )}
-                          </span>
-                          <span>
-                            <strong>{game.title}</strong>
-                            <small>
-                              {seconds > 0
-                                ? formatPlaytime(Math.round(seconds / 60))
-                                : "Horas no disponibles"}
-                            </small>
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p>Sin actividad registrada</p>
-                )}
-              </article>
-            ))}
+            <button
+              aria-pressed={historyView === "calendar"}
+              onClick={() => setHistoryView("calendar")}
+            >
+              {period === "weekly-2026" ? "Por semana" : "Por mes"}
+            </button>
+            <button
+              aria-pressed={historyView === "ranking"}
+              onClick={() => setHistoryView("ranking")}
+            >
+              Ranking por horas
+            </button>
           </div>
+          {historyView === "ranking" && <YearRanking entries={yearRanking} />}
+          {historyView === "calendar" &&
+            period === "2026" &&
+            annualRanking.length > 0 && (
+              <>
+                <div
+                  className={
+                    "annual-ranking-heading [display:flex] [align-items:center] [gap:10px] [margin:25px_0_0] [color:#a9fb76] [&_>_svg]:[width:28px] [&_>_svg]:[height:28px] [&_span]:[display:block] [&_small]:[display:block] [&_strong]:[display:block] [&_small]:[color:#6c6f7a] [&_small]:[font-size:8px] [&_small]:[font-weight:700] [&_small]:[letter-spacing:1.2px] [&_strong]:[margin-top:3px] [&_strong]:[color:#e9eaed] [&_strong]:[font-size:12px]"
+                  }
+                >
+                  <Trophy weight="fill" />
+                  <span>
+                    <small>TOP DE 2026</small>
+                    <strong>Los más jugados del año</strong>
+                  </span>
+                </div>
+                <div
+                  className={
+                    "ranking-podium [display:grid] [grid-template-columns:repeat(3,_minmax(0,_1fr))] [align-items:end] [gap:12px] [max-width:820px] [margin:32px_auto_30px] annual-podium [margin-top:24px] [border-bottom:1px_solid_#ffffff0b] [padding-bottom:24px]"
+                  }
+                >
+                  {annualRanking.map(({ game, seconds }, index) => {
+                    const cover = gameLibraryCoverUrl(game);
+                    return (
+                      <article
+                        className={`podium-game [position:relative] [min-width:0] [padding:18px_16px] [border:1px_solid_#ffffff0d] [border-radius:18px] [background:linear-gradient(180deg,_#ffffff09,_#ffffff03)] [text-align:center] [&_>_strong]:[display:block] [&_>_strong]:[overflow:hidden] [&_>_strong]:[text-overflow:ellipsis] [&_>_strong]:[white-space:nowrap] [&_>_span]:[display:block] [&_>_span]:[overflow:hidden] [&_>_span]:[text-overflow:ellipsis] [&_>_span]:[white-space:nowrap] [&_>_small]:[display:block] [&_>_small]:[overflow:hidden] [&_>_small]:[text-overflow:ellipsis] [&_>_small]:[white-space:nowrap] [&_>_strong]:[font-size:14px] [&_>_span]:[margin-top:7px] [&_>_span]:[color:#a9fb76] [&_>_span]:[font-size:18px] [&_>_span]:[font-weight:750] [&_>_small]:[margin-top:4px] [&_>_small]:[color:#686b77] [&_>_small]:[font-size:9px] podium-game-${index + 1}`}
+                        key={game.id}
+                      >
+                        <div
+                          className={
+                            "podium-cover [position:relative] [width:82px] [aspect-ratio:2_/_2.75] [overflow:visible] [margin:0_auto_14px] [border-radius:12px] [background:linear-gradient(135deg,_#292c39,_#171923)] [box-shadow:0_12px_28px_#00000066] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover] [&_img]:[border-radius:inherit] [&_>_span]:[display:grid] [&_>_span]:[place-items:center] [&_>_span]:[width:100%] [&_>_span]:[height:100%] [&_>_span]:[color:#a9fb76] [&_>_span]:[font-size:30px] [&_>_span]:[font-weight:800] [&_b]:[position:absolute] [&_b]:[right:-10px] [&_b]:[bottom:-8px] [&_b]:[display:grid] [&_b]:[place-items:center] [&_b]:[width:30px] [&_b]:[height:30px] [&_b]:[border:3px_solid_#101119] [&_b]:[border-radius:50%] [&_b]:[background:#737783] [&_b]:[color:#15161d] [&_b]:[font-size:13px]"
+                          }
+                        >
+                          {cover ? (
+                            <GameCoverImage game={game} alt="" />
+                          ) : (
+                            <span>{game.title.slice(0, 1).toUpperCase()}</span>
+                          )}
+                          <b>{index + 1}</b>
+                        </div>
+                        <strong>{game.title}</strong>
+                        <span>{formatPlaytime(Math.round(seconds / 60))}</span>
+                        <small>Jugado en 2026</small>
+                      </article>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          {historyView === "calendar" && (
+            <div
+              className={
+                "months-grid [display:grid] [grid-template-columns:repeat(3,_minmax(0,_1fr))] [gap:12px] [margin-top:24px]"
+              }
+            >
+              {activityPeriods.map((month, index) => (
+                <article
+                  className={`month-card [min-width:0] [min-height:178px] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:15px] [padding:15px] [background:#ffffff05] [&_>_header]:[display:grid] [&_>_header]:[grid-template-columns:27px_minmax(0,_1fr)_auto] [&_>_header]:[align-items:center] [&_>_header]:[gap:8px] [&_>_header]:[padding-bottom:12px] [&_>_header]:[border-bottom:1px_solid_#ffffff0b] [&_>_header_>_span]:[color:#a9fb76] [&_>_header_>_span]:[font-size:10px] [&_>_header_>_span]:[font-weight:800] [&_>_header_>_strong]:[overflow:hidden] [&_>_header_>_strong]:[font-size:13px] [&_>_header_>_strong]:[text-transform:capitalize] [&_>_header_>_strong]:[text-overflow:ellipsis] [&_>_header_>_strong]:[white-space:nowrap] [&_>_header_>_small]:[color:#626570] [&_>_header_>_small]:[font-size:9px] [&_>_p]:[margin:34px_0_0] [&_>_p]:[color:#51545f] [&_>_p]:[font-size:10px] [&_>_p]:[text-align:center] [&.empty]:[opacity:.65] ${month.entries.length === 0 ? "empty" : ""}`}
+                  key={month.name}
+                >
+                  <header>
+                    <span>{String(index + 1).padStart(2, "0")}</span>
+                    <strong title={month.dates}>{month.name}</strong>
+                    <small>
+                      {month.entries.length}{" "}
+                      {month.entries.length === 1 ? "juego" : "juegos"}
+                    </small>
+                  </header>
+                  {month.dates && (
+                    <div className="[margin-top:10px] [color:#9295a0] [font-size:10px]">
+                      {month.dates}
+                    </div>
+                  )}
+                  {month.entries.length > 0 ? (
+                    <div
+                      className={
+                        "month-games [display:grid] [gap:8px] [margin-top:11px] [&_>_div]:[display:grid] [&_>_div]:[grid-template-columns:34px_minmax(0,_1fr)] [&_>_div]:[align-items:center] [&_>_div]:[gap:9px] [&_>_div]:[min-width:0] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[font-size:11px] [&_small]:[margin-top:3px] [&_small]:[color:#696c77] [&_small]:[font-size:9px]"
+                      }
+                    >
+                      {month.entries.map(({ game, seconds }) => {
+                        const cover = gameLibraryCoverUrl(game);
+                        return (
+                          <div key={game.id}>
+                            <span
+                              className={
+                                "month-cover [display:grid] [place-items:center] [width:34px] [height:40px] [overflow:hidden] [border-radius:7px] [background:#22242f] [color:#a9fb76] [font-size:11px] [font-weight:700] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]"
+                              }
+                            >
+                              {cover ? (
+                                <GameCoverImage game={game} alt="" />
+                              ) : (
+                                game.title.slice(0, 1).toUpperCase()
+                              )}
+                            </span>
+                            <span>
+                              <strong>{game.title}</strong>
+                              <small>
+                                {seconds > 0
+                                  ? formatPlaytime(Math.round(seconds / 60))
+                                  : "Horas no disponibles"}
+                              </small>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p>Sin actividad registrada</p>
+                  )}
+                </article>
+              ))}
+            </div>
+          )}
         </section>
       )}
     </div>
+  );
+}
+
+function YearRanking({
+  entries,
+}: {
+  entries: Array<{ game: LibraryGame; seconds: number }>;
+}) {
+  const totalSeconds = entries.reduce((total, entry) => total + entry.seconds, 0);
+
+  if (!entries.length) {
+    return (
+      <p className="[padding:30px_0] [color:#9295a0]">
+        No hay horas registradas en 2026.
+      </p>
+    );
+  }
+
+  return (
+    <ol
+      aria-label="Ranking por horas de 2026"
+      className="[list-style:none] [padding:0] [margin:20px_0_0]"
+    >
+      {entries.map(({ game, seconds }, index) => (
+        <li
+          key={game.id}
+          className="[display:grid] [grid-template-columns:28px_38px_minmax(0,_1fr)_auto] [align-items:center] [gap:12px] [padding:12px_0] [border-bottom:1px_solid_#ffffff0b]"
+        >
+          <span className="[color:#9295a0] [font-size:12px]">{index + 1}</span>
+          <span className="[display:grid] [place-items:center] [width:38px] [height:44px] [overflow:hidden] [border-radius:8px] [background:#20222d] [color:var(--accent-a)] [&_img]:[width:100%] [&_img]:[height:100%] [&_img]:[object-fit:cover]">
+            {gameLibraryCoverUrl(game) ? (
+              <GameCoverImage game={game} alt="" />
+            ) : (
+              game.title.slice(0, 1).toUpperCase()
+            )}
+          </span>
+          <strong className="[overflow:hidden] [text-overflow:ellipsis] [white-space:nowrap] [font-size:12px]">
+            {game.title}
+          </strong>
+          <span className="[display:grid] [gap:4px] [text-align:right] [font-size:12px]">
+            <strong>{formatPlaytime(Math.round(seconds / 60))}</strong>
+            <small className="[color:#9295a0]">
+              {Math.round((seconds / totalSeconds) * 100)}%
+            </small>
+          </span>
+        </li>
+      ))}
+    </ol>
   );
 }

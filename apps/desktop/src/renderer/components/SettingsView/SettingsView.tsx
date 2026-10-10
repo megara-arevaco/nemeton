@@ -40,6 +40,24 @@ export function SettingsView({
     status,
     syncing,
     syncStatus,
+    dataStatus,
+    dataLocation,
+    transferringData,
+    portableFormat,
+    setPortableFormat,
+    includeArtwork,
+    setIncludeArtwork,
+    includeBackups,
+    setIncludeBackups,
+    importBackups,
+    sessionDiagnostics,
+    repairChoices,
+    setRepairChoice,
+    applySessionRepair,
+    repairPreview,
+    exportData,
+    importData,
+    restoreImportBackup,
     connect,
     syncSteam,
     chooseSyncFolder,
@@ -161,9 +179,7 @@ export function SettingsView({
           </span>
           <div>
             <h2>{t("settings.steamAccount")}</h2>
-            <p>
-              {t("settings.steamDescription")}
-            </p>
+            <p>{t("settings.steamDescription")}</p>
           </div>
           <i className={settings?.hasApiKey ? "connected" : ""}>
             {settings?.hasApiKey
@@ -219,9 +235,7 @@ export function SettingsView({
         >
           <div>
             <strong>{t("settings.localInstalls")}</strong>
-            <p>
-              {t("settings.localInstallsDescription")}
-            </p>
+            <p>{t("settings.localInstallsDescription")}</p>
           </div>
           <button
             type="button"
@@ -269,9 +283,7 @@ export function SettingsView({
           </span>
           <div>
             <h2>{t("settings.syncFolder")}</h2>
-            <p>
-              {t("settings.syncDescription")}
-            </p>
+            <p>{t("settings.syncDescription")}</p>
           </div>
           <i className={syncSettings?.status === "ready" ? "connected" : ""}>
             {syncSettings?.status === "ready"
@@ -292,9 +304,7 @@ export function SettingsView({
         >
           <span>
             <small>{t("settings.currentFolder")}</small>
-            <strong>
-              {syncSettings?.folderPath ?? t("settings.noFolder")}
-            </strong>
+            <strong>{syncSettings?.folderPath ?? t("settings.noFolder")}</strong>
           </span>
           <button
             type="button"
@@ -304,7 +314,9 @@ export function SettingsView({
             disabled={syncing}
             onClick={() => chooseSyncFolder()}
           >
-            {syncSettings?.folderPath ? t("settings.changeFolder") : t("settings.chooseFolder")}
+            {syncSettings?.folderPath
+              ? t("settings.changeFolder")
+              : t("settings.chooseFolder")}
           </button>
           {syncSettings?.folderPath && (
             <Button
@@ -324,7 +336,9 @@ export function SettingsView({
             }
           >
             {t("settings.lastSync")}{" "}
-            {new Date(syncSettings.lastSyncedAt).toLocaleString(i18n.language.startsWith("en") ? "en-US" : "es-ES")}
+            {new Date(syncSettings.lastSyncedAt).toLocaleString(
+              i18n.language.startsWith("en") ? "en-US" : "es-ES",
+            )}
           </p>
         )}
         {syncStatus && (
@@ -348,6 +362,199 @@ export function SettingsView({
         >
           {t("settings.associateGames")}
         </button>
+      </section>
+      <section className="settings-card [max-width:850px] [margin-top:16px]">
+        <div className="[display:flex] [align-items:center] [justify-content:space-between] [gap:16px]">
+          <div>
+            <h2 className="[margin:0] [font-size:17px]">
+              {t("settings.portabilityTitle")}
+            </h2>
+            <p className="[margin:6px_0_0] [color:#8b8e99] [font-size:12px] [line-height:1.55]">
+              {t("settings.portabilityDescription")}
+            </p>
+          </div>
+          <i className="[flex:none] [padding:6px_8px] [border-radius:7px] [background:#ffffff08] [color:#adb0b8] [font-size:9px] [font-style:normal] [font-weight:700] [letter-spacing:1px]">
+            {dataLocation?.portable
+              ? t("settings.portableMode")
+              : t("settings.standardMode")}
+          </i>
+        </div>
+        {dataLocation && (
+          <p
+            className="[margin:12px_0_0] [overflow:hidden] [color:#b0b2ba] [font-size:11px] [text-overflow:ellipsis] [white-space:nowrap]"
+            title={dataLocation.dataDirectory}
+          >
+            {t("settings.dataLocation")}: {dataLocation.dataDirectory}
+          </p>
+        )}
+        <div className="[display:flex] [flex-wrap:wrap] [align-items:end] [gap:12px] [margin-top:16px]">
+          <label className="portable-choice">
+            <span>{t("settings.exportFormat")}</span>
+            <select
+              aria-label={t("settings.exportFormat")}
+              value={portableFormat}
+              disabled={transferringData}
+              onChange={(event) =>
+                setPortableFormat(event.target.value as "json" | "package")
+              }
+            >
+              <option value="json">{t("settings.formatJson")}</option>
+              <option value="package">{t("settings.formatPackage")}</option>
+            </select>
+          </label>
+          {portableFormat === "package" && (
+            <div className="[display:grid] [gap:7px] [min-width:220px]">
+              <label className="portable-option">
+                <input
+                  type="checkbox"
+                  checked={includeArtwork}
+                  disabled={transferringData}
+                  onChange={(event) => setIncludeArtwork(event.target.checked)}
+                />{" "}
+                {t("settings.includeArtwork")}
+              </label>
+              <label className="portable-option">
+                <input
+                  type="checkbox"
+                  checked={includeBackups}
+                  disabled={transferringData}
+                  onChange={(event) => setIncludeBackups(event.target.checked)}
+                />{" "}
+                {t("settings.includeBackups")}
+              </label>
+            </div>
+          )}
+          <Button
+            disabled={transferringData}
+            onClick={() => void exportData()}
+            variant="secondary"
+          >
+            {transferringData ? t("settings.dataWorking") : t("settings.exportData")}
+          </Button>
+          <Button
+            disabled={transferringData}
+            onClick={() => void importData()}
+            variant="secondary"
+          >
+            {transferringData ? t("settings.dataWorking") : t("settings.importData")}
+          </Button>
+        </div>
+        {dataStatus && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="[margin:12px_0_0] [color:#b0b2ba] [font-size:12px] [line-height:1.55]"
+          >
+            {dataStatus}
+          </p>
+        )}
+
+        <section className="portable-recovery [margin-top:22px] [padding-top:18px] [border-top:1px_solid_#ffffff12]">
+          <h3>{t("settings.recoveryTitle")}</h3>
+          <p>{t("settings.recoveryDescription")}</p>
+          {importBackups.length === 0 ? (
+            <p className="portable-empty">{t("settings.noRecoveryBackups")}</p>
+          ) : (
+            <ul className="portable-recovery-list">
+              {importBackups.map((backup) => (
+                <li key={backup.fileName}>
+                  <span>
+                    <strong>{t(`settings.backupCategory.${backup.category}`)}</strong>
+                    <small>
+                      {t(`settings.backupReason.${backup.reason}`)} ·{" "}
+                      {new Date(backup.createdAt).toLocaleString(i18n.language)}
+                    </small>
+                  </span>
+                  <button
+                    type="button"
+                    className="save-action"
+                    disabled={transferringData}
+                    onClick={() =>
+                      void restoreImportBackup(backup.category, backup.fileName)
+                    }
+                  >
+                    {t("settings.restoreSafetyCopy")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="portable-recovery [margin-top:22px] [padding-top:18px] [border-top:1px_solid_#ffffff12]">
+          <h3>{t("settings.sessionRepairTitle")}</h3>
+          <p>{t("settings.sessionRepairDescription")}</p>
+          {!sessionDiagnostics || sessionDiagnostics.orphanCount === 0 ? (
+            <p className="portable-empty">{t("settings.noOrphanSessions")}</p>
+          ) : (
+            <>
+              <p className="portable-empty">
+                {t("settings.orphanSessionCount", {
+                  count: sessionDiagnostics.orphanCount,
+                })}
+              </p>
+              {sessionDiagnostics.orphanCount > sessionDiagnostics.sessions.length && (
+                <p role="alert" className="portable-empty">
+                  {t("settings.orphanSessionLimit", {
+                    count: sessionDiagnostics.sessions.length,
+                  })}
+                </p>
+              )}
+              <ul className="portable-recovery-list portable-session-list">
+                {sessionDiagnostics.sessions.map((session) => (
+                  <li key={session.id}>
+                    <span>
+                      <strong>
+                        {new Date(session.startedAt).toLocaleString(i18n.language)} ·{" "}
+                        {t("settings.sessionDuration", {
+                          seconds: session.durationSeconds,
+                        })}
+                      </strong>
+                      <small>
+                        {t("settings.orphanSessionFrom", { id: session.gameId })}
+                      </small>
+                    </span>
+                    <label>
+                      <span className="visually-hidden">
+                        {t("settings.sessionRepairChoice", { id: session.id })}
+                      </span>
+                      <select
+                        aria-label={t("settings.sessionRepairChoice", {
+                          id: session.id,
+                        })}
+                        value={repairChoices[session.id] ?? ""}
+                        disabled={transferringData}
+                        onChange={(event) =>
+                          setRepairChoice(session.id, event.target.value)
+                        }
+                      >
+                        <option value="">{t("settings.chooseRepairAction")}</option>
+                        {sessionDiagnostics.games.map((game) => (
+                          <option key={game.id} value={game.id}>
+                            {t("settings.reassignSession", { title: game.title })}
+                          </option>
+                        ))}
+                        <option value="discard">
+                          {t("settings.discardSelectedSession")}
+                        </option>
+                      </select>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+              <div className="[display:flex] [align-items:center] [flex-wrap:wrap] [gap:10px] [margin-top:12px]">
+                <span>{t("settings.repairPreview", { count: repairPreview })}</span>
+                <Button
+                  disabled={transferringData || repairPreview === 0}
+                  onClick={() => void applySessionRepair()}
+                  variant="secondary"
+                >
+                  {t("settings.applySessionRepair")}
+                </Button>
+              </div>
+            </>
+          )}
+        </section>
       </section>
     </div>
   );

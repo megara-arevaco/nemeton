@@ -1,7 +1,9 @@
 import { LoadingState } from "../LoadingState";
 import { useTranslation } from "react-i18next";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import type { BacklogStatus } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
+import { DotsThree } from "@phosphor-icons/react/DotsThree";
 import { Gear } from "@phosphor-icons/react/Gear";
 import { Image } from "@phosphor-icons/react/Image";
 import { LockKey } from "@phosphor-icons/react/LockKey";
@@ -9,6 +11,7 @@ import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Minus } from "@phosphor-icons/react/Minus";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Square } from "@phosphor-icons/react/Square";
+import { Star } from "@phosphor-icons/react/Star";
 import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
 import { Trophy } from "@phosphor-icons/react/Trophy";
 import { Trash } from "@phosphor-icons/react/Trash";
@@ -71,6 +74,10 @@ export function App() {
     workspaceStatus,
     query,
     setQuery,
+    favoritesOnly,
+    setFavoritesOnly,
+    backlogFilter,
+    setBacklogFilter,
     achievements,
     metadata,
     view,
@@ -91,6 +98,10 @@ export function App() {
     selectGame,
     openGameMenu,
     updateQuery,
+    updateCollectionState,
+    scanInstalledSteam,
+    scanningSteam,
+    clearLibraryFilters,
     minimizeWindow,
     maximizeWindow,
     closeWindow,
@@ -110,11 +121,28 @@ export function App() {
     chooseCover,
     removeGame,
     requestDeleteGame,
-    requestDeleteSelectedGame,
     deleteGameForever,
     deletingGame,
     deleteGameError,
   } = useApp();
+  const [allAchievementsVisible, setAllAchievementsVisible] = useState(false);
+  const [achievementFilter, setAchievementFilter] = useState<
+    "all" | "unlocked" | "locked"
+  >("all");
+  useEffect(() => {
+    setAllAchievementsVisible(false);
+    setAchievementFilter("all");
+  }, [selected?.id]);
+  const achievementItems = achievements
+    ? (allAchievementsVisible
+        ? achievements.items
+        : achievements.items.slice(0, 8)
+      ).filter(
+        (item) =>
+          achievementFilter === "all" ||
+          item.achieved === (achievementFilter === "unlocked"),
+      )
+    : [];
 
   return (
     <main
@@ -147,18 +175,44 @@ export function App() {
           }
         >
           {view === "library" ? (
-            <label
-              className={
-                "search [display:flex] [align-items:center] [gap:9px] [width:min(390px,_44vw)] [padding:10px_13px] [border:1px_solid_#ffffff10] [border-radius:11px] [background:#ffffff08] [color:#777a87] [-webkit-app-region:no-drag] [&_input]:[width:100%] [&_input]:[border:0] [&_input]:[outline:0] [&_input]:[background:transparent] [&_input]:[color:white]"
-              }
-            >
-              <MagnifyingGlass />
-              <input
-                value={query}
-                onChange={updateQuery}
-                placeholder={t("app.search")}
-              />
-            </label>
+            <div className="[display:flex] [align-items:center] [gap:8px] [min-width:0] [flex:1] [-webkit-app-region:no-drag]">
+              <label
+                className={
+                  "search [display:flex] [align-items:center] [gap:9px] [width:min(300px,_32vw)] [min-width:130px] [padding:10px_13px] [border:1px_solid_#ffffff10] [border-radius:11px] [background:#ffffff08] [color:#777a87] [&_input]:[width:100%] [&_input]:[border:0] [&_input]:[outline:0] [&_input]:[background:transparent] [&_input]:[color:white]"
+                }
+              >
+                <MagnifyingGlass />
+                <input
+                  value={query}
+                  onChange={updateQuery}
+                  placeholder={t("app.search")}
+                />
+              </label>
+              <button
+                type="button"
+                aria-label={t("library.favorites")}
+                aria-pressed={favoritesOnly}
+                title={t("library.favorites")}
+                onClick={() => setFavoritesOnly(!favoritesOnly)}
+                className={`[display:flex] [align-items:center] [gap:6px] [min-height:38px] [border:1px_solid_#ffffff12] [border-radius:10px] [padding:0_10px] [background:#ffffff06] [color:#a4a7b1] [cursor:pointer] [&_svg]:[width:16px] ${favoritesOnly ? "[border-color:color-mix(in_srgb,_var(--accent-a)_48%,_transparent)] [background:color-mix(in_srgb,_var(--accent-a)_10%,_transparent)] [color:var(--accent-a)]" : ""}`}
+              >
+                <Star weight={favoritesOnly ? "fill" : "regular"} />
+                <span>{t("library.favorites")}</span>
+              </button>
+              <select
+                aria-label={t("library.backlogFilter")}
+                value={backlogFilter}
+                onChange={(event) =>
+                  setBacklogFilter(event.target.value as BacklogStatus | "all")
+                }
+                className="[max-width:165px] [min-width:140px] [height:38px] [border:1px_solid_#ffffff12] [border-radius:10px] [padding:0_9px] [background:#101119] [color:#a4a7b1] [font-size:12px]"
+              >
+                <option value="all">{t("library.allStatuses")}</option>
+                <option value="pending">{t("library.status.pending")}</option>
+                <option value="playing">{t("library.status.playing")}</option>
+                <option value="finished">{t("library.status.finished")}</option>
+              </select>
+            </div>
           ) : (
             <span
               className={
@@ -223,7 +277,7 @@ export function App() {
           >
             <section
               className={
-                'game-hero [position:relative] [overflow:hidden] [height:min(510px,_62vh)] [min-height:410px] [margin:0_34px] [border:1px_solid_#ffffff10] [border-radius:24px] [background:linear-gradient(120deg,_#11131c_8%,_#171a27_55%,_#20253a)] [&:not(:has(.hero-art))_.ambient::after]:[content:""] [&:not(:has(.hero-art))_.ambient::after]:[position:absolute] [&:not(:has(.hero-art))_.ambient::after]:[width:380px] [&:not(:has(.hero-art))_.ambient::after]:[height:380px] [&:not(:has(.hero-art))_.ambient::after]:[right:10%] [&:not(:has(.hero-art))_.ambient::after]:[top:13%] [&:not(:has(.hero-art))_.ambient::after]:[border:1px_solid_#adff8f28] [&:not(:has(.hero-art))_.ambient::after]:[border-radius:42%_58%_67%_33%] [&:not(:has(.hero-art))_.ambient::after]:[transform:rotate(18deg)] [&:not(:has(.hero-art))_.ambient::after]:[box-shadow:0_0_90px_#7eff6815,_inset_0_0_80px_#6caaff0d]'
+                'game-hero [position:relative] [overflow:hidden] [height:min(430px,_55vh)] [min-height:320px] [margin:0_34px] [border:1px_solid_#ffffff10] [border-radius:20px] [background:linear-gradient(120deg,_#11131c_8%,_#171a27_55%,_#20253a)] [&:not(:has(.hero-art))_.ambient::after]:[content:""] [&:not(:has(.hero-art))_.ambient::after]:[position:absolute] [&:not(:has(.hero-art))_.ambient::after]:[width:380px] [&:not(:has(.hero-art))_.ambient::after]:[height:380px] [&:not(:has(.hero-art))_.ambient::after]:[right:10%] [&:not(:has(.hero-art))_.ambient::after]:[top:13%] [&:not(:has(.hero-art))_.ambient::after]:[border:1px_solid_#adff8f28] [&:not(:has(.hero-art))_.ambient::after]:[border-radius:42%_58%_67%_33%] [&:not(:has(.hero-art))_.ambient::after]:[transform:rotate(18deg)] [&:not(:has(.hero-art))_.ambient::after]:[box-shadow:0_0_90px_#7eff6815,_inset_0_0_80px_#6caaff0d]'
               }
             >
               <div
@@ -248,7 +302,7 @@ export function App() {
               />
               <div
                 className={
-                  "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [width:58%] [height:100%] [padding:64px] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
+                  "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [width:64%] [height:100%] [padding:clamp(24px,_4vw,_48px)] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
                 }
               >
                 <span
@@ -266,7 +320,7 @@ export function App() {
                 <p>{selected.installPath}</p>
                 <div
                   className={
-                    "stats [display:flex] [gap:32px] [margin:24px_0_32px] [color:#777a86] [font-size:12px] [&_b]:[display:block] [&_b]:[color:white] [&_b]:[font-size:17px] [&_b]:[margin-bottom:4px]"
+                    "stats [display:flex] [gap:28px] [margin:16px_0_20px] [color:#90939e] [font-size:12px] [&_b]:[display:block] [&_b]:[color:white] [&_b]:[font-size:17px] [&_b]:[margin-bottom:4px]"
                   }
                 >
                   <span>
@@ -275,17 +329,55 @@ export function App() {
                         selected.platformPlaytimeMinutes ?? selected.playtimeMinutes,
                       )}
                     </b>{" "}
-                    {selected.source === "steam" ? t("app.steamTime") : t("app.totalTime")}
+                    {selected.source === "steam"
+                      ? t("app.steamTime")
+                      : t("app.totalTime")}
                   </span>
                   <span>
-                    <b>{formatLastPlayed(
-                      selected.lastPlayedAt,
-                      i18n.language.startsWith("en") ? "en-US" : "es-ES",
-                      t,
-                    )}</b> {t("app.lastPlayed")}
+                    <b>
+                      {formatLastPlayed(
+                        selected.lastPlayedAt,
+                        i18n.language.startsWith("en") ? "en-US" : "es-ES",
+                        t,
+                      )}
+                    </b>{" "}
+                    {t("app.lastPlayed")}
                   </span>
                 </div>
-                <div className={"hero-actions [display:flex] [gap:10px]"}>
+                <div className="[display:flex] [align-items:center] [gap:8px] [margin-bottom:12px] [-webkit-app-region:no-drag]">
+                  <button
+                    type="button"
+                    aria-pressed={selected.favorite === true}
+                    onClick={() =>
+                      void updateCollectionState(selected.id, {
+                        favorite: selected.favorite !== true,
+                      })
+                    }
+                    className="[display:inline-flex] [align-items:center] [gap:6px] [min-height:34px] [border:1px_solid_#ffffff18] [border-radius:9px] [padding:0_10px] [background:#ffffff08] [color:#d1d2d8] [cursor:pointer] [&_svg]:[width:15px]"
+                  >
+                    <Star weight={selected.favorite ? "fill" : "regular"} />
+                    {selected.favorite ? t("app.favorite") : t("app.addFavorite")}
+                  </button>
+                  <select
+                    aria-label={t("app.backlogStatus")}
+                    value={selected.backlogStatus ?? ""}
+                    onChange={(event) =>
+                      void updateCollectionState(selected.id, {
+                        backlogStatus: (event.target.value ||
+                          null) as BacklogStatus | null,
+                      })
+                    }
+                    className="[height:34px] [border:1px_solid_#ffffff18] [border-radius:9px] [padding:0_9px] [background:#11131c] [color:#c5c7cf] [font-size:11px]"
+                  >
+                    <option value="">{t("app.noBacklogStatus")}</option>
+                    <option value="pending">{t("library.status.pending")}</option>
+                    <option value="playing">{t("library.status.playing")}</option>
+                    <option value="finished">{t("library.status.finished")}</option>
+                  </select>
+                </div>
+                <div
+                  className={"hero-actions [display:flex] [flex-wrap:wrap] [gap:8px]"}
+                >
                   <GameLaunchButton
                     game={selected}
                     isRunning={runningGameIds.has(selected.id)}
@@ -301,11 +393,14 @@ export function App() {
                     <Image /> {t("app.cover")}
                   </Button>
                   <Button
-                    className="[color:#ee959b] [&:hover]:[background:#ff727d12]"
-                    onClick={requestDeleteSelectedGame}
+                    aria-label={t("app.moreActions")}
+                    onClick={(event) => {
+                      const bounds = event.currentTarget.getBoundingClientRect();
+                      openGameMenu(selected, bounds.right, bounds.bottom);
+                    }}
                     variant="secondary"
                   >
-                    <Trash /> {t("app.remove")}
+                    <DotsThree /> {t("app.moreActions")}
                   </Button>
                 </div>
               </div>
@@ -382,15 +477,52 @@ export function App() {
                       <strong>
                         {achievements.totalKnown === false
                           ? t("app.unlockedPending", { count: achievements.unlocked })
-                          : t("app.unlockedOf", { unlocked: achievements.unlocked, total: achievements.total })}
+                          : t("app.unlockedOf", {
+                              unlocked: achievements.unlocked,
+                              total: achievements.total,
+                            })}
                       </strong>
                     </span>
                   </div>
-                  <b>
-                    {achievements.totalKnown === false
-                      ? "—"
-                      : `${Math.round((achievements.unlocked / achievements.total) * 100)}%`}
-                  </b>
+                  <div className="[display:flex] [align-items:center] [gap:10px]">
+                    {achievements.items.length > 8 && (
+                      <button
+                        type="button"
+                        aria-expanded={allAchievementsVisible}
+                        onClick={() =>
+                          setAllAchievementsVisible(!allAchievementsVisible)
+                        }
+                        className="achievement-control [min-height:32px] [border:0] [border-radius:7px] [padding:0_8px] [background:transparent] [color:var(--accent-a)] [font-size:12px] [font-weight:600] [cursor:pointer]"
+                      >
+                        {allAchievementsVisible
+                          ? t("app.showFeaturedAchievements")
+                          : t("app.viewAllAchievements")}
+                      </button>
+                    )}
+                    {allAchievementsVisible && achievements.items.length > 8 && (
+                      <select
+                        aria-label={t("app.achievementFilter")}
+                        className="achievement-control [height:36px] [border:1px_solid_#ffffff16] [border-radius:8px] [padding:0_8px] [background:#11131c] [color:#d0d2d9] [font-size:12px]"
+                        value={achievementFilter}
+                        onChange={(event) =>
+                          setAchievementFilter(
+                            event.target.value as "all" | "unlocked" | "locked",
+                          )
+                        }
+                      >
+                        <option value="all">{t("app.allAchievements")}</option>
+                        <option value="unlocked">
+                          {t("app.unlockedAchievements")}
+                        </option>
+                        <option value="locked">{t("app.lockedAchievements")}</option>
+                      </select>
+                    )}
+                    <b>
+                      {achievements.totalKnown === false
+                        ? "—"
+                        : `${Math.round((achievements.unlocked / achievements.total) * 100)}%`}
+                    </b>
+                  </div>
                 </div>
                 <div
                   className={
@@ -411,10 +543,10 @@ export function App() {
                     "achievement-grid [display:grid] [grid-template-columns:repeat(2,_minmax(0,_1fr))] [gap:10px]"
                   }
                 >
-                  {achievements.items.slice(0, 8).map((achievement) => (
+                  {achievementItems.map((achievement) => (
                     <article
                       key={achievement.id}
-                      className={`achievement [display:grid] [grid-template-columns:54px_1fr] [gap:12px] [min-width:0] [padding:10px] [border-radius:13px] [background:#ffffff06] [&.locked]:[opacity:.55] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_p]:[display:block] [&_p]:[overflow:hidden] [&_p]:[text-overflow:ellipsis] [&_p]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[margin-top:1px] [&_strong]:[font-size:13px] [&_p]:[margin:4px_0] [&_p]:[color:#777a86] [&_p]:[font-size:11px] [&_small]:[color:#a2a5af] [&_small]:[font-size:10px] ${achievement.achieved ? "unlocked" : "locked"}`}
+                      className={`achievement [display:grid] [grid-template-columns:54px_1fr] [gap:12px] [min-width:0] [padding:10px] [border-radius:13px] [background:#ffffff06] [&_strong]:[display:block] [&_strong]:[overflow:hidden] [&_strong]:[text-overflow:ellipsis] [&_strong]:[white-space:nowrap] [&_p]:[display:block] [&_p]:[overflow:hidden] [&_p]:[text-overflow:ellipsis] [&_p]:[white-space:nowrap] [&_small]:[display:block] [&_small]:[overflow:hidden] [&_small]:[text-overflow:ellipsis] [&_small]:[white-space:nowrap] [&_strong]:[margin-top:1px] [&_strong]:[font-size:13px] [&_p]:[margin:4px_0] [&_p]:[color:#777a86] [&_p]:[font-size:11px] [&_small]:[color:#a2a5af] [&_small]:[font-size:10px] ${achievement.achieved ? "unlocked" : "locked"}`}
                     >
                       <div
                         className={
@@ -456,6 +588,11 @@ export function App() {
                     </article>
                   ))}
                 </div>
+                {achievementItems.length === 0 && (
+                  <p className="[margin:14px_0_0] [color:#9699a4] [font-size:12px]">
+                    {t("app.noAchievementsForFilter")}
+                  </p>
+                )}
               </section>
             )}
             {selected.source === "local" && (
@@ -474,26 +611,53 @@ export function App() {
             runningGameIds={runningGameIds}
             onSelect={selectGame}
           />
+        ) : libraryGames.length > 0 ? (
+          <section className="[display:grid] [place-content:center] [justify-items:center] [gap:14px] [margin:0_34px] [padding:32px] [border:1px_dashed_#ffffff17] [border-radius:20px] [background:#ffffff04] [text-align:center]">
+            <h1 className="[margin:0] [font-size:24px]">{t("library.noResults")}</h1>
+            <p className="[max-width:440px] [margin:0] [color:#9699a4] [font-size:13px] [line-height:1.55]">
+              {t("library.noResultsHelp")}
+            </p>
+            <Button onClick={clearLibraryFilters} variant="secondary">
+              {t("library.clearFilters")}
+            </Button>
+          </section>
         ) : (
           <section
             className={
-              "empty-state [display:grid] [place-items:center] [align-content:center] [margin:0_34px] [padding:40px] [border:1px_dashed_#ffffff17] [border-radius:24px] [background:#ffffff04] [text-align:center] [&_h1]:[font-size:38px] [&_h1]:[letter-spacing:-1.8px] [&_p]:[max-width:470px] [&_p]:[margin:0_0_26px] [&_p]:[color:#898c97] [&_p]:[line-height:1.6]"
+              "empty-state [display:grid] [place-items:center] [align-content:center] [gap:12px] [margin:0_34px] [padding:28px] [border:1px_dashed_#ffffff17] [border-radius:20px] [background:#ffffff04] [text-align:center] [&_h1]:[margin:0] [&_h1]:[font-size:30px] [&_h1]:[letter-spacing:-.8px] [&_p]:[max-width:480px] [&_p]:[margin:0_0_8px] [&_p]:[color:#9699a4] [&_p]:[font-size:13px] [&_p]:[line-height:1.6]"
             }
           >
             <span
               className={
-                "empty-icon [display:grid] [place-items:center] [width:76px] [height:76px] [border-radius:24px] [background:#ffffff08] [color:#a8f982] [&_svg]:[width:38px] [&_svg]:[height:38px]"
+                "empty-icon [display:grid] [place-items:center] [width:56px] [height:56px] [border-radius:18px] [background:#ffffff08] [color:#a8f982] [&_svg]:[width:28px] [&_svg]:[height:28px]"
               }
             >
               <SteamLogo weight="fill" />
             </span>
             <h1>{t("app.emptyTitle")}</h1>
-            <p>
-              {t("app.emptyDescription")}
-            </p>
-            <Button onClick={openSettings} variant="primary">
-              <SteamLogo /> {t("app.configureSteam")}
-            </Button>
+            <p>{t("app.emptyDescription")}</p>
+            <div className="[display:flex] [flex-wrap:wrap] [justify-content:center] [gap:9px]">
+              <Button
+                disabled={scanningSteam}
+                onClick={() => void scanInstalledSteam()}
+                variant="primary"
+              >
+                <SteamLogo />{" "}
+                {scanningSteam
+                  ? t("app.importingInstalledSteam")
+                  : t("app.importInstalledSteam")}
+              </Button>
+              <Button onClick={addGame} variant="secondary">
+                {t("app.addLocalGame")}
+              </Button>
+            </div>
+            <button
+              type="button"
+              className="[border:0] [background:transparent] [color:#9ca0ab] [font-size:11px] [text-decoration:underline] [text-underline-offset:3px] [cursor:pointer]"
+              onClick={openSettings}
+            >
+              {t("app.connectFullLibraryOptional")}
+            </button>
           </section>
         )}
         <footer className="app-statusbar">
@@ -504,23 +668,25 @@ export function App() {
               {workspaceStatus ? `v${workspaceStatus.version}` : "…"}
             </span>
             <span>
-              {syncSettings?.folderPath
-                ? t("app.syncActive")
-                : t("app.noSync")}
+              {syncSettings?.folderPath ? t("app.syncActive") : t("app.noSync")}
             </span>
           </div>
         </footer>
       </section>
       {showAddGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
+          fallback={
+            <LoadingState variant="overlay" label={t("app.preparingOptions")} />
+          }
         >
           <AddGameModal onClose={closeAddGame} onCreated={onLocalGameCreated} />
         </Suspense>
       )}
       {artworkGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
+          fallback={
+            <LoadingState variant="overlay" label={t("app.preparingOptions")} />
+          }
         >
           <ArtworkModal
             game={artworkGame}
@@ -531,7 +697,9 @@ export function App() {
       )}
       {editGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
+          fallback={
+            <LoadingState variant="overlay" label={t("app.preparingOptions")} />
+          }
         >
           <EditGameModal
             game={editGame}
@@ -542,7 +710,9 @@ export function App() {
       )}
       {deleteGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
+          fallback={
+            <LoadingState variant="overlay" label={t("app.preparingOptions")} />
+          }
         >
           <DeleteGameModal
             game={deleteGame}
@@ -569,11 +739,16 @@ export function App() {
             onMouseDown={stopPropagation}
           >
             <small>{gameMenu.game.title}</small>
+            <p className="[margin:2px_8px_8px] [color:#a1a3ad] [font-size:11px] [line-height:1.45]">
+              {gameMenu.game.source === "steam" && gameMenu.game.installed
+                ? t("app.uninstallExplanation")
+                : t("app.hideExplanation")}
+            </p>
             <button onClick={() => removeGame()}>
               <X weight="bold" />
               {gameMenu.game.source === "steam" && gameMenu.game.installed
-                ? t("app.uninstall")
-                : t("app.removeFromLibrary")}
+                ? t("app.uninstallAndHide")
+                : t("app.hideKeepData")}
             </button>
             <button onClick={requestDeleteGame}>
               <Trash weight="bold" />

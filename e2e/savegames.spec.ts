@@ -36,17 +36,25 @@ test("backs up, verifies and restores saves while preserving the previous state"
     .getByRole("group", { name: /^Lista de juegos/ })
     .getByRole("button", { name: /^E2E Saves,/ })
     .click();
-  await page.getByRole("button", { name: "Indicar carpeta", exact: true }).click();
-  await page.getByRole("button", { name: "Sincronizar ahora", exact: true }).click();
+  await page.getByRole("button", { name: "Añadir carpeta local", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Crear / comprobar copia", exact: true })
+    .click();
   await expect(
-    page.getByText("Partidas sincronizadas", { exact: true }).first(),
+    page.getByText("Copia guardada en la carpeta configurada", { exact: true }).first(),
   ).toBeVisible();
-  const gameId = await page.evaluate(
+  await expect(
+    page.getByText("Integridad sin comprobar", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Verificar", exact: true }).click();
+  await expect(page.getByText("Integridad verificada", { exact: true })).toBeVisible();
+  const game = await page.evaluate(
     async () =>
       (await window.launcher.listGames()).games.find(
-        (game) => game.title === "E2E Saves",
-      )!.id,
+        (item) => item.title === "E2E Saves",
+      )!,
   );
+  const gameId = game.id;
   const versions = await page.evaluate(
     async (id) => (await window.launcher.getSavegames(id)).versions,
     gameId,
@@ -92,4 +100,35 @@ test("backs up, verifies and restores saves while preserving the previous state"
     { gameId, versionId: safetyCopy.id },
   );
   expect(await fs.readFile(saveFile, "utf8")).toBe("new progress");
+
+  await fs.writeFile(path.join(saves, "overflow.sav"), Buffer.alloc(1024 * 1024 + 1));
+  const backupError = await page.evaluate(async (id) => {
+    await window.launcher.setSavegamePolicy(id, { maxSizeMb: 1 });
+    try {
+      await window.launcher.backupSavegames(id);
+      return null;
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    }
+  }, gameId);
+  expect(backupError).toContain("La copia supera el tamaño permitido");
+  await expect(page.getByRole("alert")).toContainText("Falló la última copia");
+
+  const archivePath = path.join(
+    sync,
+    "launcher-next-saves",
+    game.sourceId,
+    "versions",
+    `${versions[0]!.id}.zip`,
+  );
+  await fs.writeFile(archivePath, "fictitious corruption");
+  await expect(
+    page.evaluate(
+      ({ id, versionId }) => window.launcher.verifySavegameVersion(id, versionId),
+      {
+        id: gameId,
+        versionId: versions[0]!.id,
+      },
+    ),
+  ).resolves.toBe("corrupt");
 });

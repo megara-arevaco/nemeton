@@ -60,12 +60,14 @@ export function DeleteGameModal({
         >
           <Warning weight="fill" />
           <p>
-            {t("modal.deleteWarning")}
+            {t(
+              game.source === "steam"
+                ? "modal.deleteSteamWarning"
+                : "modal.deleteWarning",
+            )}
           </p>
         </div>
-        <p>
-          {t("modal.confirmDelete", { title: game.title })}
-        </p>
+        <p>{t("modal.confirmDelete", { title: game.title })}</p>
         <label>
           <span>{t("modal.gameName")}</span>
           <input

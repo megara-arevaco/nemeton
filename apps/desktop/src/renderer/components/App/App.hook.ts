@@ -12,6 +12,7 @@ import type { SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import type {
+  BacklogStatus,
   FolderSyncSettings,
   LibraryGame,
   LibrarySnapshot,
@@ -25,6 +26,7 @@ import {
   useLaunchGameMutation,
   useRemoveGameMutation,
   useRunningGamesQuery,
+  useScanSteamMutation,
   useSteamSettingsQuery,
   useSyncSettingsQuery,
 } from "../../queries/library.queries";
@@ -180,6 +182,9 @@ export function useApp() {
     initialNavigationState,
   );
   const [query, setQuery] = useState("");
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [backlogFilter, setBacklogFilter] = useState<BacklogStatus | "all">("all");
+  const scanSteamMutation = useScanSteamMutation();
   const launchGameMutation = useLaunchGameMutation();
   const removeGameMutation = useRemoveGameMutation();
   const deleteGameForeverMutation = useDeleteGameForeverMutation();
@@ -220,14 +225,17 @@ export function useApp() {
   );
   const visibleGames = useMemo(() => {
     const normalized = deferredQuery.trim().toLocaleLowerCase();
-    return normalized
-      ? libraryGames.filter((game) =>
-          game.title.toLocaleLowerCase().includes(normalized),
-        )
-      : libraryGames;
-  }, [libraryGames, deferredQuery]);
+    return libraryGames.filter((game) => {
+      const matchesQuery =
+        !normalized || game.title.toLocaleLowerCase().includes(normalized);
+      const matchesFavorite = !favoritesOnly || game.favorite === true;
+      const matchesBacklog =
+        backlogFilter === "all" || game.backlogStatus === backlogFilter;
+      return matchesQuery && matchesFavorite && matchesBacklog;
+    });
+  }, [libraryGames, deferredQuery, favoritesOnly, backlogFilter]);
   const selected =
-    libraryGames.find((game) => game.id === navigation.selectedId) ?? null;
+    visibleGames.find((game) => game.id === navigation.selectedId) ?? null;
   const selectedIsRunning = selected ? library.runningGameIds.has(selected.id) : false;
   const achievementsQuery = useAchievementsQuery(
     selected?.id ?? null,
@@ -287,6 +295,42 @@ export function useApp() {
 
   const updateQuery = (event: ChangeEvent<HTMLInputElement>) => {
     setQuery(event.target.value);
+  };
+
+  const updateCollectionState = async (
+    gameId: string,
+    state: { favorite?: boolean; backlogStatus?: BacklogStatus | null },
+  ) => {
+    try {
+      const snapshot = await window.launcher.setGameCollectionState(gameId, state);
+      queryClient.setQueryData(queryKeys.library, snapshot);
+      library.setMessage(t("status.collectionUpdated"));
+    } catch (error) {
+      library.setMessage(
+        error instanceof Error ? error.message : t("status.collectionError"),
+      );
+    }
+  };
+
+  const scanInstalledSteam = async () => {
+    try {
+      library.setMessage(t("status.scanningSteam"));
+      const snapshot = await scanSteamMutation.mutateAsync();
+      const count = snapshot.games.filter(
+        (game) => game.source === "steam" && game.installed && !game.hiddenFromLibrary,
+      ).length;
+      library.setMessage(t("status.installedSteamGames", { count }));
+    } catch (error) {
+      library.setMessage(
+        error instanceof Error ? error.message : t("status.scanSteamError"),
+      );
+    }
+  };
+
+  const clearLibraryFilters = () => {
+    setQuery("");
+    setFavoritesOnly(false);
+    setBacklogFilter("all");
   };
 
   const minimizeWindow = () => {
@@ -364,7 +408,9 @@ export function useApp() {
       library.setMessage(t("status.gameStarted", { title: selected.title }));
     } catch (error) {
       library.setMessage(
-        error instanceof Error ? error.message : t("status.launchFailed", { title: selected.title }),
+        error instanceof Error
+          ? error.message
+          : t("status.launchFailed", { title: selected.title }),
       );
     }
   };
@@ -465,6 +511,10 @@ export function useApp() {
     selectedId: navigation.selectedId,
     query,
     setQuery,
+    favoritesOnly,
+    setFavoritesOnly,
+    backlogFilter,
+    setBacklogFilter,
     achievements,
     metadata,
     view,
@@ -485,6 +535,10 @@ export function useApp() {
     selectGame,
     openGameMenu,
     updateQuery,
+    updateCollectionState,
+    scanInstalledSteam,
+    scanningSteam: scanSteamMutation.isPending,
+    clearLibraryFilters,
     minimizeWindow,
     maximizeWindow,
     closeWindow,

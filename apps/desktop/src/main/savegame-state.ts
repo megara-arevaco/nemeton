@@ -94,6 +94,7 @@ export async function readSavegameState(
   const versions = settings.syncFolderPath
     ? await savegameManager.listVersions(settings.syncFolderPath, game.sourceId)
     : [];
+  const backupFailure = await savegameManager.getBackupOutcome(gameId);
   const missingPaths = (
     await Promise.all(
       paths.map(async (folderPath) => ({
@@ -116,6 +117,7 @@ export async function readSavegameState(
   });
   return {
     paths,
+    backupFailure,
     suggestions: suggestions.filter((item) => !paths.includes(item.path)),
     versions,
     policy,
@@ -123,5 +125,6 @@ export async function readSavegameState(
     syncState: syncState === "pending" ? "checking" : syncState,
     missingPaths,
     conflict: null,
+    localSummary: null,
   };
 }

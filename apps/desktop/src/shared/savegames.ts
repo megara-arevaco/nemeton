@@ -30,6 +30,7 @@ export interface SavegamePolicy {
 
 export interface SavegameState {
   paths: string[];
+  backupFailure: { failedAt: string; message: string } | null;
   suggestions: SavegameSuggestion[];
   versions: SavegameVersion[];
   policy: SavegamePolicy;
@@ -45,8 +46,18 @@ export interface SavegameState {
     | "checking";
   missingPaths: string[];
   conflict: SavegameVersion | null;
+  localSummary: SavegameLocalSummary | null;
+}
+
+export interface SavegameLocalSummary {
+  modifiedAt: string | null;
+  sizeBytes: number;
+  fileCount: number;
 }
 
 export type SavegameVerification = Pick<SavegameState, "syncState" | "conflict"> & {
   versionId: string | null;
+  localSummary: SavegameLocalSummary | null;
 };
+
+export type SavegameVersionIntegrity = "verified" | "corrupt";

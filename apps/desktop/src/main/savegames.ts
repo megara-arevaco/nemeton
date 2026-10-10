@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   copyAndHash,
+  rewriteArchiveManifest,
   writeArchive,
   withArchive,
   MAX_BACKUP_BYTES,
@@ -39,6 +40,7 @@ interface SavegameConfig {
   games: Record<string, string[]>;
   policies?: Record<string, SavegamePolicy>;
   learned?: Record<string, string[]>;
+  backupFailures?: Record<string, { failedAt: string; message: string }>;
 }
 
 interface SnapshotFile {
@@ -60,6 +62,7 @@ const emptyConfig = (): SavegameConfig => ({
   games: {},
   policies: {},
   learned: {},
+  backupFailures: {},
 });
 
 const safeSegment = (value: string) => value.replace(/[^a-z0-9_-]/gi, "_");
@@ -118,6 +121,7 @@ export class SavegameManager {
           games: parsed.games ?? {},
           policies: parsed.policies ?? {},
           learned: parsed.learned ?? {},
+          backupFailures: parsed.backupFailures ?? {},
         };
       } catch {
         throw new Error("La configuración de partidas está dañada");
@@ -138,6 +142,87 @@ export class SavegameManager {
     return savegamePolicySchema.parse({
       ...defaultPolicy(),
       ...(await this.readConfig()).policies?.[gameId],
+    });
+  }
+
+  async getBackupOutcome(gameId: string) {
+    return (await this.readConfig()).backupFailures?.[gameId] ?? null;
+  }
+
+  async recordBackupOutcome(gameId: string, message: string | null) {
+    return withFileLock(this.configPath, async () => {
+      const config = await this.readConfig();
+      config.backupFailures ??= {};
+      if (message) {
+        config.backupFailures[gameId] = {
+          failedAt: new Date().toISOString(),
+          message: message.slice(0, 2000),
+        };
+      } else {
+        delete config.backupFailures[gameId];
+      }
+      await this.writeConfig(config);
+    });
+  }
+
+  async backupWithOutcome(
+    gameId: string,
+    sourceId: string,
+    syncFolder: string,
+    preserveVersionId?: string,
+  ) {
+    try {
+      const result = await this.backup(gameId, sourceId, syncFolder, preserveVersionId);
+      await this.recordBackupOutcome(gameId, null);
+      return result;
+    } catch (error) {
+      await this.recordBackupOutcome(
+        gameId,
+        error instanceof Error ? error.message : String(error),
+      ).catch(() => undefined);
+      throw error;
+    }
+  }
+
+  async createSafetyBackup(label: string) {
+    return withFileLock(this.configPath, async () => {
+      const info = await fs.promises
+        .lstat(this.configPath)
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") {
+            return null;
+          }
+          throw error;
+        });
+
+      if (!info) {
+        return null;
+      }
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("No se crea una copia de seguridad de una ruta no regular");
+      }
+
+      const safeLabel = label.replace(/[^a-z0-9-]/gi, "-");
+      const backupPath = `${this.configPath}.${safeLabel}-${new Date().toISOString().replace(/[:.]/g, "-")}.bak`;
+      await fs.promises.copyFile(
+        this.configPath,
+        backupPath,
+        fs.constants.COPYFILE_EXCL,
+      );
+      return backupPath;
+    });
+  }
+
+  async importPortablePolicies(policies: Record<string, SavegamePolicy>) {
+    return withFileLock(this.configPath, async () => {
+      const config = await this.readConfig();
+      config.policies ??= {};
+      for (const [gameId, policy] of Object.entries(policies)) {
+        if (!config.policies[gameId]) {
+          config.policies[gameId] = savegamePolicySchema.parse(policy);
+        }
+      }
+      await this.writeConfig(config);
     });
   }
 
@@ -379,6 +464,46 @@ export class SavegameManager {
     return this.signatureFor(inputs.paths, inputs.policy);
   }
 
+  private async summarizeCurrent(roots: string[], policy: SavegamePolicy) {
+    let sizeBytes = 0;
+    let fileCount = 0;
+    let modifiedAt: number | null = null;
+    const visit = async (directory: string) => {
+      const entries = await fs.promises.readdir(directory, { withFileTypes: true });
+
+      for (const entry of entries) {
+        if (policy.excludedNames.includes(entry.name.toLocaleLowerCase())) {
+          continue;
+        }
+
+        const absolute = path.join(directory, entry.name);
+
+        if (entry.isDirectory() && !entry.isSymbolicLink()) {
+          await visit(absolute);
+        } else if (entry.isFile()) {
+          const stat = await fs.promises.stat(absolute);
+          sizeBytes += stat.size;
+          fileCount += 1;
+          modifiedAt = Math.max(modifiedAt ?? 0, stat.mtimeMs);
+          if (fileCount > 100_000 || sizeBytes > policy.maxSizeMb * 1024 * 1024) {
+            throw new Error(
+              "Las partidas superan los límites configurados para la copia",
+            );
+          }
+        }
+      }
+    };
+
+    for (const root of roots) {
+      await visit(root);
+    }
+    return {
+      modifiedAt: modifiedAt === null ? null : new Date(modifiedAt).toISOString(),
+      sizeBytes,
+      fileCount,
+    };
+  }
+
   private async signatureFor(roots: string[], policy: SavegamePolicy) {
     if (!roots.length) {
       return null;
@@ -450,15 +575,28 @@ export class SavegameManager {
 
     const request = (async (): Promise<SavegameVerification> => {
       if (!inputs.paths.length) {
-        return { syncState: "not-detected", conflict: null, versionId };
+        return {
+          syncState: "not-detected",
+          conflict: null,
+          versionId,
+          localSummary: null,
+        };
       }
       for (const folder of inputs.paths) {
         if (!(await fs.promises.stat(folder).catch(() => null))?.isDirectory()) {
-          return { syncState: "path-missing", conflict: null, versionId };
+          return {
+            syncState: "path-missing",
+            conflict: null,
+            versionId,
+            localSummary: null,
+          };
         }
       }
+
+      const localSummary = await this.summarizeCurrent(inputs.paths, inputs.policy);
+
       if (!latest) {
-        return { syncState: "waiting-backup", conflict: null, versionId };
+        return { syncState: "waiting-backup", conflict: null, versionId, localSummary };
       }
 
       // Hash without holding the shared configuration lock.
@@ -474,6 +612,7 @@ export class SavegameManager {
           syncState: "checking",
           conflict: null,
           versionId: currentLatest?.id ?? null,
+          localSummary,
         };
       }
 
@@ -483,6 +622,7 @@ export class SavegameManager {
         syncState: synchronized ? "synced" : conflict ? "conflict" : "pending",
         conflict,
         versionId,
+        localSummary,
       };
     })().finally(() => this.verifications.delete(key));
     this.verifications.set(key, request);
@@ -669,6 +809,277 @@ export class SavegameManager {
     });
   }
 
+  async createPortableBackupFiles(
+    syncFolder: string,
+    sourceId: string,
+    stagingDirectory: string,
+    maxBytes: number,
+  ) {
+    const root = this.gameRoot(syncFolder, sourceId);
+    const versions = await this.listVersions(syncFolder, sourceId);
+    const output: Array<{
+      versionId: string;
+      filePath: string;
+      size: number;
+      sha256: string;
+    }> = [];
+    let total = 0;
+
+    for (const version of versions) {
+      const manifest = await this.readManifest(root, version.id);
+
+      if (manifest.sizeBytes > maxBytes - total) {
+        throw new Error("Las copias opcionales superan el límite de 40 MB del paquete");
+      }
+      if ((await this.verifyVersion(syncFolder, sourceId, version.id)) !== "verified") {
+        throw new Error(`No se puede exportar la copia dañada ${version.id}`);
+      }
+
+      const filePath = path.join(stagingDirectory, `backup-${output.length}.zip`);
+      const archivePath = path.join(root, "versions", `${version.id}.zip`);
+      const archiveInfo = await fs.promises.lstat(archivePath).catch(() => null);
+      const portableManifest = {
+        ...manifest,
+        deviceId: "portable-package",
+        deviceName: "Portable backup",
+        files: manifest.files.map((file, index) => ({
+          ...file,
+          rootKey: undefined,
+          archivePath: file.archivePath ?? `files/${index}`,
+        })),
+      };
+
+      if (archiveInfo) {
+        if (!archiveInfo.isFile() || archiveInfo.isSymbolicLink()) {
+          throw new Error("No se exportan copias que sean enlaces simbólicos");
+        }
+        await rewriteArchiveManifest(
+          archivePath,
+          filePath,
+          () => portableManifest,
+          manifest.sizeBytes,
+        );
+      } else {
+        const files = manifest.files.map((file, index) => ({
+          source: path.join(root, "blobs", file.hash),
+          name: file.archivePath ?? `files/${index}`,
+        }));
+        await writeArchive(filePath, files, portableManifest);
+      }
+      await this.validatePortableBackupArchive(filePath, version.id);
+      const stat = await fs.promises.stat(filePath);
+      total += stat.size;
+      if (total > maxBytes) {
+        throw new Error("Las copias opcionales superan el límite de 40 MB del paquete");
+      }
+
+      const { hash } = await copyAndHash(filePath, undefined, maxBytes);
+      output.push({ versionId: version.id, filePath, size: stat.size, sha256: hash });
+    }
+    return output;
+  }
+
+  async validatePortableBackupArchive(filePath: string, versionId: string) {
+    versionIdSchema.parse(versionId);
+    const fileInfo = await fs.promises.lstat(filePath);
+
+    if (!fileInfo.isFile() || fileInfo.isSymbolicLink()) {
+      throw new Error("El archivo de copia no es un archivo normal");
+    }
+    return withArchive(filePath, 40 * 1024 * 1024, async (archive) => {
+      const manifest = manifestSchema.parse(await archive.manifest());
+
+      if (
+        manifest.id !== versionId ||
+        manifest.deviceId !== "portable-package" ||
+        manifest.deviceName !== "Portable backup"
+      ) {
+        throw new Error("El manifiesto de la copia portátil no coincide");
+      }
+
+      const expected = new Set(["manifest.json"]);
+      let totalSize = 0;
+
+      for (const [index, file] of manifest.files.entries()) {
+        if (
+          file.rootKey ||
+          !file.archivePath ||
+          !/^files\/[0-9]+$/.test(file.archivePath)
+        ) {
+          throw new Error(
+            "La copia portátil contiene rutas locales o entradas no válidas",
+          );
+        }
+        if (expected.has(file.archivePath)) {
+          throw new Error("La copia portátil contiene rutas de archivo duplicadas");
+        }
+
+        const entry = archive.entries.get(file.archivePath);
+
+        if (!entry || entry.uncompressedSize !== file.size) {
+          throw new Error("La copia portátil no coincide con su manifiesto");
+        }
+
+        const result = await copyAndHash(
+          await archive.stream(file.archivePath),
+          undefined,
+          file.size,
+        );
+
+        if (result.hash !== file.hash || result.size !== file.size) {
+          throw new Error("La copia portátil no supera la verificación de integridad");
+        }
+        totalSize += result.size;
+        expected.add(file.archivePath);
+      }
+      if (totalSize !== manifest.sizeBytes || expected.size !== archive.entries.size) {
+        throw new Error("La copia portátil contiene entradas inesperadas");
+      }
+      return manifest;
+    });
+  }
+
+  async importPortableBackup(
+    syncFolder: string,
+    sourceId: string,
+    versionId: string,
+    stagedArchive: string,
+    expectedSha256: string,
+  ) {
+    await this.validatePortableBackupArchive(stagedArchive, versionId);
+    const { hash } = await copyAndHash(stagedArchive, undefined, 40 * 1024 * 1024);
+
+    if (hash !== expectedSha256) {
+      throw new Error("La copia portátil no coincide con el hash declarado");
+    }
+
+    const canonicalSyncFolder = await fs.promises.realpath(syncFolder);
+    const syncInfo = await fs.promises.lstat(canonicalSyncFolder);
+
+    if (!syncInfo.isDirectory() || syncInfo.isSymbolicLink()) {
+      throw new Error("La carpeta de sincronización no es un directorio seguro");
+    }
+
+    const savesRoot = path.join(canonicalSyncFolder, "launcher-next-saves");
+    await fs.promises.mkdir(savesRoot, { recursive: true });
+    const savesInfo = await fs.promises.lstat(savesRoot);
+
+    if (!savesInfo.isDirectory() || savesInfo.isSymbolicLink()) {
+      throw new Error("La carpeta de copias contiene un enlace simbólico");
+    }
+
+    const root = this.gameRoot(canonicalSyncFolder, sourceId);
+    const versions = path.join(root, "versions");
+    await fs.promises.mkdir(versions, { recursive: true });
+    const rootInfo = await fs.promises.lstat(root);
+    const versionsInfo = await fs.promises.lstat(versions);
+
+    if (
+      !rootInfo.isDirectory() ||
+      rootInfo.isSymbolicLink() ||
+      !versionsInfo.isDirectory() ||
+      versionsInfo.isSymbolicLink()
+    ) {
+      throw new Error(
+        "La carpeta de copias contiene un enlace simbólico o no es un directorio",
+      );
+    }
+
+    const target = path.join(versions, `${versionId}.zip`);
+    const existing = await fs.promises.lstat(target).catch(() => null);
+
+    if (existing) {
+      if (!existing.isFile() || existing.isSymbolicLink()) {
+        throw new Error("La ruta de destino de la copia no es un archivo normal");
+      }
+
+      const current = await copyAndHash(target, undefined, 40 * 1024 * 1024);
+
+      if (current.hash !== expectedSha256) {
+        throw new Error(
+          `Conflicto de copia ${versionId}; el archivo existente se conservó sin cambios`,
+        );
+      }
+      return { path: target, created: false };
+    }
+
+    const temporary = `${target}.import-${randomUUID()}`;
+    await fs.promises.copyFile(stagedArchive, temporary, fs.constants.COPYFILE_EXCL);
+    try {
+      await this.validatePortableBackupArchive(temporary, versionId);
+      await fs.promises.link(temporary, target);
+      return { path: target, created: true };
+    } finally {
+      await fs.promises.unlink(temporary).catch(() => undefined);
+    }
+  }
+
+  async verifyVersion(
+    syncFolder: string,
+    sourceId: string,
+    versionId: string,
+  ): Promise<"verified" | "corrupt"> {
+    versionIdSchema.parse(versionId);
+    const root = this.gameRoot(syncFolder, sourceId);
+
+    try {
+      const manifest = await this.readManifest(root, versionId);
+
+      if (manifest.files.length !== manifest.fileCount) {
+        return "corrupt";
+      }
+
+      const archivePath = path.join(root, "versions", `${versionId}.zip`);
+      const hasArchive = Boolean(await fs.promises.stat(archivePath).catch(() => null));
+      const verifyFiles = async (
+        stream?: (name: string) => Promise<NodeJS.ReadableStream>,
+        entries?: Map<string, import("yauzl").Entry>,
+      ) => {
+        let totalSize = 0;
+
+        for (const [index, file] of manifest.files.entries()) {
+          const name = file.archivePath ?? `files/${index}`;
+          let source: string | NodeJS.ReadableStream;
+
+          if (stream && file.archivePath) {
+            const entry = entries?.get(name);
+
+            if (!entry || entry.uncompressedSize !== file.size) {
+              return false;
+            }
+            source = await stream(name);
+          } else {
+            source = path.join(root, "blobs", file.hash);
+          }
+
+          const result = await copyAndHash(source, undefined, file.size);
+
+          if (result.hash !== file.hash || result.size !== file.size) {
+            return false;
+          }
+          totalSize += result.size;
+        }
+        return totalSize === manifest.sizeBytes;
+      };
+
+      if (hasArchive) {
+        return (await withArchive(archivePath, MAX_BACKUP_BYTES, async (archive) => {
+          const embedded = manifestSchema.parse(await archive.manifest());
+
+          if (embedded.id !== versionId) {
+            return false;
+          }
+          return verifyFiles(archive.stream, archive.entries);
+        }))
+          ? "verified"
+          : "corrupt";
+      }
+      return (await verifyFiles()) ? "verified" : "corrupt";
+    } catch {
+      return "corrupt";
+    }
+  }
+
   async setPinned(
     syncFolder: string,
     sourceId: string,
@@ -715,7 +1126,12 @@ export class SavegameManager {
   }
 
   async recoverRestore(onReady?: () => void) {
-    await recoverRestore(`${this.configPath}.restore.json`, onReady);
+    const config = await this.readConfig();
+    await recoverRestore(
+      `${this.configPath}.restore.json`,
+      onReady,
+      Object.values(config.games).flat(),
+    );
   }
 
   async restore(

@@ -1,5 +1,10 @@
 export type GameSource = "steam" | "local";
 
+export const isValidSteamAppId = (value: string): boolean =>
+  /^[1-9]\d{0,11}$/.test(value);
+
+export type BacklogStatus = "pending" | "playing" | "finished";
+
 export interface LibraryGame {
   id: string;
   source: GameSource;
@@ -19,6 +24,8 @@ export interface LibraryGame {
   trackedPlaytimeSeconds: number;
   installed: boolean;
   hiddenFromLibrary?: boolean;
+  favorite?: boolean;
+  backlogStatus?: BacklogStatus | null;
   lastPlayedAt: string | null;
   importedAt: string;
   updatedAt?: string;

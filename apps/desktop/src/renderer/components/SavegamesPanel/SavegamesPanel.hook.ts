@@ -4,9 +4,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { LibraryGame } from "@launcher/core";
 import {
+  useAddSavegameFolderMutation,
   useBackupSavegamesMutation,
   useChooseSavegameFolderMutation,
+  useRemoveSavegameFolderMutation,
   useRestoreSavegamesMutation,
+  useSavegamePinnedMutation,
+  useSetSavegamePolicyMutation,
   useSavegamesQuery,
 } from "../../queries/game.queries";
 
@@ -16,9 +20,26 @@ export function useSavegamesPanel(game: LibraryGame) {
   const { t, i18n } = useTranslation();
   const [status, setStatus] = useState<SavegameStatus | null>(null);
   const savegamesQuery = useSavegamesQuery(game.id);
+  useEffect(() => {
+    const unsubscribe = window.launcher.onSavegamesChanged((changedGameId) => {
+      if (changedGameId === game.id) {
+        void savegamesQuery.refetch();
+      }
+    });
+    return () => {
+      unsubscribe();
+    };
+  }, [game.id, savegamesQuery.refetch]);
   const backupMutation = useBackupSavegamesMutation(game.id);
   const chooseFolderMutation = useChooseSavegameFolderMutation(game.id);
   const restoreMutation = useRestoreSavegamesMutation(game.id);
+  const setPolicyMutation = useSetSavegamePolicyMutation(game.id);
+  const pinMutation = useSavegamePinnedMutation(game.id);
+  const addFolderMutation = useAddSavegameFolderMutation(game.id);
+  const removeFolderMutation = useRemoveSavegameFolderMutation(game.id);
+  const [integrity, setIntegrity] = useState<
+    Record<string, "checking" | "verified" | "corrupt">
+  >({});
   const discovery = useQuery({
     queryKey: [...queryKeys.savegameDiscovery(game.id), savegamesQuery.dataUpdatedAt],
     queryFn: () => window.launcher.discoverSavegames(game.id),
@@ -61,7 +82,11 @@ export function useSavegamesPanel(game: LibraryGame) {
   const busy =
     backupMutation.isPending ||
     chooseFolderMutation.isPending ||
-    restoreMutation.isPending;
+    restoreMutation.isPending ||
+    setPolicyMutation.isPending ||
+    pinMutation.isPending ||
+    addFolderMutation.isPending ||
+    removeFolderMutation.isPending;
 
   const run = async (action: () => Promise<unknown>, successKey: string) => {
     setStatus(null);
@@ -144,7 +169,14 @@ export function useSavegamesPanel(game: LibraryGame) {
   const conflictCopy = data?.conflict
     ? t("savegames.conflictCopy", {
         device: data.conflict.deviceName,
-        date: new Date(data.conflict.createdAt).toLocaleString(i18n.language),
+        remoteDate: new Date(data.conflict.createdAt).toLocaleString(i18n.language),
+        remoteSize: (data.conflict.sizeBytes / 1024).toFixed(0),
+        remoteFiles: data.conflict.fileCount,
+        localDate: data.localSummary?.modifiedAt
+          ? new Date(data.localSummary.modifiedAt).toLocaleString(i18n.language)
+          : t("savegames.unknownDate"),
+        localSize: ((data.localSummary?.sizeBytes ?? 0) / 1024).toFixed(0),
+        localFiles: data.localSummary?.fileCount ?? 0,
       })
     : "";
   const chooseFolder = () => chooseFolderMutation.mutateAsync(data?.missingPaths ?? []);
@@ -155,25 +187,49 @@ export function useSavegamesPanel(game: LibraryGame) {
     if (!data?.conflict) {
       return Promise.resolve(null);
     }
-
     return restoreMutation.mutateAsync(data.conflict.id);
+  };
+  const restoreVersion = (versionId: string) => restoreMutation.mutateAsync(versionId);
+  const setPolicy = (policy: Partial<NonNullable<typeof data>["policy"]>) =>
+    setPolicyMutation.mutateAsync(policy);
+  const pinVersion = (versionId: string, pinned: boolean) =>
+    pinMutation.mutateAsync({ versionId, pinned });
+  const addFolder = () => addFolderMutation.mutateAsync();
+  const removeFolder = (folderPath: string) =>
+    removeFolderMutation.mutateAsync(folderPath);
+  const verifyVersion = async (versionId: string) => {
+    setIntegrity((current) => ({ ...current, [versionId]: "checking" }));
+    try {
+      const result = await window.launcher.verifySavegameVersion(game.id, versionId);
+      setIntegrity((current) => ({ ...current, [versionId]: result }));
+      return result;
+    } catch (error) {
+      setIntegrity((current) => ({ ...current, [versionId]: "corrupt" }));
+      setStatus({
+        text: error instanceof Error ? error.message : t("savegames.verifyError"),
+      });
+      return "corrupt" as const;
+    }
   };
 
   return {
     loading: savegamesQuery.isPending,
     data,
     busy,
-    status: status
-      ? "key" in status
-        ? t(status.key)
-        : status.text
-      : errorMessage,
+    status: status ? ("key" in status ? t(status.key) : status.text) : errorMessage,
     copy,
     conflictCopy,
     run,
     chooseFolder,
     backup,
     restoreLatest,
+    restoreVersion,
+    setPolicy,
+    pinVersion,
+    addFolder,
+    removeFolder,
+    verifyVersion,
+    integrity,
     verificationFailed: Boolean(verification.error || discovery.error),
     retryVerification: () =>
       discovery.error ? discovery.refetch() : verification.refetch(),

@@ -5,7 +5,7 @@ import { pipeline } from "node:stream/promises";
 import * as yauzl from "yauzl";
 import * as yazl from "yazl";
 
-export const MAX_MANIFEST_BYTES = 32 * 1024 * 1024;
+export const MAX_MANIFEST_BYTES = 96 * 1024 * 1024;
 export const MAX_BACKUP_BYTES = 10 * 1024 * 1024 * 1024;
 export const MAX_FILES = 100_000;
 
@@ -64,6 +64,39 @@ export async function writeArchive(
   await output;
 }
 
+export async function rewriteArchiveManifest(
+  sourcePath: string,
+  targetPath: string,
+  transform: (manifest: unknown) => unknown,
+  maxUncompressedBytes = MAX_BACKUP_BYTES,
+) {
+  return withArchive(sourcePath, maxUncompressedBytes, async (archive) => {
+    const manifest = transform(await archive.manifest());
+    const zip = new yazl.ZipFile();
+    zip.on("error", (error) => (zip.outputStream as Readable).destroy(error));
+    const output = pipeline(
+      zip.outputStream,
+      fs.createWriteStream(targetPath, { flags: "wx", mode: 0o600 }),
+    );
+
+    for (const name of archive.entries.keys()) {
+      if (name === "manifest.json") {
+        continue;
+      }
+      zip.addReadStreamLazy(name, (callback) => {
+        void archive.stream(name).then(
+          (stream) => callback(null, stream as Readable),
+          (error) => callback(error as Error, null as unknown as Readable),
+        );
+      });
+    }
+    zip.addBuffer(Buffer.from(JSON.stringify(manifest)), "manifest.json");
+    zip.end();
+    await output;
+    return manifest;
+  });
+}
+
 export async function withArchive<T>(
   filePath: string,
   maxBytes: number,
@@ -73,31 +106,72 @@ export async function withArchive<T>(
     manifest: () => Promise<unknown>;
   }) => Promise<T>,
 ): Promise<T> {
+  const pathInfo = await fs.promises.lstat(filePath);
+
   if (
-    (await fs.promises.stat(filePath)).size >
-    maxBytes + MAX_MANIFEST_BYTES + 16 * 1024 * 1024
+    !pathInfo.isFile() ||
+    pathInfo.isSymbolicLink() ||
+    pathInfo.size > maxBytes + MAX_MANIFEST_BYTES + 16 * 1024 * 1024
   ) {
     throw new Error("El archivo comprimido supera el tamaño permitido");
   }
 
-  const zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
-    yauzl.open(
+  const fd = await new Promise<number>((resolve, reject) => {
+    fs.open(
       filePath,
-      {
-        lazyEntries: true,
-        autoClose: false,
-        validateEntrySizes: true,
-        strictFileNames: true,
-      },
-      (error, result) => {
-        if (error || !result) {
-          reject(error ?? new Error("Copia no válida"));
+      fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0),
+      (error, openedFd) => {
+        if (error || openedFd === undefined) {
+          reject(error ?? new Error("No se pudo abrir el archivo comprimido"));
           return;
         }
-        resolve(result);
+        resolve(openedFd);
       },
     );
   });
+  let zip: yauzl.ZipFile;
+
+  try {
+    const opened = await new Promise<fs.Stats>((resolve, reject) => {
+      fs.fstat(fd, (error, stats) => {
+        if (error || !stats) {
+          reject(error ?? new Error("No se pudo validar el archivo comprimido"));
+          return;
+        }
+        resolve(stats);
+      });
+    });
+
+    if (
+      !opened.isFile() ||
+      opened.dev !== pathInfo.dev ||
+      opened.ino !== pathInfo.ino ||
+      opened.size > maxBytes + MAX_MANIFEST_BYTES + 16 * 1024 * 1024
+    ) {
+      throw new Error("El archivo comprimido cambió durante la validación");
+    }
+    zip = await new Promise<yauzl.ZipFile>((resolve, reject) => {
+      yauzl.fromFd(
+        fd,
+        {
+          lazyEntries: true,
+          autoClose: false,
+          validateEntrySizes: true,
+          strictFileNames: true,
+        },
+        (error, result) => {
+          if (error || !result) {
+            reject(error ?? new Error("Copia no válida"));
+            return;
+          }
+          resolve(result);
+        },
+      );
+    });
+  } catch (error) {
+    await new Promise<void>((resolve) => fs.close(fd, () => resolve()));
+    throw error;
+  }
 
   try {
     const entries = new Map<string, yauzl.Entry>();
@@ -106,12 +180,24 @@ export async function withArchive<T>(
       zip.on("error", reject);
       zip.on("end", resolve);
       zip.on("entry", (entry: yauzl.Entry) => {
+        const segments = entry.fileName.split("/");
+        const mode = (entry.externalFileAttributes >>> 16) & 0o170000;
+        const unsafeName =
+          !entry.fileName ||
+          entry.fileName.includes("\\") ||
+          entry.fileName.startsWith("/") ||
+          /^[a-zA-Z]:/.test(entry.fileName) ||
+          entry.fileName.endsWith("/") ||
+          segments.some((segment) => !segment || segment === "." || segment === "..");
+
         if (entry.fileName !== "manifest.json") {
           total += entry.uncompressedSize;
         }
         if (
+          unsafeName ||
+          mode === 0o120000 ||
           entries.has(entry.fileName) ||
-          entries.size >= MAX_FILES + 1 ||
+          entries.size >= MAX_FILES ||
           total > maxBytes ||
           (entry.fileName === "manifest.json" &&
             entry.uncompressedSize > MAX_MANIFEST_BYTES)

@@ -14,6 +14,7 @@ export function registerSavegameHandlers({
   settingsStore,
   ludusaviCatalog,
   reportSlowOperation,
+  broadcastSavegameChanged,
 }: MainContext) {
   const loadState = (gameId: string, discover = false) =>
     readSavegameState(
@@ -51,10 +52,31 @@ export function registerSavegameHandlers({
       const settings = await settingsStore.read();
 
       if (!settings.syncFolderPath) {
-        return { syncState: "unconfigured" as const, conflict: null, versionId: null };
+        return {
+          syncState: "unconfigured" as const,
+          conflict: null,
+          versionId: null,
+          localSummary: null,
+        };
       }
       return savegameManager.verify(gameId, game.sourceId, settings.syncFolderPath);
     }),
+  );
+  handle(
+    "savegames:verify-version",
+    async (_event, gameId: string, versionId: string) => {
+      const game = await store.getGame(gameId);
+      const settings = await settingsStore.read();
+
+      if (!game || game.source !== "local" || !settings.syncFolderPath) {
+        throw new Error("No se puede verificar esta copia");
+      }
+      return savegameManager.verifyVersion(
+        settings.syncFolderPath,
+        game.sourceId,
+        versionId,
+      );
+    },
   );
   handle(
     "savegames:set-policy",
@@ -79,21 +101,29 @@ export function registerSavegameHandlers({
   handle("savegames:remove-folder", (_event, gameId: string, folderPath: string) =>
     savegameManager.removePath(gameId, folderPath),
   );
-  handle("savegames:backup", async (_event, gameId: string) =>
-    reportSlowOperation("savegames:backup", async () => {
-      const game = await store.getGame(gameId);
-      const settings = await settingsStore.read();
+  handle("savegames:backup", async (_event, gameId: string) => {
+    try {
+      return await reportSlowOperation("savegames:backup", async () => {
+        const game = await store.getGame(gameId);
+        const settings = await settingsStore.read();
 
-      if (!game || game.source !== "local") {
-        throw new Error("No se encontró el juego manual");
-      }
-      if (!settings.syncFolderPath) {
-        throw new Error("Selecciona primero la carpeta de sincronización en Ajustes");
-      }
-      await savegameManager.backup(game.id, game.sourceId, settings.syncFolderPath);
-      return savegameManager.listVersions(settings.syncFolderPath, game.sourceId);
-    }),
-  );
+        if (!game || game.source !== "local") {
+          throw new Error("No se encontró el juego manual");
+        }
+        if (!settings.syncFolderPath) {
+          throw new Error("Selecciona primero la carpeta de sincronización en Ajustes");
+        }
+        await savegameManager.backupWithOutcome(
+          game.id,
+          game.sourceId,
+          settings.syncFolderPath,
+        );
+        return savegameManager.listVersions(settings.syncFolderPath, game.sourceId);
+      });
+    } finally {
+      broadcastSavegameChanged(gameId);
+    }
+  });
   handle(
     "savegames:set-pinned",
     async (_event, gameId: string, versionId: string, pinned: boolean) => {
@@ -148,17 +178,21 @@ export function registerSavegameHandlers({
     if (response.response !== 1) {
       return null;
     }
-    await savegameManager.backup(
-      game.id,
-      game.sourceId,
-      settings.syncFolderPath,
-      versionId,
-    );
-    return savegameManager.restore(
-      game.id,
-      game.sourceId,
-      settings.syncFolderPath,
-      versionId,
-    );
+    try {
+      await savegameManager.backupWithOutcome(
+        game.id,
+        game.sourceId,
+        settings.syncFolderPath,
+        versionId,
+      );
+      return await savegameManager.restore(
+        game.id,
+        game.sourceId,
+        settings.syncFolderPath,
+        versionId,
+      );
+    } finally {
+      broadcastSavegameChanged(gameId);
+    }
   });
 }

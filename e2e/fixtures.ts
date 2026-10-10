@@ -7,6 +7,47 @@ import path from "node:path";
 import type { GameSession, LibraryGame } from "../packages/core/src/shared/types";
 import type { LauncherApi } from "../apps/desktop/src/preload/index";
 
+export async function launchIsolatedDesktop(directory: string) {
+  await fs.mkdir(directory, { recursive: true });
+  const data = path.join(directory, "data");
+  const roamingAppData = path.join(directory, "roaming-appdata");
+  await fs.mkdir(data, { recursive: true });
+  await fs.mkdir(roamingAppData, { recursive: true });
+  const catalogPath = path.join(data, "ludusavi-catalog.json");
+  const libraryPath = path.join(data, "library.json");
+
+  if (!(await fs.stat(catalogPath).catch(() => null))) {
+    await fs.writeFile(
+      catalogPath,
+      JSON.stringify({ updatedAt: new Date().toISOString(), games: [] }),
+    );
+  }
+  if (!(await fs.stat(libraryPath).catch(() => null))) {
+    await fs.writeFile(
+      libraryPath,
+      JSON.stringify({ version: 1, games: [], sessions: [], excludedGameKeys: [] }),
+    );
+  }
+
+  const electronRequire = createRequire(path.resolve("apps/desktop/package.json"));
+  const app = await _electron.launch({
+    executablePath: electronRequire("electron") as string,
+    args: [
+      ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
+      "--host-resolver-rules=MAP * ~NOTFOUND",
+      path.resolve("e2e/bootstrap.cjs"),
+    ],
+    env: {
+      ...process.env,
+      HOME: directory,
+      APPDATA: roamingAppData,
+      NEMETON_E2E_DATA: data,
+      ELECTRON_RENDERER_URL: "",
+    },
+  });
+  return { app, dataDirectory: data, roamingAppData };
+}
+
 export const test = base.extend<{
   desktop: {
     app: ElectronApplication;
@@ -15,17 +56,19 @@ export const test = base.extend<{
     restart: () => Promise<Page>;
   };
   gameCount: number;
-  sessionData: { sessions: GameSession[] };
+  sessionData: { sessions: GameSession[]; excludedGameKeys?: string[] };
 }>({
   gameCount: [0, { option: true }],
-  sessionData: [{ sessions: [] }, { option: true }],
+  sessionData: [{ sessions: [], excludedGameKeys: [] }, { option: true }],
   desktop: async ({ gameCount, sessionData }, use, testInfo) => {
     // Windows runners may expose an 8.3 alias in TEMP. Restore validation
     // requires canonical paths so it can reject redirected directories.
     const temporaryRoot = await fs.realpath(os.tmpdir());
     const directory = await fs.mkdtemp(path.join(temporaryRoot, "nemeton-e2e-"));
     const data = path.join(directory, "data");
+    const roamingAppData = path.join(directory, "roaming-appdata");
     await fs.mkdir(data);
+    await fs.mkdir(roamingAppData);
     await fs.writeFile(
       path.join(data, "ludusavi-catalog.json"),
       JSON.stringify({ updatedAt: new Date().toISOString(), games: [] }),
@@ -54,7 +97,7 @@ export const test = base.extend<{
         version: 1,
         games,
         sessions: sessionData.sessions,
-        excludedGameKeys: [],
+        excludedGameKeys: sessionData.excludedGameKeys ?? [],
       }),
     );
     const require = createRequire(path.resolve("apps/desktop/package.json"));
@@ -64,16 +107,25 @@ export const test = base.extend<{
         executablePath: require("electron") as string,
         args: [
           ...(process.platform === "linux" && process.env.CI ? ["--no-sandbox"] : []),
+          "--host-resolver-rules=MAP * ~NOTFOUND",
           path.resolve("e2e/bootstrap.cjs"),
         ],
-        env: { ...process.env, NEMETON_E2E_DATA: data, ELECTRON_RENDERER_URL: "" },
+        env: {
+          ...process.env,
+          HOME: directory,
+          APPDATA: roamingAppData,
+          NEMETON_E2E_DATA: data,
+          ELECTRON_RENDERER_URL: "",
+        },
       });
       await app
         .context()
         .tracing.start({ screenshots: true, snapshots: true, sources: true });
       const page = await app.firstWindow();
       await expect(
-        page.getByRole("button", { name: /^(Añadir juego|Add game)$/ }),
+        page
+          .getByRole("navigation")
+          .getByRole("button", { name: /^(Añadir juego|Add game)$/ }),
       ).toBeVisible();
       await page.evaluate(() =>
         (window as unknown as { launcher: LauncherApi }).launcher.listGames(),

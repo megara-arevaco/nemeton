@@ -230,6 +230,11 @@ export function registerLibraryHandlers({
     scheduleAutoSync();
     return snapshot;
   });
+  handle("library:set-collection-state", async (_event, gameId, state) => {
+    const snapshot = await store.setCollectionState(gameId, state);
+    scheduleAutoSync();
+    return snapshot;
+  });
   handle("library:uninstall-or-hide", async (_event, gameId: string) => {
     const game = await store.getGame(gameId);
 

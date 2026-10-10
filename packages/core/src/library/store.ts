@@ -6,6 +6,7 @@ import {
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
+import { isValidSteamAppId } from "../shared/types.js";
 import type {
   LibraryGame,
   LibrarySnapshot,
@@ -267,6 +268,8 @@ export class LibraryStore {
         trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
         installed: true,
         hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
+        favorite: previous?.favorite ?? false,
+        backlogStatus: previous?.backlogStatus ?? null,
         lastPlayedAt: candidate.lastPlayedAt ?? previous?.lastPlayedAt ?? null,
         importedAt: previous?.importedAt ?? new Date().toISOString(),
         updatedAt:
@@ -352,6 +355,8 @@ export class LibraryStore {
           previous?.updatedAt ?? previous?.importedAt ?? new Date().toISOString(),
         installed: previous?.installed ?? false,
         hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
+        favorite: previous?.favorite ?? false,
+        backlogStatus: previous?.backlogStatus ?? null,
       });
     }
 
@@ -398,6 +403,8 @@ export class LibraryStore {
           trackedPlaytimeSeconds: 0,
           installed: Boolean(normalizedPath),
           hiddenFromLibrary: false,
+          favorite: false,
+          backlogStatus: null,
           lastPlayedAt: null,
           importedAt: now,
           updatedAt: now,
@@ -524,6 +531,32 @@ export class LibraryStore {
     });
   }
 
+  async setCollectionState(
+    gameId: string,
+    state: {
+      favorite?: boolean;
+      backlogStatus?: "pending" | "playing" | "finished" | null;
+    },
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      const game = snapshot.games.find((item) => item.id === gameId);
+
+      if (!game) {
+        throw new Error("No se encontró el juego");
+      }
+      if (state.favorite !== undefined) {
+        game.favorite = state.favorite;
+      }
+      if (state.backlogStatus !== undefined) {
+        game.backlogStatus = state.backlogStatus;
+      }
+      game.updatedAt = new Date().toISOString();
+      await this.write(snapshot);
+      return snapshot;
+    });
+  }
+
   async hideFromLibrary(gameId: string): Promise<LibrarySnapshot> {
     return withFileLock(this.filePath, async () => {
       const snapshot = await this.read();
@@ -557,6 +590,212 @@ export class LibraryStore {
       ];
       await this.write(snapshot);
       return snapshot;
+    });
+  }
+
+  async createSafetyBackup(label: string): Promise<string | null> {
+    return withFileLock(this.filePath, async () => {
+      const info = await fs.promises
+        .lstat(this.filePath)
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") {
+            return null;
+          }
+          throw error;
+        });
+
+      if (!info) {
+        return null;
+      }
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("No se crea una copia de seguridad de una ruta no regular");
+      }
+
+      const safeLabel = label.replace(/[^a-z0-9-]/gi, "-");
+      const backupPath = `${this.filePath}.${safeLabel}-${new Date().toISOString().replace(/[:.]/g, "-")}.bak`;
+      await fs.promises.copyFile(this.filePath, backupPath, fs.constants.COPYFILE_EXCL);
+      return backupPath;
+    });
+  }
+
+  async importPortableSnapshot(remote: LibrarySnapshot): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      for (const game of remote.games) {
+        if (
+          game.source === "steam" &&
+          (!isValidSteamAppId(game.sourceId) ||
+            (game.steamAppId != null && game.steamAppId !== game.sourceId))
+        ) {
+          throw new Error("El juego Steam importado no contiene un AppID coherente");
+        }
+      }
+
+      const current = await this.read();
+      const currentGameIds = new Set(current.games.map((game) => game.id));
+
+      if (current.sessions.some((session) => !currentGameIds.has(session.gameId))) {
+        throw new Error(
+          "La biblioteca local contiene sesiones sin juego; importación cancelada",
+        );
+      }
+
+      const currentExcludedGameKeys = new Set(current.excludedGameKeys ?? []);
+      const remoteExcludedGameKeys = new Set(remote.excludedGameKeys ?? []);
+      // Exclusions travel with the merge, but are import filters—not deletion commands.
+      const excludedGameKeys = new Set([
+        ...currentExcludedGameKeys,
+        ...remoteExcludedGameKeys,
+      ]);
+      const games = new Map(
+        current.games.map((game) => [`${game.source}:${game.sourceId}`, { ...game }]),
+      );
+      const importedIds = new Map<string, string>();
+
+      for (const imported of remote.games) {
+        const key = `${imported.source}:${imported.sourceId}`;
+        const existing = games.get(key);
+
+        // Either device's exclusion blocks importing this record, but never removes a local one.
+        if (currentExcludedGameKeys.has(key) || remoteExcludedGameKeys.has(key)) {
+          continue;
+        }
+
+        const id = existing?.id ?? randomUUID();
+        importedIds.set(imported.id, id);
+        games.set(key, {
+          ...imported,
+          id,
+          installPath: existing?.installPath ?? "",
+          launchUri:
+            existing?.launchUri ??
+            (imported.source === "steam"
+              ? `steam://rungameid/${imported.sourceId}`
+              : null),
+          coverPath: existing?.coverPath ?? imported.coverPath ?? null,
+          installed: existing?.installed ?? false,
+          hiddenFromLibrary:
+            existing?.hiddenFromLibrary ?? imported.hiddenFromLibrary ?? false,
+          playtimeMinutes: Math.max(
+            existing?.playtimeMinutes ?? 0,
+            imported.playtimeMinutes,
+          ),
+          trackedPlaytimeSeconds: Math.max(
+            existing?.trackedPlaytimeSeconds ?? 0,
+            imported.trackedPlaytimeSeconds,
+          ),
+          playtimeSecondsRemainder:
+            existing?.playtimeSecondsRemainder ?? imported.playtimeSecondsRemainder,
+          // Local preferences win on identity matches; importing another device must not
+          // silently replace a user's collection state.
+          favorite: existing?.favorite ?? imported.favorite ?? false,
+          backlogStatus: existing?.backlogStatus ?? imported.backlogStatus ?? null,
+          lastPlayedAt:
+            [existing?.lastPlayedAt, imported.lastPlayedAt]
+              .filter((value): value is string => Boolean(value))
+              .sort()
+              .at(-1) ?? null,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      const retainedIds = new Set([...games.values()].map((game) => game.id));
+      const sessions = new Map(
+        current.sessions.map((session) => [session.id, { ...session }]),
+      );
+      const sessionKey = (session: LibrarySnapshot["sessions"][number]) =>
+        [
+          session.gameId,
+          session.startedAt,
+          session.endedAt,
+          session.durationSeconds,
+          session.origin ?? "launcher",
+        ].join("\0");
+      const knownSessions = new Set(current.sessions.map(sessionKey));
+
+      for (const session of remote.sessions) {
+        const gameId = importedIds.get(session.gameId);
+
+        if (!gameId || !retainedIds.has(gameId)) {
+          continue;
+        }
+
+        const merged = { ...session, gameId };
+        const key = sessionKey(merged);
+
+        if (knownSessions.has(key)) {
+          continue;
+        }
+
+        const id = sessions.has(session.id) ? randomUUID() : session.id;
+        sessions.set(id, { ...merged, id });
+        knownSessions.add(key);
+      }
+
+      const next: LibrarySnapshot = {
+        version: 1,
+        games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
+        sessions: [...sessions.values()].sort((a, b) =>
+          a.startedAt.localeCompare(b.startedAt),
+        ),
+        excludedGameKeys: [...excludedGameKeys],
+      };
+      await this.write(next);
+      return next;
+    });
+  }
+
+  async repairOrphanSessions(
+    decisions: Array<{ sessionId: string; gameId: string | null }>,
+  ): Promise<{
+    snapshot: LibrarySnapshot;
+    repairedCount: number;
+    discardedCount: number;
+  }> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      const gameIds = new Set(snapshot.games.map((game) => game.id));
+      const orphans = new Map(
+        snapshot.sessions
+          .filter((session) => !gameIds.has(session.gameId))
+          .map((session) => [session.id, session]),
+      );
+      const selected = new Set<string>();
+
+      for (const decision of decisions) {
+        if (selected.has(decision.sessionId) || !orphans.has(decision.sessionId)) {
+          throw new Error(
+            "La sesión huérfana cambió; vuelve a diagnosticar antes de reparar",
+          );
+        }
+        if (decision.gameId !== null && !gameIds.has(decision.gameId)) {
+          throw new Error("El juego elegido para reparar la sesión ya no existe");
+        }
+        selected.add(decision.sessionId);
+      }
+      if (!decisions.length) {
+        throw new Error("Selecciona al menos una decisión explícita");
+      }
+
+      let repairedCount = 0;
+      let discardedCount = 0;
+      const repaired = new Map(
+        decisions.map((decision) => [decision.sessionId, decision]),
+      );
+      snapshot.sessions = snapshot.sessions.flatMap((session) => {
+        const decision = repaired.get(session.id);
+
+        if (!decision) {
+          return [session];
+        }
+        if (decision.gameId === null) {
+          discardedCount += 1;
+          return [];
+        }
+        repairedCount += 1;
+        return [{ ...session, gameId: decision.gameId }];
+      });
+      await this.write(snapshot);
+      return { snapshot, repairedCount, discardedCount };
     });
   }
 

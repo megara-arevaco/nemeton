@@ -3,22 +3,66 @@ import path from "node:path";
 import { writeJsonAtomically } from "@launcher/core";
 import { z } from "zod";
 
-const journalSchema = z.object({
-  committed: z.boolean(),
-  directories: z.array(
-    z.object({ root: z.string(), stage: z.string(), previous: z.string() }),
-  ),
-});
+const journalSchema = z
+  .object({
+    committed: z.boolean(),
+    directories: z
+      .array(
+        z
+          .object({ root: z.string(), stage: z.string(), previous: z.string() })
+          .strict(),
+      )
+      .min(1)
+      .max(1000),
+  })
+  .strict();
 
-export async function recoverRestore(journalPath: string, onReady?: () => void) {
-  const raw = await fs
-    .readFile(journalPath, "utf8")
+const pathKey = (value: string) =>
+  process.platform === "win32" ? value.toLocaleLowerCase("en-US") : value;
+
+async function existingDirectory(filePath: string) {
+  const info = await fs.lstat(filePath).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  });
+
+  if (info && (!info.isDirectory() || info.isSymbolicLink())) {
+    throw new Error(
+      "El registro de restauración apunta a una ruta que no es un directorio seguro",
+    );
+  }
+  return info;
+}
+
+export async function recoverRestore(
+  journalPath: string,
+  onReady?: () => void,
+  allowedRoots: string[] = [],
+) {
+  const journalInfo = await fs
+    .lstat(journalPath)
     .catch((error: NodeJS.ErrnoException) => {
       if (error.code === "ENOENT") {
         return null;
       }
       throw error;
     });
+
+  if (!journalInfo) {
+    onReady?.();
+    return;
+  }
+  if (
+    !journalInfo.isFile() ||
+    journalInfo.isSymbolicLink() ||
+    journalInfo.size > 1024 * 1024
+  ) {
+    throw new Error("El registro de restauración no es un archivo seguro");
+  }
+
+  const raw = await fs.readFile(journalPath, "utf8");
 
   if (!raw) {
     onReady?.();
@@ -27,21 +71,62 @@ export async function recoverRestore(journalPath: string, onReady?: () => void) 
 
   const journal = journalSchema.parse(JSON.parse(raw));
 
+  const allowed = new Set(allowedRoots.map((root) => pathKey(path.resolve(root))));
+  const roots = new Set<string>();
+
   for (const entry of journal.directories) {
+    const root = path.resolve(entry.root);
+    const stage = path.resolve(entry.stage);
+    const parent = path.dirname(root);
+    const stageName = path.basename(stage);
+    const key = pathKey(root);
+
     if (
       !path.isAbsolute(entry.root) ||
-      entry.root === entry.stage ||
-      entry.root === entry.previous ||
-      path.dirname(entry.root) !== path.dirname(entry.stage) ||
-      entry.previous !== `${entry.stage}.previous` ||
-      !path.basename(entry.stage).startsWith(".nemeton-restore-")
+      root !== entry.root ||
+      !allowed.has(key) ||
+      roots.has(key) ||
+      root === stage ||
+      root === path.resolve(entry.previous) ||
+      pathKey(path.dirname(stage)) !== pathKey(parent) ||
+      pathKey(path.dirname(path.resolve(entry.previous))) !== pathKey(parent) ||
+      pathKey(path.resolve(entry.previous)) !== pathKey(`${stage}.previous`) ||
+      !/^\.nemeton-restore-[a-zA-Z0-9_-]{6,}$/.test(stageName)
     ) {
-      throw new Error("Registro de restauración no válido");
+      throw new Error(
+        "Registro de restauración no válido o ajeno a las carpetas configuradas",
+      );
+    }
+    roots.add(key);
+
+    const realParent = await fs.realpath(parent);
+
+    if (pathKey(realParent) !== pathKey(parent)) {
+      throw new Error("La recuperación rechazó un padre con enlace simbólico");
+    }
+
+    const [rootInfo, stageInfo, previousInfo, discardedInfo] = await Promise.all([
+      existingDirectory(root),
+      existingDirectory(stage),
+      existingDirectory(`${stage}.previous`),
+      existingDirectory(`${stage}.discarded`),
+    ]);
+
+    if (journal.committed && !rootInfo) {
+      throw new Error(
+        "La recuperación comprometida no encuentra el directorio restaurado",
+      );
+    }
+    if (!journal.committed && !rootInfo && !previousInfo) {
+      throw new Error("No hay directorio actual ni copia previa para recuperar");
+    }
+    if (stageInfo && previousInfo && discardedInfo) {
+      throw new Error("La recuperación encontró demasiadas copias temporales");
     }
   }
   if (!journal.committed) {
     for (const entry of [...journal.directories].reverse()) {
-      if (await fs.stat(entry.previous).catch(() => null)) {
+      if (await existingDirectory(entry.previous)) {
         const discarded = `${entry.stage}.discarded`;
         const rootExists = await fs.lstat(entry.root).catch(() => null);
 
@@ -80,7 +165,7 @@ export async function restoreDirectories(
   journalPath: string,
   populate: (stages: string[]) => Promise<void>,
 ) {
-  await recoverRestore(journalPath);
+  await recoverRestore(journalPath, undefined, roots);
   const directories: Array<{ root: string; stage: string; previous: string }> = [];
   let journalWritten = false;
 
@@ -104,7 +189,7 @@ export async function restoreDirectories(
       if (
         !info.isDirectory() ||
         info.isSymbolicLink() ||
-        (await fs.realpath(root)).toLowerCase() !== root.toLowerCase()
+        pathKey(await fs.realpath(root)) !== pathKey(root)
       ) {
         throw new Error(
           "La carpeta de partidas debe ser un directorio local sin enlaces",
@@ -135,11 +220,11 @@ export async function restoreDirectories(
       await fs.rename(entry.stage, entry.root);
     }
     await writeJsonAtomically(journalPath, { committed: true, directories });
-    await recoverRestore(journalPath);
+    await recoverRestore(journalPath, undefined, roots);
   } catch (error) {
     if (journalWritten) {
       try {
-        await recoverRestore(journalPath);
+        await recoverRestore(journalPath, undefined, roots);
       } catch (recoveryError) {
         throw new AggregateError(
           [error, recoveryError],

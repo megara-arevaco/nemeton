@@ -68,10 +68,11 @@ required.
 
 ## Using Nemeton
 
-### Import installed Steam games
+### Start without a Steam key
 
-Open **Settings → Steam → Find Steam**. Nemeton scans the local Steam libraries and
-imports installed titles without requiring an API key.
+On first use, choose **Import installed games** to scan local Steam libraries without
+an API key, or **Add game** to create a local entry. A SteamID64 and API key are
+optional and only needed for importing the full account library.
 
 ### Import a complete Steam account library
 
@@ -90,12 +91,36 @@ Choose **Add game**, select an executable, and optionally associate the title wi
 Ludusavi entry or Steam AppID. The association improves artwork, achievement, and
 save-location detection.
 
-### Back up and synchronize saves
+### Back up and restore saves
 
-Open a game's save panel to review detected locations and create a versioned backup.
+Open a local game's save panel to review protected folders, detection suggestions,
+backup policy, and version history. Each version shows its date, size, file count,
+origin, and integrity check; restoring a selected version first preserves the current
+state in another backup and asks for confirmation. Exact restore can remove extra files
+only when that policy is explicitly enabled. Pin versions to protect them from
+retention. Automatic backups after a game closes and optional pre-launch backups are
+existing engine behaviors with visible controls; they require a configured backup
+folder. A green verification means the local files match a backup in that folder, not
+that OneDrive, Dropbox, or another provider has uploaded it.
+
 In **Settings → Synchronization**, choose a local or cloud-synchronized folder.
-Nemeton uses atomic JSON writes, merges compatible history, and detects conflicting
-save versions instead of silently overwriting them.
+Conflicts show local and folder versions side by side so you can keep the local state
+as another version or restore a chosen version without silently overwriting current
+saves.
+
+### Export, import, and portable data
+
+**Settings → Portability and recovery** exports library metadata, play sessions,
+achievement history, favorites, backlog status, language/theme preferences, and
+save-backup policies. It does not export Steam API credentials, executable paths,
+local save-folder paths, or the external synchronization folder. Import merges with
+the current library, preserves existing local installation paths, and creates safety
+copies of the library, backup policies, and achievement history before applying data.
+Excluded-game keys from either file are retained as import filters: an excluded game
+is not added when absent locally, but an exclusion never deletes a matching local game
+or its sessions. A local exclusion therefore continues to block later re-imports.
+Local artwork files are not included. Re-select local executables and save folders on
+a different computer; those machine-specific paths are never restored from an export.
 
 ## Development
 
@@ -169,8 +194,11 @@ corepack pnpm dist:win:portable
 
 The installer is per-user, lets the user select an installation directory, creates
 Desktop and Start menu shortcuts, and preserves Nemeton data after uninstalling.
-The portable artifact does not require installation, but currently stores data in
-Electron's standard per-user application-data directory rather than beside the EXE.
+The portable artifact does not require installation. When Electron's portable
+launcher provides `PORTABLE_EXECUTABLE_DIR`, Nemeton uses a `NemetonData` folder next
+to the portable executable instead of the installer's per-user data directory. Copy
+that data folder or use the explicit export/import controls to move data. Windows
+portable path behavior still needs validation in a native Windows run.
 
 Cross-building from WSL or Linux can work when Wine and the required packaging tools
 are installed. Native Windows or a Windows CI runner remains the recommended release
@@ -218,9 +246,13 @@ without storing signing credentials in the repository.
 
 ## Data locations and privacy
 
-Nemeton stores its database and settings in Electron's per-user application-data
-directory. A configured synchronization folder contains portable history and backup
-data intended for the user's own storage provider.
+The installer stores its database and settings in Electron's per-user
+application-data directory. The portable executable uses `NemetonData` next to the
+EXE when `PORTABLE_EXECUTABLE_DIR` is supplied by the portable launcher. Settings
+exports never contain a Steam API key, executable paths, save-folder paths, or the
+external synchronization-folder path. A configured synchronization folder contains
+versioned backup archives and portable play/achievement history intended for the
+user's own storage provider.
 
 Some synchronized files retain the historical `launcher-next-*` prefix for backward
 compatibility with existing libraries. These names are internal implementation

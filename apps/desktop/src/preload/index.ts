@@ -3,6 +3,7 @@ import type {
   SavegameState,
   SavegamePolicy,
   SavegameVersion,
+  SavegameVersionIntegrity,
 } from "../shared/savegames.js";
 import type { LibraryChange, PublishedLibrary } from "../shared/library-updates.js";
 import type { IpcArgs, IpcChannel } from "../shared/ipc-contracts.js";
@@ -54,6 +55,63 @@ const api = {
     invoke("library:metadata", gameId),
   getSteamSettings: (): Promise<SteamAccountSettings> => invoke("steam:settings"),
   getSyncSettings: (): Promise<FolderSyncSettings> => invoke("sync:settings"),
+  getDataLocation: (): Promise<{ portable: boolean; dataDirectory: string }> =>
+    invoke("runtime:data-location"),
+  exportPortableData: (options: {
+    language: "es" | "en";
+    accentTheme: "forest" | "aurora" | "ember" | "amethyst" | "glacier";
+    format: "json" | "package";
+    includeArtwork: boolean;
+    includeBackups: boolean;
+  }): Promise<{ gameCount: number; assetCount: number; backupCount: number } | null> =>
+    invoke("data:export", options),
+  importPortableData: (
+    language: "es" | "en",
+  ): Promise<{
+    gameCount: number;
+    preferences: {
+      language: "es" | "en";
+      accentTheme: "forest" | "aurora" | "ember" | "amethyst" | "glacier";
+    };
+    libraryBackup: string | null;
+    savegameBackup: string | null;
+    achievementBackup: string | null;
+    assetCount: number;
+    backupCount: number;
+  } | null> => invoke("data:import", language),
+  listImportBackups: (): Promise<
+    Array<{
+      category: "library" | "savegames" | "achievements";
+      fileName: string;
+      createdAt: string;
+      reason: "before-import" | "before-session-repair" | "before-recovery";
+    }>
+  > => invoke("data:list-import-backups"),
+  restoreImportBackup: (
+    category: "library" | "savegames" | "achievements",
+    fileName: string,
+    language: "es" | "en",
+  ): Promise<{ safetyCopy: string | null } | null> =>
+    invoke("data:restore-import-backup", category, fileName, language),
+  getSessionDiagnostics: (): Promise<{
+    orphanCount: number;
+    sessions: Array<{
+      id: string;
+      gameId: string;
+      startedAt: string;
+      endedAt: string;
+      durationSeconds: number;
+    }>;
+    games: Array<{ id: string; title: string }>;
+  }> => invoke("data:session-diagnostics"),
+  repairOrphanSessions: (
+    decisions: Array<{ sessionId: string; gameId: string | null }>,
+    language: "es" | "en",
+  ): Promise<{
+    repairedCount: number;
+    discardedCount: number;
+    safetyCopy: string | null;
+  }> => invoke("data:repair-sessions", decisions, language),
   selectSyncFolder: (): Promise<{
     snapshot: LibrarySnapshot;
     settings: FolderSyncSettings;
@@ -66,6 +124,11 @@ const api = {
     invoke("savegames:discover", gameId),
   verifySavegames: (gameId: string): Promise<SavegameVerification> =>
     invoke("savegames:verify", gameId),
+  verifySavegameVersion: (
+    gameId: string,
+    versionId: string,
+  ): Promise<SavegameVersionIntegrity> =>
+    invoke("savegames:verify-version", gameId, versionId),
   setSavegamePolicy: (
     gameId: string,
     policy: Partial<SavegamePolicy>,
@@ -147,6 +210,13 @@ const api = {
   ): Promise<LibrarySnapshot> => invoke("library:update-local", gameId, input),
   setCover: (gameId: string): Promise<LibrarySnapshot | null> =>
     invoke("library:set-cover", gameId),
+  setGameCollectionState: (
+    gameId: string,
+    state: {
+      favorite?: boolean;
+      backlogStatus?: "pending" | "playing" | "finished" | null;
+    },
+  ): Promise<LibrarySnapshot> => invoke("library:set-collection-state", gameId, state),
   uninstallOrHide: (gameId: string): Promise<LibrarySnapshot> =>
     invoke("library:uninstall-or-hide", gameId),
   deleteGameForever: (gameId: string, confirmation: string): Promise<LibrarySnapshot> =>
@@ -157,6 +227,12 @@ const api = {
       callback(snapshot);
     ipcRenderer.on("library:changed", listener);
     return () => ipcRenderer.removeListener("library:changed", listener);
+  },
+  onSavegamesChanged: (callback: (gameId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, gameId: string) =>
+      callback(gameId);
+    ipcRenderer.on("savegames:changed", listener);
+    return () => ipcRenderer.removeListener("savegames:changed", listener);
   },
   onGameRunningChanged: (
     callback: (state: { gameId: string; running: boolean }) => void,

@@ -11,6 +11,7 @@ export interface MainContext {
   achievementService: AchievementService;
   autoSync: () => Promise<void>;
   broadcastGameRunning: (gameId: string, running: boolean) => void;
+  broadcastSavegameChanged: (gameId: string) => void;
   broadcastLibrary: (snapshot?: LibrarySnapshot) => Promise<void>;
   publishLibrarySnapshot: (snapshot: LibrarySnapshot) => LibrarySnapshot;
   coversDirectory: string;

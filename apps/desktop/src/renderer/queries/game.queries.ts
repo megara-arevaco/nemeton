@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "./queryKeys";
+import type { SavegamePolicy } from "../../shared/savegames";
 
 export function useDebouncedValue<T>(value: T, delayMs: number): T {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -88,6 +89,49 @@ export function useChooseSavegameFolderMutation(gameId: string) {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.savegames(gameId),
       });
+    },
+  });
+}
+
+export function useSetSavegamePolicyMutation(gameId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (policy: Partial<SavegamePolicy>) =>
+      window.launcher.setSavegamePolicy(gameId, policy),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.savegames(gameId) });
+    },
+  });
+}
+
+export function useSavegamePinnedMutation(gameId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ versionId, pinned }: { versionId: string; pinned: boolean }) =>
+      window.launcher.setSavegamePinned(gameId, versionId, pinned),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.savegames(gameId) });
+    },
+  });
+}
+
+export function useAddSavegameFolderMutation(gameId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => window.launcher.addSavegameFolder(gameId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.savegames(gameId) });
+    },
+  });
+}
+
+export function useRemoveSavegameFolderMutation(gameId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (folderPath: string) =>
+      window.launcher.removeSavegameFolder(gameId, folderPath),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.savegames(gameId) });
     },
   });
 }

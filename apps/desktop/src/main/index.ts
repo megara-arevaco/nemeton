@@ -42,6 +42,12 @@ let startupReady: Promise<void> = Promise.resolve();
 if (process.platform === "win32") {
   app.setAppUserModelId("io.nemeton.desktop");
 }
+if (process.env.PORTABLE_EXECUTABLE_DIR) {
+  app.setPath(
+    "userData",
+    path.join(process.env.PORTABLE_EXECUTABLE_DIR, "NemetonData"),
+  );
+}
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "launcher-cover", privileges: { secure: true, supportFetchAPI: true } },
@@ -82,6 +88,12 @@ const broadcastLibrary = async (
 const broadcastGameRunning = (gameId: string, running: boolean) => {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send("game:running-changed", { gameId, running });
+  }
+};
+
+const broadcastSavegameChanged = (gameId: string) => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send("savegames:changed", gameId);
   }
 };
 
@@ -228,15 +240,13 @@ app
     folderSyncService = new FolderSyncService(store, settingsStore, achievementService);
     steamSyncService = new SteamSyncService(store, settingsStore, broadcastLibrary);
     let resolveStartupReady!: () => void;
-    let rejectStartupReady!: (error: unknown) => void;
-    startupReady = new Promise<void>((resolve, reject) => {
+    startupReady = new Promise<void>((resolve) => {
       resolveStartupReady = resolve;
-      rejectStartupReady = reject;
     });
     startupRecovery = savegameManager
       .recoverRestore(resolveStartupReady)
       .catch((error) => {
-        rejectStartupReady(error);
+        resolveStartupReady();
         throw error;
       });
     runBackground(startupReady, "[savegames:startup-ready]");
@@ -272,6 +282,7 @@ app
       achievementService,
       autoSync,
       broadcastGameRunning,
+      broadcastSavegameChanged,
       broadcastLibrary,
       publishLibrarySnapshot: (snapshot) =>
         publisher.snapshot(snapshot, store.getSnapshotRevision(snapshot)),

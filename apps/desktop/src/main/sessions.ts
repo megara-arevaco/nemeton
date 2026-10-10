@@ -69,6 +69,7 @@ export function registerLaunchHandlers({
   savegameManager,
   achievementService,
   broadcastGameRunning,
+  broadcastSavegameChanged,
   broadcastLibrary,
   scheduleAutoSync,
   autoSync,
@@ -95,11 +96,15 @@ export function registerLaunchHandlers({
     const launchSettings = await settingsStore.read();
 
     if (savePolicy.backupBeforeLaunch && launchSettings.syncFolderPath) {
-      await savegameManager.backup(
-        game.id,
-        game.sourceId,
-        launchSettings.syncFolderPath,
-      );
+      try {
+        await savegameManager.backupWithOutcome(
+          game.id,
+          game.sourceId,
+          launchSettings.syncFolderPath,
+        );
+      } finally {
+        broadcastSavegameChanged(game.id);
+      }
     }
 
     const stateBeforeLaunch = await achievementService.captureGoldbergState();
@@ -181,8 +186,9 @@ export function registerLaunchHandlers({
 
       if (savePolicy.autoBackup && syncSettings.syncFolderPath) {
         await savegameManager
-          .backup(game.id, game.sourceId, syncSettings.syncFolderPath)
-          .catch((error) => console.error("[savegames:auto]", error));
+          .backupWithOutcome(game.id, game.sourceId, syncSettings.syncFolderPath)
+          .catch((error) => console.error("[savegames:auto]", error))
+          .finally(() => broadcastSavegameChanged(game.id));
       }
 
       const durationSeconds = Math.round((endedAt - startedAt) / 1_000);

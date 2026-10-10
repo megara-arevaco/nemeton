@@ -78,12 +78,40 @@ export const ipcContracts = {
       .optional(),
   ]),
   "library:scan-steam": z.tuple([]),
+  "data:export": z.tuple([
+    z
+      .object({
+        language: z.enum(["es", "en"]),
+        accentTheme: z.enum(["forest", "aurora", "ember", "amethyst", "glacier"]),
+        format: z.enum(["json", "package"]),
+        includeArtwork: z.boolean(),
+        includeBackups: z.boolean(),
+      })
+      .strict(),
+  ]),
+  "data:import": z.tuple([z.enum(["es", "en"])]),
+  "data:list-import-backups": z.tuple([]),
+  "data:restore-import-backup": z.tuple([
+    z.enum(["library", "savegames", "achievements"]),
+    z.string().regex(/^[a-zA-Z0-9_.-]+\.bak$/),
+    z.enum(["es", "en"]),
+  ]),
+  "data:session-diagnostics": z.tuple([]),
+  "data:repair-sessions": z.tuple([
+    z
+      .array(z.object({ sessionId: id, gameId: id.nullable() }).strict())
+      .min(1)
+      .max(200),
+    z.enum(["es", "en"]),
+  ]),
+  "runtime:data-location": z.tuple([]),
   "sync:settings": z.tuple([]),
   "sync:select-folder": z.tuple([]),
   "sync:now": z.tuple([]),
   "savegames:get": z.tuple([id]),
   "savegames:discover": z.tuple([id]),
   "savegames:verify": z.tuple([id]),
+  "savegames:verify-version": z.tuple([id, id]),
   "savegames:set-policy": z.tuple([id, savegamePolicySchema.partial().strict()]),
   "savegames:add-folder": z.tuple([id]),
   "savegames:add-suggested": z.tuple([id, text.min(1)]),
@@ -126,6 +154,16 @@ export const ipcContracts = {
       .strict(),
   ]),
   "library:set-cover": z.tuple([id]),
+  "library:set-collection-state": z.tuple([
+    id,
+    z
+      .object({
+        favorite: z.boolean().optional(),
+        backlogStatus: z.enum(["pending", "playing", "finished"]).nullable().optional(),
+      })
+      .strict()
+      .refine((value) => Object.keys(value).length > 0),
+  ]),
   "library:uninstall-or-hide": z.tuple([id]),
   "library:delete-forever": z.tuple([id, title]),
   "library:launch": z.tuple([id]),

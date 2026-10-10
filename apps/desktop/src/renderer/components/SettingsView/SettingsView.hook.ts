@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type {
   FolderSyncSettings,
@@ -24,7 +24,8 @@ type Feedback =
   | { text: string };
 
 export function useSettingsView(options: SettingsViewOptions) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const queryClient = useQueryClient();
   const { settings, onConnected, onSynced, onLibraryUpdated } = options;
   const [steamIdDraft, setSteamIdDraft] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
@@ -45,6 +46,32 @@ export function useSettingsView(options: SettingsViewOptions) {
   });
   const syncNowMutation = useMutation({
     mutationFn: window.launcher.syncNow,
+  });
+  const exportDataMutation = useMutation({
+    mutationFn: window.launcher.exportPortableData,
+  });
+  const importDataMutation = useMutation({
+    mutationFn: window.launcher.importPortableData,
+  });
+  const dataLocationQuery = useQuery({
+    queryKey: ["runtime", "data-location"],
+    queryFn: window.launcher.getDataLocation,
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const [dataStatus, setDataStatus] = useState("");
+  const [portableFormat, setPortableFormat] = useState<"json" | "package">("json");
+  const [includeArtwork, setIncludeArtwork] = useState(true);
+  const [includeBackups, setIncludeBackups] = useState(false);
+  const [repairChoices, setRepairChoices] = useState<Record<string, string>>({});
+  const [backupRecoveryBusy, setBackupRecoveryBusy] = useState(false);
+  const [sessionRepairBusy, setSessionRepairBusy] = useState(false);
+  const importBackupsQuery = useQuery({
+    queryKey: ["data", "import-backups"],
+    queryFn: window.launcher.listImportBackups,
+  });
+  const sessionDiagnosticsQuery = useQuery({
+    queryKey: ["data", "session-diagnostics"],
+    queryFn: window.launcher.getSessionDiagnostics,
   });
   const associateLudusaviMutation = useMutation({
     mutationFn: window.launcher.autoAssociateLudusavi,
@@ -67,7 +94,8 @@ export function useSettingsView(options: SettingsViewOptions) {
       });
     } catch (error) {
       setStatus({
-        text: error instanceof Error ? error.message : t("settings.feedback.connectError"),
+        text:
+          error instanceof Error ? error.message : t("settings.feedback.connectError"),
       });
     }
   };
@@ -86,7 +114,10 @@ export function useSettingsView(options: SettingsViewOptions) {
       }
     } catch (error) {
       setSyncStatus({
-        text: error instanceof Error ? error.message : t("settings.feedback.configureFolderError"),
+        text:
+          error instanceof Error
+            ? error.message
+            : t("settings.feedback.configureFolderError"),
       });
     }
   };
@@ -105,6 +136,139 @@ export function useSettingsView(options: SettingsViewOptions) {
     }
   };
 
+  const exportData = async () => {
+    setDataStatus(t("settings.dataExporting"));
+    try {
+      const result = await exportDataMutation.mutateAsync({
+        language: i18n.resolvedLanguage?.startsWith("en") ? "en" : "es",
+        accentTheme: options.accentTheme,
+        format: portableFormat,
+        includeArtwork: portableFormat === "package" && includeArtwork,
+        includeBackups: portableFormat === "package" && includeBackups,
+      });
+      setDataStatus(
+        result
+          ? t("settings.dataExported", {
+              count: result.gameCount,
+              assets: result.assetCount,
+              backups: result.backupCount,
+            })
+          : "",
+      );
+    } catch (error) {
+      setDataStatus(
+        error instanceof Error ? error.message : t("settings.dataExportError"),
+      );
+    }
+  };
+
+  const importData = async () => {
+    setDataStatus(t("settings.dataImporting"));
+    try {
+      const result = await importDataMutation.mutateAsync(
+        i18n.resolvedLanguage?.startsWith("en") ? "en" : "es",
+      );
+
+      if (result) {
+        options.onAccentThemeChange(result.preferences.accentTheme);
+        await i18n.changeLanguage(result.preferences.language);
+        await queryClient.invalidateQueries({ queryKey: ["data", "import-backups"] });
+      }
+      setDataStatus(
+        result
+          ? t("settings.dataImported", {
+              count: result.gameCount,
+              assets: result.assetCount,
+              backups: result.backupCount,
+            })
+          : "",
+      );
+    } catch (error) {
+      setDataStatus(
+        error instanceof Error ? error.message : t("settings.dataImportError"),
+      );
+    }
+  };
+
+  const restoreImportBackup = async (
+    category: "library" | "savegames" | "achievements",
+    fileName: string,
+  ) => {
+    setDataStatus(t("settings.dataWorking"));
+    setBackupRecoveryBusy(true);
+    try {
+      const result = await window.launcher.restoreImportBackup(
+        category,
+        fileName,
+        i18n.resolvedLanguage?.startsWith("en") ? "en" : "es",
+      );
+
+      if (result && category === "library") {
+        onLibraryUpdated(await window.launcher.listGames());
+      }
+      await queryClient.invalidateQueries({ queryKey: ["data", "import-backups"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["data", "session-diagnostics"],
+      });
+      setDataStatus(result ? t("settings.recoveryRestored") : "");
+    } catch (error) {
+      setDataStatus(
+        error instanceof Error ? error.message : t("settings.dataImportError"),
+      );
+    } finally {
+      setBackupRecoveryBusy(false);
+    }
+  };
+
+  const setRepairChoice = (sessionId: string, choice: string) => {
+    setRepairChoices((current) => ({ ...current, [sessionId]: choice }));
+  };
+
+  const applySessionRepair = async () => {
+    const decisions = Object.entries(repairChoices)
+      .filter(([, choice]) => choice !== "")
+      .map(([sessionId, choice]) => ({
+        sessionId,
+        gameId: choice === "discard" ? null : choice,
+      }));
+
+    if (!decisions.length) {
+      return;
+    }
+    setDataStatus(t("settings.dataWorking"));
+    setSessionRepairBusy(true);
+    try {
+      const result = await window.launcher.repairOrphanSessions(
+        decisions,
+        i18n.resolvedLanguage?.startsWith("en") ? "en" : "es",
+      );
+
+      if (result.repairedCount || result.discardedCount) {
+        onLibraryUpdated(await window.launcher.listGames());
+        setRepairChoices({});
+        await queryClient.invalidateQueries({
+          queryKey: ["data", "session-diagnostics"],
+        });
+        await queryClient.invalidateQueries({ queryKey: ["data", "import-backups"] });
+      }
+      setDataStatus(
+        t("settings.repairFinished", {
+          repaired: result.repairedCount,
+          discarded: result.discardedCount,
+        }),
+      );
+    } catch (error) {
+      setDataStatus(
+        error instanceof Error ? error.message : t("settings.dataImportError"),
+      );
+      await queryClient.invalidateQueries({
+        queryKey: ["data", "session-diagnostics"],
+      });
+    } finally {
+      setSessionRepairBusy(false);
+    }
+  };
+
   const associateLudusavi = async () => {
     setSyncStatus({ key: "settings.feedback.matchingLudusavi" });
 
@@ -117,7 +281,8 @@ export function useSettingsView(options: SettingsViewOptions) {
       });
     } catch (error) {
       setSyncStatus({
-        text: error instanceof Error ? error.message : t("settings.feedback.ludusaviError"),
+        text:
+          error instanceof Error ? error.message : t("settings.feedback.ludusaviError"),
       });
     }
   };
@@ -136,7 +301,9 @@ export function useSettingsView(options: SettingsViewOptions) {
           result = await refreshSteamMutation.mutateAsync();
         } catch (error) {
           accountError =
-            error instanceof Error ? error.message : t("settings.feedback.accountError");
+            error instanceof Error
+              ? error.message
+              : t("settings.feedback.accountError");
         }
       }
 
@@ -147,7 +314,10 @@ export function useSettingsView(options: SettingsViewOptions) {
       ).length;
       setStatus(
         accountError
-          ? { key: "settings.feedback.accountSyncPending", values: { error: accountError } }
+          ? {
+              key: "settings.feedback.accountSyncPending",
+              values: { error: accountError },
+            }
           : result
             ? {
                 key: "settings.feedback.steamSynced",
@@ -160,7 +330,10 @@ export function useSettingsView(options: SettingsViewOptions) {
       );
     } catch (error) {
       setStatus({
-        text: error instanceof Error ? error.message : t("settings.feedback.readSteamError"),
+        text:
+          error instanceof Error
+            ? error.message
+            : t("settings.feedback.readSteamError"),
       });
     }
   };
@@ -180,6 +353,30 @@ export function useSettingsView(options: SettingsViewOptions) {
       syncNowMutation.isPending ||
       associateLudusaviMutation.isPending,
     syncStatus: renderFeedback(syncStatus),
+    dataStatus,
+    dataLocation: dataLocationQuery.data ?? null,
+    transferringData:
+      exportDataMutation.isPending ||
+      importDataMutation.isPending ||
+      backupRecoveryBusy ||
+      sessionRepairBusy,
+    portableFormat,
+    setPortableFormat,
+    includeArtwork,
+    setIncludeArtwork,
+    includeBackups,
+    setIncludeBackups,
+    importBackups: importBackupsQuery.data ?? [],
+    sessionDiagnostics: sessionDiagnosticsQuery.data ?? null,
+    repairChoices,
+    setRepairChoice,
+    applySessionRepair,
+    restoringBackup: backupRecoveryBusy,
+    repairingSessions: sessionRepairBusy,
+    repairPreview: Object.values(repairChoices).filter(Boolean).length,
+    exportData,
+    importData,
+    restoreImportBackup,
     connect,
     syncSteam,
     chooseSyncFolder,

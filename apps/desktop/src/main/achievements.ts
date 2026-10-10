@@ -226,22 +226,67 @@ export class AchievementService {
     await writeJsonAtomically(this.historyPath, entries);
   }
 
-  async mergeHistory(remote: AchievementHistoryEntry[], excluded: Set<string>) {
+  async createSafetyBackup(label: string) {
+    return withFileLock(this.historyPath, async () => {
+      const info = await fs.promises
+        .lstat(this.historyPath)
+        .catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") {
+            return null;
+          }
+          throw error;
+        });
+
+      if (!info) {
+        return null;
+      }
+      if (!info.isFile() || info.isSymbolicLink()) {
+        throw new Error("No se crea una copia de seguridad de una ruta no regular");
+      }
+
+      const safeLabel = label.replace(/[^a-z0-9-]/gi, "-");
+      const backupPath = `${this.historyPath}.${safeLabel}-${new Date().toISOString().replace(/[:.]/g, "-")}.bak`;
+      await fs.promises.copyFile(
+        this.historyPath,
+        backupPath,
+        fs.constants.COPYFILE_EXCL,
+      );
+      return backupPath;
+    });
+  }
+
+  async mergeHistory(
+    remote: AchievementHistoryEntry[],
+    excluded: Set<string>,
+    preserveLocalExcludedSourceIds = new Set<string>(),
+  ) {
     return withFileLock(this.historyPath, async () => {
       const merged = new Map<string, AchievementHistoryEntry>();
+      const mergeEntries = (
+        entries: AchievementHistoryEntry[],
+        preserveExcluded: boolean,
+      ) => {
+        for (const entry of entries) {
+          if (
+            excluded.has(entry.gameSourceId) &&
+            !(
+              preserveExcluded && preserveLocalExcludedSourceIds.has(entry.gameSourceId)
+            )
+          ) {
+            continue;
+          }
 
-      for (const entry of [...(await this.readHistory()), ...remote]) {
-        if (excluded.has(entry.gameSourceId)) {
-          continue;
+          const key = `${entry.gameSourceId}:${entry.achievementId}`;
+          const previous = merged.get(key);
+
+          if (!previous || entry.detectedAt < previous.detectedAt) {
+            merged.set(key, entry);
+          }
         }
+      };
 
-        const key = `${entry.gameSourceId}:${entry.achievementId}`;
-        const previous = merged.get(key);
-
-        if (!previous || entry.detectedAt < previous.detectedAt) {
-          merged.set(key, entry);
-        }
-      }
+      mergeEntries(await this.readHistory(), true);
+      mergeEntries(remote, false);
 
       const entries = [...merged.values()];
       await this.writeHistory(entries);

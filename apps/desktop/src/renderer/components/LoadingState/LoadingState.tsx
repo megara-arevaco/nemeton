@@ -27,7 +27,9 @@ export function LoadingState({
           <span className="nemeton-loading__eyebrow">
             {variant === "startup" ? "NEMETON" : t("loading.wait")}
           </span>
-          <span className="nemeton-loading__label">{label ?? t("loading.default")}</span>
+          <span className="nemeton-loading__label">
+            {label ?? t("loading.default")}
+          </span>
         </div>
       </div>
     </div>

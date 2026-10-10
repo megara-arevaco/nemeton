@@ -119,7 +119,11 @@ export const Sidebar = memo(function Sidebar({
             return (
               <button
                 data-game-index={gameIndex}
-                aria-label={t("library.gamePosition", { title: game.title, index: gameIndex + 1, total: games.length })}
+                aria-label={t("library.gamePosition", {
+                  title: game.title,
+                  index: gameIndex + 1,
+                  total: games.length,
+                })}
                 tabIndex={
                   virtual
                     ? gameIndex === activeIndex ||

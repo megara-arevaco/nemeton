@@ -156,9 +156,7 @@ export function EditGameModal({
             <b>{t("modal.hours")}</b>
           </div>
         </label>
-        <p>
-          {t("modal.ludusaviHint")}
-        </p>
+        <p>{t("modal.ludusaviHint")}</p>
       </div>
       {error && (
         <div

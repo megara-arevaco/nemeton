@@ -130,9 +130,7 @@ export function AddGameModal({
             }
           >
             <GameController />
-            <span>
-              {t("modal.gameDetailsHint")}
-            </span>
+            <span>{t("modal.gameDetailsHint")}</span>
           </div>
         </div>
       </div>

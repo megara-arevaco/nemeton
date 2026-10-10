@@ -287,17 +287,25 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       const comparison =
         previousSeconds === 0
           ? t(`summary.noPrevious${period}`)
-          : t(`summary.${currentSeconds >= previousSeconds ? "more" : "less"}${period}`, {
-              percentage: Math.abs(
-                Math.round(((currentSeconds - previousSeconds) / previousSeconds) * 100),
-              ),
-            });
+          : t(
+              `summary.${currentSeconds >= previousSeconds ? "more" : "less"}${period}`,
+              {
+                percentage: Math.abs(
+                  Math.round(
+                    ((currentSeconds - previousSeconds) / previousSeconds) * 100,
+                  ),
+                ),
+              },
+            );
       cards.push({
         label: t(summaryPeriod === "week" ? "summary.weekLabel" : "summary.monthLabel"),
-        text: t(summaryPeriod === "week" ? "summary.playedWeek" : "summary.playedMonth", {
-          time: formatPlaytime(Math.round(currentSeconds / 60)),
-          comparison,
-        }),
+        text: t(
+          summaryPeriod === "week" ? "summary.playedWeek" : "summary.playedMonth",
+          {
+            time: formatPlaytime(Math.round(currentSeconds / 60)),
+            comparison,
+          },
+        ),
       });
     }
     if (top) {
@@ -323,7 +331,9 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
           text: t("summary.longest", {
             game: game.title,
             time: formatPlaytime(Math.round(longest.durationSeconds / 60)),
-            weekday: new Intl.DateTimeFormat(locale, { weekday: "long" }).format(longest.ended),
+            weekday: new Intl.DateTimeFormat(locale, { weekday: "long" }).format(
+              longest.ended,
+            ),
           }),
         });
       }
@@ -372,7 +382,10 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       if (game) {
         cards.push({
           label: t("summary.comebackLabel"),
-          text: t("summary.comeback", { game: game.title, days: resolvedComeback.days }),
+          text: t("summary.comeback", {
+            game: game.title,
+            days: resolvedComeback.days,
+          }),
         });
       }
     }

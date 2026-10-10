@@ -54,9 +54,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
       setError("");
     } catch (reason) {
       setError(
-        reason instanceof Error
-          ? reason.message
-          : t("modal.error.chooseExecutable"),
+        reason instanceof Error ? reason.message : t("modal.error.chooseExecutable"),
       );
     }
   };

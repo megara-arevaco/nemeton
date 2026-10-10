@@ -60,7 +60,8 @@ export const LibraryCollection = memo(function LibraryCollection({
             <h2>{t("library.title")}</h2>
           </div>
           <span>
-            {games.length} {games.length === 1 ? t("library.oneGame") : t("library.games")}
+            {games.length}{" "}
+            {games.length === 1 ? t("library.oneGame") : t("library.games")}
           </span>
         </div>
         <div
@@ -85,8 +86,14 @@ export const LibraryCollection = memo(function LibraryCollection({
             return (
               <button
                 data-game-index={gameIndex}
-                data-running-label={runningGameIds.has(game.id) ? t("library.running") : undefined}
-                aria-label={t("library.gamePosition", { title: game.title, index: gameIndex + 1, total: games.length })}
+                data-running-label={
+                  runningGameIds.has(game.id) ? t("library.running") : undefined
+                }
+                aria-label={t("library.gamePosition", {
+                  title: game.title,
+                  index: gameIndex + 1,
+                  total: games.length,
+                })}
                 tabIndex={
                   virtual
                     ? gameIndex === activeIndex ||

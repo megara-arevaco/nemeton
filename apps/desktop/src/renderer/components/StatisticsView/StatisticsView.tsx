@@ -200,7 +200,8 @@ export function StatisticsView({
                   <strong>{game.title}</strong>
                   <span>{formatPlaytime(minutes)}</span>
                   <small>
-                    {Math.round((minutes / statistics.totalMinutes) * 100)}{t("statistics.yourTime")}
+                    {Math.round((minutes / statistics.totalMinutes) * 100)}
+                    {t("statistics.yourTime")}
                   </small>
                 </article>
               );
@@ -247,7 +248,9 @@ export function StatisticsView({
                     >
                       <strong>{game.title}</strong>
                       <small>
-                        {game.source === "steam" ? "Steam" : t("statistics.manuallyAdded")}
+                        {game.source === "steam"
+                          ? "Steam"
+                          : t("statistics.manuallyAdded")}
                       </small>
                     </span>
                     <div
@@ -406,7 +409,9 @@ export function StatisticsView({
                     <strong title={month.dates}>{month.name}</strong>
                     <small>
                       {month.entries.length}{" "}
-                      {month.entries.length === 1 ? t("statistics.oneGame") : t("statistics.games")}
+                      {month.entries.length === 1
+                        ? t("statistics.oneGame")
+                        : t("statistics.games")}
                     </small>
                   </header>
                   {month.dates && (

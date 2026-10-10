@@ -39,9 +39,7 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
       }
     } catch (reason) {
       setError(
-        reason instanceof Error
-          ? reason.message
-          : t("modal.error.chooseExecutable"),
+        reason instanceof Error ? reason.message : t("modal.error.chooseExecutable"),
       );
     }
   };

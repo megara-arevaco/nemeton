@@ -13,7 +13,9 @@ export function GameMetadata({ metadata }: GameMetadataProps) {
     metadata.publishers.length > 0
       ? { label: t("metadata.publishing"), value: metadata.publishers.join(", ") }
       : null,
-    metadata.releaseDate ? { label: t("metadata.release"), value: metadata.releaseDate } : null,
+    metadata.releaseDate
+      ? { label: t("metadata.release"), value: metadata.releaseDate }
+      : null,
   ].filter((credit): credit is { label: string; value: string } => credit !== null);
 
   if (!metadata.description && metadata.genres.length === 0 && credits.length === 0) {

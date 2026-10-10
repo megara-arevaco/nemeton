@@ -1,4 +1,5 @@
 import type { GameSession, LibraryGame } from "@launcher/core";
+import { useTranslation } from "react-i18next";
 import { CalendarBlank } from "@phosphor-icons/react/CalendarBlank";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { Clock } from "@phosphor-icons/react/Clock";
@@ -12,6 +13,7 @@ export function StatisticsView({
   games,
   sessions,
 }: Readonly<{ games: LibraryGame[]; sessions: GameSession[] }>) {
+  const { t } = useTranslation();
   const {
     period,
     setPeriod,
@@ -45,9 +47,9 @@ export function StatisticsView({
             "eyebrow [color:#a3f982] [font-size:11px] [font-weight:700] [letter-spacing:1.7px]"
           }
         >
-          TU HISTÓRICO DE JUEGO
+          {t("statistics.eyebrow")}
         </span>
-        <h1>Estadísticas</h1>
+        <h1>{t("statistics.title")}</h1>
       </div>
       <section
         className={
@@ -60,7 +62,7 @@ export function StatisticsView({
           }
         >
           <div>
-            <h2>Lo más destacado</h2>
+            <h2>{t("statistics.highlights")}</h2>
           </div>
           <div
             className={
@@ -71,13 +73,13 @@ export function StatisticsView({
               className={summaryPeriod === "week" ? "active" : ""}
               onClick={() => setSummaryPeriod("week")}
             >
-              Semana
+              {t("statistics.week")}
             </button>
             <button
               className={summaryPeriod === "month" ? "active" : ""}
               onClick={() => setSummaryPeriod("month")}
             >
-              Mes
+              {t("statistics.month")}
             </button>
           </div>
         </div>
@@ -100,7 +102,7 @@ export function StatisticsView({
         </div>
       </section>
       <h2 className="[margin:32px_0_0] [padding-top:24px] [border-top:1px_solid_#ffffff12] [font-size:22px]">
-        Histórico de juego
+        {t("statistics.history")}
       </h2>
       <div
         className={
@@ -117,12 +119,12 @@ export function StatisticsView({
             <span>
               <small>
                 {period === "all"
-                  ? "TIEMPO TOTAL"
+                  ? t("statistics.totalTime")
                   : period === "week"
-                    ? "TIEMPO ESTA SEMANA"
+                    ? t("statistics.timeThisWeek")
                     : period === "month"
-                      ? "TIEMPO ESTE MES"
-                      : "TIEMPO EN 2026"}
+                      ? t("statistics.timeThisMonth")
+                      : t("statistics.timeThisYear", { year: 2026 })}
               </small>
               <strong>
                 {period === "all"
@@ -139,14 +141,14 @@ export function StatisticsView({
         >
           <CalendarBlank />
           <select
-            aria-label="Periodo del histórico"
+            aria-label={t("statistics.periodLabel")}
             value={period}
             onChange={(event) => setPeriod(event.target.value as StatisticsPeriod)}
           >
-            <option value="all">Total histórico</option>
-            <option value="2026">Anual · 2026</option>
-            <option value="month">Mensual · mes actual</option>
-            <option value="week">Semanal · semana actual</option>
+            <option value="all">{t("statistics.allTime")}</option>
+            <option value="2026">{t("statistics.annualPeriod", { year: 2026 })}</option>
+            <option value="month">{t("statistics.monthlyPeriod")}</option>
+            <option value="week">{t("statistics.weeklyPeriod")}</option>
           </select>
         </label>
       </div>
@@ -162,10 +164,10 @@ export function StatisticsView({
             }
           >
             <div>
-              <small>CLASIFICACIÓN</small>
-              <h2>Tus juegos más jugados</h2>
+              <small>{t("statistics.ranking")}</small>
+              <h2>{t("statistics.mostPlayed")}</h2>
             </div>
-            <span>Ordenados por tiempo total</span>
+            <span>{t("statistics.sortedByTotal")}</span>
           </div>
           <div
             className={
@@ -198,8 +200,7 @@ export function StatisticsView({
                   <strong>{game.title}</strong>
                   <span>{formatPlaytime(minutes)}</span>
                   <small>
-                    {Math.round((minutes / statistics.totalMinutes) * 100)}% de tu
-                    tiempo
+                    {Math.round((minutes / statistics.totalMinutes) * 100)}{t("statistics.yourTime")}
                   </small>
                 </article>
               );
@@ -246,7 +247,7 @@ export function StatisticsView({
                     >
                       <strong>{game.title}</strong>
                       <small>
-                        {game.source === "steam" ? "Steam" : "Añadido manualmente"}
+                        {game.source === "steam" ? "Steam" : t("statistics.manuallyAdded")}
                       </small>
                     </span>
                     <div
@@ -278,8 +279,8 @@ export function StatisticsView({
           }
         >
           <ChartDonut />
-          <strong>Aún no hay tiempo registrado</strong>
-          <span>Importa Steam o inicia un juego local desde el launcher.</span>
+          <strong>{t("statistics.noTime")}</strong>
+          <span>{t("statistics.noTimeHelp")}</span>
         </div>
       )}
       {period !== "all" && (
@@ -296,37 +297,37 @@ export function StatisticsView({
             <div>
               <small>
                 {period === "week"
-                  ? "ACTIVIDAD SEMANAL"
+                  ? t("statistics.weeklyActivity")
                   : period === "month"
-                    ? "ACTIVIDAD MENSUAL"
-                    : "ACTIVIDAD ANUAL"}
+                    ? t("statistics.monthlyActivity")
+                    : t("statistics.annualActivity")}
               </small>
               <h2>
                 {period === "week"
-                  ? "Esta semana"
+                  ? t("statistics.thisWeek")
                   : period === "month"
-                    ? "Este mes"
-                    : "Tu año jugando"}
+                    ? t("statistics.thisMonth")
+                    : t("statistics.playingYear")}
               </h2>
             </div>
             <span>{periodDates}</span>
           </div>
           <div
             role="group"
-            aria-label="Vista del histórico"
+            aria-label={t("statistics.periodView")}
             className="[display:flex] [gap:4px] [width:fit-content] [margin-top:20px] [padding:4px] [border:1px_solid_#ffffff14] [border-radius:10px] [background:#090a0f80] [&_button]:[border:0] [&_button]:[border-radius:7px] [&_button]:[padding:9px_14px] [&_button]:[background:transparent] [&_button]:[color:#9295a0] [&_button]:[cursor:pointer] [&_button]:[font-size:11px] [&_button[aria-pressed=true]]:[color:var(--accent-a)] [&_button[aria-pressed=true]]:[background:color-mix(in_srgb,_var(--accent-a)_12%,_transparent)]"
           >
             <button
               aria-pressed={historyView === "calendar"}
               onClick={() => setHistoryView("calendar")}
             >
-              {period === "2026" ? "Por mes" : "Por día"}
+              {period === "2026" ? t("statistics.byMonth") : t("statistics.byDay")}
             </button>
             <button
               aria-pressed={historyView === "ranking"}
               onClick={() => setHistoryView("ranking")}
             >
-              Ranking por horas
+              {t("statistics.hoursRanking")}
             </button>
           </div>
           {historyView === "ranking" && (
@@ -334,10 +335,10 @@ export function StatisticsView({
               entries={periodRanking}
               label={
                 period === "week"
-                  ? "esta semana"
+                  ? t("statistics.thisPeriod")
                   : period === "month"
-                    ? "este mes"
-                    : "2026"
+                    ? t("statistics.currentMonth")
+                    : t("statistics.year", { year: 2026 })
               }
             />
           )}
@@ -352,8 +353,8 @@ export function StatisticsView({
                 >
                   <Trophy weight="fill" />
                   <span>
-                    <small>TOP DE 2026</small>
-                    <strong>Los más jugados del año</strong>
+                    <small>{t("statistics.topYear", { year: 2026 })}</small>
+                    <strong>{t("statistics.mostPlayedYear")}</strong>
                   </span>
                 </div>
                 <div
@@ -382,7 +383,7 @@ export function StatisticsView({
                         </div>
                         <strong>{game.title}</strong>
                         <span>{formatPlaytime(Math.round(seconds / 60))}</span>
-                        <small>Jugado en 2026</small>
+                        <small>{t("statistics.playedInYear", { year: 2026 })}</small>
                       </article>
                     );
                   })}
@@ -405,7 +406,7 @@ export function StatisticsView({
                     <strong title={month.dates}>{month.name}</strong>
                     <small>
                       {month.entries.length}{" "}
-                      {month.entries.length === 1 ? "juego" : "juegos"}
+                      {month.entries.length === 1 ? t("statistics.oneGame") : t("statistics.games")}
                     </small>
                   </header>
                   {month.dates && (
@@ -439,7 +440,7 @@ export function StatisticsView({
                               <small>
                                 {seconds > 0
                                   ? formatPlaytime(Math.round(seconds / 60))
-                                  : "Horas no disponibles"}
+                                  : t("statistics.hoursUnavailable")}
                               </small>
                             </span>
                           </div>
@@ -447,7 +448,7 @@ export function StatisticsView({
                       })}
                     </div>
                   ) : (
-                    <p>Sin actividad registrada</p>
+                    <p>{t("statistics.noActivity")}</p>
                   )}
                 </article>
               ))}
@@ -466,19 +467,20 @@ function PeriodRanking({
   entries: Array<{ game: LibraryGame; seconds: number }>;
   label: string;
 }) {
+  const { t } = useTranslation();
   const totalSeconds = entries.reduce((total, entry) => total + entry.seconds, 0);
 
   if (!entries.length) {
     return (
       <p className="[padding:30px_0] [color:#9295a0]">
-        No hay horas registradas en {label}.
+        {t("statistics.noHoursForPeriod", { period: label })}
       </p>
     );
   }
 
   return (
     <ol
-      aria-label={`Ranking por horas de ${label}`}
+      aria-label={t("statistics.hoursRankingFor", { period: label })}
       className="[list-style:none] [padding:0] [margin:20px_0_0]"
     >
       {entries.map(({ game, seconds }, index) => (

@@ -1,4 +1,5 @@
 import { Modal } from "../Modal";
+import { useTranslation } from "react-i18next";
 import type { LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
@@ -16,6 +17,7 @@ export function EditGameModal({
   onClose: () => void;
   onUpdated: (snapshot: LibrarySnapshot) => void;
 }>) {
+  const { t } = useTranslation();
   const {
     title,
     setTitle,
@@ -37,8 +39,8 @@ export function EditGameModal({
 
   return (
     <Modal
-      title="Editar ficha"
-      subtitle="JUEGO LOCAL"
+      title={t("modal.editTitle")}
+      subtitle={t("modal.localGame")}
       icon={<PencilSimple />}
       busy={saving}
       size="standard"
@@ -47,10 +49,10 @@ export function EditGameModal({
       actions={
         <>
           <Button disabled={saving} onClick={onClose} variant="secondary">
-            Cancelar
+            {t("modal.cancel")}
           </Button>
           <Button disabled={saving} onClick={save} variant="primary">
-            {saving ? "Guardando…" : "Guardar cambios"}
+            {saving ? t("modal.saving") : t("modal.saveChanges")}
           </Button>
         </>
       }
@@ -61,7 +63,7 @@ export function EditGameModal({
         }
       >
         <label>
-          <span>Nombre</span>
+          <span>{t("modal.name")}</span>
           <input
             autoFocus
             value={title}
@@ -70,7 +72,7 @@ export function EditGameModal({
         </label>
         <label>
           <span>
-            Ejecutable <em>Opcional</em>
+            {t("modal.executable")} <em>{t("modal.optional")}</em>
           </span>
           <div
             className={
@@ -80,29 +82,29 @@ export function EditGameModal({
             <input
               readOnly
               value={executablePath}
-              placeholder="Sin ejecutable configurado"
+              placeholder={t("modal.noExecutable")}
             />
             <button onClick={chooseExecutable}>
-              <FolderOpen /> Examinar
+              <FolderOpen /> {t("modal.browse")}
             </button>
             {executablePath && (
               <button
                 className={"clear-file [color:#e49096]"}
                 onClick={() => setExecutablePath("")}
               >
-                <X /> Quitar
+                <X /> {t("modal.removeExecutable")}
               </button>
             )}
           </div>
         </label>
         <label className={"game-name-field [position:relative]"}>
           <span>
-            Juego en Ludusavi <em>Opcional</em>
+            {t("modal.ludusaviGame")} <em>{t("modal.optional")}</em>
           </span>
           <input
             value={ludusaviName}
             onChange={(event) => setLudusaviName(event.target.value)}
-            placeholder="Buscar asociación o dejar vacío"
+            placeholder={t("modal.searchAssociation")}
           />
           {ludusaviMatches.length > 0 && (
             <div
@@ -130,17 +132,17 @@ export function EditGameModal({
         </label>
         <label>
           <span>
-            Steam AppID <em>Para logros locales</em>
+            {t("modal.appId")} <em>{t("modal.localAchievements")}</em>
           </span>
           <input
             inputMode="numeric"
             value={steamAppId}
             onChange={(event) => setSteamAppId(event.target.value.replace(/\D/g, ""))}
-            placeholder="Ej. 1238840"
+            placeholder={t("modal.exampleAppId")}
           />
         </label>
         <label>
-          <span>Horas acumuladas</span>
+          <span>{t("modal.accumulatedHours")}</span>
           <div
             className={
               "hours-field [position:relative] [&_input]:[padding-right:65px] [&_b]:[position:absolute] [&_b]:[right:13px] [&_b]:[top:14px] [&_b]:[color:#6e717c] [&_b]:[font-size:11px] [&_b]:[font-weight:500]"
@@ -151,12 +153,11 @@ export function EditGameModal({
               value={hours}
               onChange={(event) => setHours(event.target.value)}
             />
-            <b>horas</b>
+            <b>{t("modal.hours")}</b>
           </div>
         </label>
         <p>
-          La asociación de Ludusavi localiza las partidas; el AppID permite leer logros
-          locales.
+          {t("modal.ludusaviHint")}
         </p>
       </div>
       {error && (

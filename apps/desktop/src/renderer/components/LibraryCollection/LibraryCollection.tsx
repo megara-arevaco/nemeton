@@ -1,4 +1,5 @@
 import { useVirtualCollection, CARD_HEIGHT } from "../../shared/virtualCollection";
+import { useTranslation } from "react-i18next";
 import { memo } from "react";
 import type { LibraryGame } from "@launcher/core";
 import type { SyntheticEvent } from "react";
@@ -23,6 +24,7 @@ export const LibraryCollection = memo(function LibraryCollection({
   runningGameIds: Set<string>;
   onSelect: (gameId: string) => void;
 }>) {
+  const { t } = useTranslation();
   const { scrollRef, gridRef, range, virtual, activeIndex, setActiveId, onKeyDown } =
     useVirtualCollection(games);
   const useFallbackImage = (
@@ -54,18 +56,18 @@ export const LibraryCollection = memo(function LibraryCollection({
           }
         >
           <div>
-            <small>TU COLECCIÓN</small>
-            <h2>Juegos en tu biblioteca</h2>
+            <small>{t("library.collection")}</small>
+            <h2>{t("library.title")}</h2>
           </div>
           <span>
-            {games.length} {games.length === 1 ? "juego" : "juegos"}
+            {games.length} {games.length === 1 ? t("library.oneGame") : t("library.games")}
           </span>
         </div>
         <div
           ref={gridRef}
           onKeyDown={onKeyDown}
           role="group"
-          aria-label="Juegos de la biblioteca. Usa las flechas para recorrer la colección."
+          aria-label={t("library.gridLabel")}
           style={{ paddingTop: range.top, paddingBottom: range.bottom }}
           className={
             "installed-grid [display:grid] [grid-template-columns:repeat(auto-fill,_minmax(190px,_1fr))] [gap:14px]"
@@ -83,7 +85,8 @@ export const LibraryCollection = memo(function LibraryCollection({
             return (
               <button
                 data-game-index={gameIndex}
-                aria-label={`${game.title}, juego ${gameIndex + 1} de ${games.length}`}
+                data-running-label={runningGameIds.has(game.id) ? t("library.running") : undefined}
+                aria-label={t("library.gamePosition", { title: game.title, index: gameIndex + 1, total: games.length })}
                 tabIndex={
                   virtual
                     ? gameIndex === activeIndex ||
@@ -95,7 +98,7 @@ export const LibraryCollection = memo(function LibraryCollection({
                 }
                 onFocus={() => setActiveId(game.id)}
                 style={virtual ? { height: CARD_HEIGHT } : undefined}
-                className={`installed-card [content-visibility:auto] [contain-intrinsic-size:auto_248px] [position:relative] [min-width:0] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:17px] [padding:0] [background:#151720] [color:white] [text-align:left] [cursor:pointer] [transition:transform_.18s_ease,_border-color_.18s_ease,_box-shadow_.18s_ease] [&:hover]:[z-index:1] [&:hover]:[border-color:#a9fb7652] [&:hover]:[transform:translateY(-4px)] [&:hover]:[box-shadow:0_18px_38px_#00000055] [&.selected]:[border-color:#a9fb7645] [&.selected]:[box-shadow:inset_0_0_0_1px_#a9fb761b] [&.unavailable_.installed-play]:[background:#777b87] [&.unavailable_.installed-play]:[color:#15161d] [&:hover_.installed-cover]:[transform:scale(1.035)] [&:hover_.installed-play]:[opacity:1] [&:hover_.installed-play]:[transform:translateY(0)] [&.selected_.installed-play]:[opacity:1] [&.selected_.installed-play]:[transform:translateY(0)] [&.running]:[border-color:#a9fb765c] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb761a,_0_12px_35px_#68ee8110] [&.running::after]:[content:"JUGANDO"] [&.running::after]:[position:absolute] [&.running::after]:[z-index:4] [&.running::after]:[top:12px] [&.running::after]:[left:12px] [&.running::after]:[padding:5px_8px] [&.running::after]:[border-radius:20px] [&.running::after]:[background:#10150de8] [&.running::after]:[color:#a9fb76] [&.running::after]:[font-size:8px] [&.running::after]:[font-weight:800] [&.running::after]:[letter-spacing:1px] [&.running::after]:[box-shadow:0_0_0_1px_#a9fb7640] [&.running_.installed-copy_small]:[color:#9df37b] [&:hover]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] ${!game.installed ? "unavailable" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
+                className={`installed-card [content-visibility:auto] [contain-intrinsic-size:auto_248px] [position:relative] [min-width:0] [overflow:hidden] [border:1px_solid_#ffffff0d] [border-radius:17px] [padding:0] [background:#151720] [color:white] [text-align:left] [cursor:pointer] [transition:transform_.18s_ease,_border-color_.18s_ease,_box-shadow_.18s_ease] [&:hover]:[z-index:1] [&:hover]:[border-color:#a9fb7652] [&:hover]:[transform:translateY(-4px)] [&:hover]:[box-shadow:0_18px_38px_#00000055] [&.selected]:[border-color:#a9fb7645] [&.selected]:[box-shadow:inset_0_0_0_1px_#a9fb761b] [&.unavailable_.installed-play]:[background:#777b87] [&.unavailable_.installed-play]:[color:#15161d] [&:hover_.installed-cover]:[transform:scale(1.035)] [&:hover_.installed-play]:[opacity:1] [&:hover_.installed-play]:[transform:translateY(0)] [&.selected_.installed-play]:[opacity:1] [&.selected_.installed-play]:[transform:translateY(0)] [&.running]:[border-color:#a9fb765c] [&.running]:[box-shadow:inset_0_0_0_1px_#a9fb761a,_0_12px_35px_#68ee8110] [&.running::after]:[content:attr(data-running-label)] [&.running::after]:[position:absolute] [&.running::after]:[z-index:4] [&.running::after]:[top:12px] [&.running::after]:[left:12px] [&.running::after]:[padding:5px_8px] [&.running::after]:[border-radius:20px] [&.running::after]:[background:#10150de8] [&.running::after]:[color:#a9fb76] [&.running::after]:[font-size:8px] [&.running::after]:[font-weight:800] [&.running::after]:[letter-spacing:1px] [&.running::after]:[box-shadow:0_0_0_1px_#a9fb7640] [&.running_.installed-copy_small]:[color:#9df37b] [&:hover]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.selected]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] [&.running]:[border-color:color-mix(in_srgb,_var(--accent-a)_34%,_transparent)] ${!game.installed ? "unavailable" : ""} ${runningGameIds.has(game.id) ? "running" : ""}`}
                 key={game.id}
                 onClick={() => onSelect(game.id)}
               >
@@ -145,8 +148,8 @@ export const LibraryCollection = memo(function LibraryCollection({
                   <strong>{game.title}</strong>
                   <small>
                     {runningGameIds.has(game.id)
-                      ? "Jugando ahora"
-                      : `${formatPlaytime(game.platformPlaytimeMinutes ?? game.playtimeMinutes)}${!game.installed ? " · Sin ejecutable" : ""}`}
+                      ? t("library.playingNow")
+                      : `${formatPlaytime(game.platformPlaytimeMinutes ?? game.playtimeMinutes)}${!game.installed ? ` ${t("library.noExecutable")}` : ""}`}
                   </small>
                 </span>
                 <span

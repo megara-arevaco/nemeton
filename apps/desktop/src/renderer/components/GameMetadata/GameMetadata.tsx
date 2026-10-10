@@ -1,17 +1,19 @@
 import type { GameMetadata as GameMetadataDetails } from "@launcher/core";
+import { useTranslation } from "react-i18next";
 interface GameMetadataProps {
   metadata: GameMetadataDetails;
 }
 
 export function GameMetadata({ metadata }: GameMetadataProps) {
+  const { t } = useTranslation();
   const credits = [
     metadata.developers.length > 0
-      ? { label: "Desarrollo", value: metadata.developers.join(", ") }
+      ? { label: t("metadata.development"), value: metadata.developers.join(", ") }
       : null,
     metadata.publishers.length > 0
-      ? { label: "Publicación", value: metadata.publishers.join(", ") }
+      ? { label: t("metadata.publishing"), value: metadata.publishers.join(", ") }
       : null,
-    metadata.releaseDate ? { label: "Lanzamiento", value: metadata.releaseDate } : null,
+    metadata.releaseDate ? { label: t("metadata.release"), value: metadata.releaseDate } : null,
   ].filter((credit): credit is { label: string; value: string } => credit !== null);
 
   if (!metadata.description && metadata.genres.length === 0 && credits.length === 0) {
@@ -29,10 +31,10 @@ export function GameMetadata({ metadata }: GameMetadataProps) {
           "[margin-bottom:9px] [color:var(--accent-a)] [font-size:9px] [font-weight:800] [letter-spacing:1.6px]"
         }
       >
-        FICHA DEL JUEGO
+        {t("metadata.eyebrow")}
       </span>
       <h2 className={"[margin:0_0_12px] [font-size:17px] [letter-spacing:-.35px]"}>
-        Acerca del juego
+        {t("metadata.about")}
       </h2>
       {metadata.description && (
         <p

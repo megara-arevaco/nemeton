@@ -2,7 +2,7 @@
 
 :root {
   color-scheme: dark;
-  font-family: Inter, "Segoe UI", sans-serif;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   --surface-canvas: #090a0f;
   --surface-card: #101119;
   --surface-raised: #ffffff08;
@@ -27,7 +27,6 @@
   --space-6: 24px;
   --card-padding: 26px;
   --page-gutter: 34px;
-  --text-label: 9px;
   --text-caption: 11px;
   --text-body: 12px;
   --transition-interactive: 0.16s ease;
@@ -91,7 +90,8 @@ body {
   overflow: hidden;
 }
 button,
-input {
+input,
+select {
   font: inherit;
 }
 button {
@@ -212,6 +212,42 @@ h1 {
 .sync-settings-card > .cancel-button:hover:not(:disabled) {
   border-color: var(--border-strong);
   background: var(--surface-hover);
+}
+.language-settings-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  max-width: 850px;
+  margin-top: 30px;
+}
+.language-settings-card h2 {
+  margin: 0;
+  font-size: 17px;
+}
+.language-settings-card p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-body);
+}
+.language-settings-card label {
+  display: grid;
+  gap: 7px;
+  min-width: 180px;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+}
+.language-settings-card select {
+  height: 42px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-field);
+  padding: 0 12px;
+  background: var(--surface-canvas);
+  color: var(--text-primary);
+}
+.language-settings-card select:focus-visible {
+  outline: 2px solid var(--accent-a);
+  outline-offset: 3px;
 }
 .settings-card {
   padding: var(--card-padding);
@@ -345,6 +381,14 @@ h1 {
   }
 }
 @media (max-width: 720px) {
+  .language-settings-card {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .language-settings-card label {
+    min-width: 0;
+  }
   .suggestion-strip {
     grid-template-columns: repeat(3, 1fr);
   }

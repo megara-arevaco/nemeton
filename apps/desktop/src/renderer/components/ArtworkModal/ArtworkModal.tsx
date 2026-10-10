@@ -1,4 +1,5 @@
 import { Button } from "../Button";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../Modal";
 import type { LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
@@ -15,6 +16,7 @@ export function ArtworkModal({
   onClose: () => void;
   onUpdated: (snapshot: LibrarySnapshot) => void;
 }>) {
+  const { t } = useTranslation();
   const {
     query,
     setQuery,
@@ -28,8 +30,8 @@ export function ArtworkModal({
 
   return (
     <Modal
-      title={`Arte para ${game.title}`}
-      subtitle="PERSONALIZACIÓN"
+      title={t("modal.artworkTitleFor", { title: game.title })}
+      subtitle={t("modal.customize")}
       icon={<Image weight="fill" />}
       busy={saving}
       size="wide"
@@ -38,11 +40,11 @@ export function ArtworkModal({
       actions={
         <>
           <Button disabled={saving} onClick={onClose} variant="secondary">
-            Cerrar
+            {t("modal.close")}
           </Button>
           <Button disabled={saving} onClick={uploadArtwork} variant="primary">
             <FolderOpen />
-            {saving ? "Aplicando…" : "Usar archivo"}
+            {saving ? t("modal.applying") : t("modal.useFile")}
           </Button>
         </>
       }
@@ -54,12 +56,12 @@ export function ArtworkModal({
       >
         <MagnifyingGlass />
         <input
-          aria-label="Buscar un juego"
+          aria-label={t("modal.searchGame")}
           disabled={saving}
           autoFocus
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Buscar un juego"
+          placeholder={t("modal.searchGame")}
         />
       </div>
       {error && (
@@ -83,7 +85,7 @@ export function ArtworkModal({
               "artwork-loading [grid-column:1_/_-1] [display:grid] [place-items:center] [color:#737681] [font-size:12px]"
             }
           >
-            Buscando arte…
+            {t("modal.searchingArtwork")}
           </div>
         ) : (
           suggestions.map((suggestion) => (
@@ -97,8 +99,8 @@ export function ArtworkModal({
                 <strong>{suggestion.title}</strong>
                 <small>
                   {suggestion.provider === "steam"
-                    ? "Steam · portada y hero"
-                    : "Wikipedia · imagen principal"}
+                    ? t("modal.steamArtwork")
+                    : t("modal.wikipediaImage")}
                 </small>
               </span>
             </button>

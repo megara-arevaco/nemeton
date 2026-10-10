@@ -5,7 +5,7 @@
   min-width: 0;
   min-height: 240px;
   color: #e8eaf0;
-  font-family: Inter, "Segoe UI", sans-serif;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
   text-align: center;
 }
 .nemeton-loading__content {
@@ -47,7 +47,6 @@
   height: 5px;
   border-radius: 50%;
   background: var(--loading-accent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--loading-accent) 50%, transparent);
 }
 .nemeton-loading__core {
   display: grid;
@@ -65,7 +64,7 @@
 }
 .nemeton-loading__eyebrow {
   color: var(--loading-accent);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 3px;
 }
@@ -73,20 +72,6 @@
   color: #8e93a5;
   font-size: 12px;
   line-height: 1.5;
-}
-.nemeton-loading__track {
-  width: 96px;
-  height: 2px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: #ffffff0a;
-}
-.nemeton-loading__track > span {
-  display: block;
-  width: 50%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, var(--loading-accent), transparent);
-  animation: nemeton-loading-sweep 1.8s ease-in-out infinite;
 }
 .nemeton-loading--view {
   height: 100%;
@@ -126,9 +111,6 @@
   align-self: end;
   gap: 5px;
 }
-.nemeton-loading--panel .nemeton-loading__track {
-  align-self: start;
-}
 .nemeton-loading--overlay {
   position: fixed;
   inset: 44px 0 0;
@@ -151,14 +133,6 @@
     transform: scale(1);
   }
 }
-@keyframes nemeton-loading-sweep {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(300%);
-  }
-}
 @keyframes nemeton-loading-enter {
   from {
     opacity: 0;
@@ -172,8 +146,7 @@
 @media (prefers-reduced-motion: reduce) {
   .nemeton-loading__content,
   .nemeton-loading__orbit,
-  .nemeton-loading__core,
-  .nemeton-loading__track > span {
+  .nemeton-loading__core {
     animation: none;
   }
 }

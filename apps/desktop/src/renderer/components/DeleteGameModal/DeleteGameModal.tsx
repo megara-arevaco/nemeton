@@ -1,4 +1,5 @@
 import { Button } from "../Button";
+import { useTranslation } from "react-i18next";
 import { Modal } from "../Modal";
 import type { LibraryGame } from "@launcher/core";
 import { Trash } from "@phosphor-icons/react/Trash";
@@ -18,13 +19,14 @@ export function DeleteGameModal({
   onClose: () => void;
   onConfirm: (confirmation: string) => void;
 }>) {
+  const { t } = useTranslation();
   const { confirmation, setConfirmation, confirmed, confirmDeletion, submitDeletion } =
     useDeleteGameModal(game.title, onConfirm, deleting);
 
   return (
     <Modal
-      title="Eliminar para siempre"
-      subtitle="ACCIÓN IRREVERSIBLE"
+      title={t("modal.deleteTitle")}
+      subtitle={t("modal.irreversible")}
       icon={<Trash weight="fill" />}
       busy={deleting}
       size="compact"
@@ -33,14 +35,14 @@ export function DeleteGameModal({
       actions={
         <>
           <Button disabled={deleting} onClick={onClose} variant="secondary">
-            Cancelar
+            {t("modal.cancel")}
           </Button>
           <Button
             disabled={!confirmed || deleting}
             onClick={confirmDeletion}
             variant="danger"
           >
-            {deleting ? "Eliminando…" : "Eliminar definitivamente"}
+            {deleting ? t("modal.deleting") : t("modal.deletePermanently")}
           </Button>
         </>
       }
@@ -58,16 +60,14 @@ export function DeleteGameModal({
         >
           <Warning weight="fill" />
           <p>
-            Se borrarán de Nemeton la ficha, estadísticas, sesiones, logros, carátulas y
-            copias de partidas. No se eliminarán la instalación ni las partidas
-            originales.
+            {t("modal.deleteWarning")}
           </p>
         </div>
         <p>
-          Escribe <strong>{game.title}</strong> para confirmar.
+          {t("modal.confirmDelete", { title: game.title })}
         </p>
         <label>
-          <span>Nombre del juego</span>
+          <span>{t("modal.gameName")}</span>
           <input
             autoFocus
             autoComplete="off"

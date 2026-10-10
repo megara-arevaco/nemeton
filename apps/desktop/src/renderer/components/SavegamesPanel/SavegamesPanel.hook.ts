@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { queryKeys } from "../../queries/queryKeys";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { LibraryGame } from "@launcher/core";
 import {
   useBackupSavegamesMutation,
@@ -9,8 +10,11 @@ import {
   useSavegamesQuery,
 } from "../../queries/game.queries";
 
+type SavegameStatus = { key: string } | { text: string };
+
 export function useSavegamesPanel(game: LibraryGame) {
-  const [status, setStatus] = useState("");
+  const { t, i18n } = useTranslation();
+  const [status, setStatus] = useState<SavegameStatus | null>(null);
   const savegamesQuery = useSavegamesQuery(game.id);
   const backupMutation = useBackupSavegamesMutation(game.id);
   const chooseFolderMutation = useChooseSavegameFolderMutation(game.id);
@@ -36,9 +40,7 @@ export function useSavegamesPanel(game: LibraryGame) {
           return result;
         }
       }
-      throw new Error(
-        "Las partidas cambiaron durante la verificación. Vuelve a comprobarlas.",
-      );
+      throw new Error(t("savegames.verificationStale"));
     },
     enabled: !discovery.isPending && base?.syncState === "checking",
     staleTime: 0,
@@ -61,91 +63,89 @@ export function useSavegamesPanel(game: LibraryGame) {
     chooseFolderMutation.isPending ||
     restoreMutation.isPending;
 
-  const run = async (action: () => Promise<unknown>, successMessage: string) => {
-    setStatus("");
+  const run = async (action: () => Promise<unknown>, successKey: string) => {
+    setStatus(null);
 
     try {
       await action();
-      setStatus(successMessage);
+      setStatus({ key: successKey });
     } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : "No se pudo completar la operación",
-      );
+      setStatus({
+        text: error instanceof Error ? error.message : t("savegames.operationError"),
+      });
     }
   };
 
   const errorMessage = savegamesQuery.error
     ? savegamesQuery.error instanceof Error
       ? savegamesQuery.error.message
-      : "No se pudieron cargar las partidas"
+      : t("savegames.loadError")
     : discovery.error
-      ? "No se pudieron detectar las rutas de partidas. Inténtalo de nuevo."
+      ? t("savegames.discoverError")
       : verification.error
-        ? "No se pudo verificar el contenido de las partidas. Inténtalo de nuevo."
+        ? t("savegames.verifyError")
         : "";
 
   const copy = !data
     ? {
-        title: "Comprobando partidas…",
-        detail: "Revisando las rutas y la última copia.",
+        title: t("savegames.checking"),
+        detail: t("savegames.checkingDetail"),
         tone: "checking",
       }
     : data.syncState === "checking"
       ? {
-          title: "Comprobando cambios",
-          detail:
-            "Tus rutas y copias están disponibles. Verificando el contenido de las partidas…",
+          title: t("savegames.checkingChanges"),
+          detail: t("savegames.checkingChangesDetail"),
           tone: "checking",
         }
       : data.syncState === "synced"
         ? {
-            title: "Partidas sincronizadas",
-            detail: `Todo está protegido · última copia ${new Date(data.versions[0]!.createdAt).toLocaleString("es-ES")}`,
+            title: t("savegames.syncedTitle"),
+            detail: t("savegames.syncedDetail", {
+              date: new Date(data.versions[0]!.createdAt).toLocaleString(i18n.language),
+            }),
             tone: "ok",
           }
         : data.syncState === "conflict"
           ? {
-              title: "Conflicto entre dispositivos",
-              detail:
-                "Las partidas locales y la última copia remota son diferentes. Elige qué versión quieres continuar.",
+              title: t("savegames.conflictTitle"),
+              detail: t("savegames.conflictDetail"),
               tone: "warning",
             }
           : data.syncState === "unconfigured"
             ? {
-                title: "Sincronización sin configurar",
-                detail:
-                  "Elige una carpeta de Google Drive u otro servicio desde Ajustes.",
+                title: t("savegames.unconfiguredTitle"),
+                detail: t("savegames.unconfiguredDetail"),
                 tone: "warning",
               }
             : data.syncState === "path-missing"
               ? {
-                  title: "No se encuentra la carpeta de partidas",
-                  detail:
-                    data.missingPaths[0] ?? "La ubicación configurada ya no existe.",
+                  title: t("savegames.pathMissingTitle"),
+                  detail: data.missingPaths[0] ?? t("savegames.pathMissingDetail"),
                   tone: "error",
                 }
               : data.syncState === "not-detected"
                 ? {
-                    title: "No se localizaron las partidas",
-                    detail:
-                      "Juega una vez para que Nemeton intente detectarlas o indica su carpeta.",
+                    title: t("savegames.notDetectedTitle"),
+                    detail: t("savegames.notDetectedDetail"),
                     tone: "warning",
                   }
                 : data.syncState === "waiting-backup"
                   ? {
-                      title: "Preparado para sincronizar",
-                      detail:
-                        "La carpeta de partidas está detectada; falta crear la primera copia.",
+                      title: t("savegames.waitingBackupTitle"),
+                      detail: t("savegames.waitingBackupDetail"),
                       tone: "warning",
                     }
                   : {
-                      title: "Hay cambios pendientes",
-                      detail:
-                        "Las partidas actuales son más recientes que la última copia.",
+                      title: t("savegames.pendingTitle"),
+                      detail: t("savegames.pendingDetail"),
                       tone: "warning",
                     };
   const conflictCopy = data?.conflict
-    ? `La última copia es de ${data.conflict.deviceName} (${new Date(data.conflict.createdAt).toLocaleString("es-ES")}).`
+    ? t("savegames.conflictCopy", {
+        device: data.conflict.deviceName,
+        date: new Date(data.conflict.createdAt).toLocaleString(i18n.language),
+      })
     : "";
   const chooseFolder = () => chooseFolderMutation.mutateAsync(data?.missingPaths ?? []);
 
@@ -163,7 +163,11 @@ export function useSavegamesPanel(game: LibraryGame) {
     loading: savegamesQuery.isPending,
     data,
     busy,
-    status: status || errorMessage,
+    status: status
+      ? "key" in status
+        ? t(status.key)
+        : status.text
+      : errorMessage,
     copy,
     conflictCopy,
     run,

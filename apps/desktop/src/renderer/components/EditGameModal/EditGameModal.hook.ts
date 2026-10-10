@@ -1,5 +1,6 @@
 import { useDeferredValue, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { LibraryGame, LibrarySnapshot } from "@launcher/core";
 import { useLudusaviQuery } from "../../queries/game.queries";
 import type { LudusaviSuggestion } from "../../types/ludusavi";
@@ -11,6 +12,7 @@ export interface EditGameModalOptions {
 }
 
 export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOptions) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(game.title);
   const [executablePath, setExecutablePath] = useState(game.installPath);
   const [hours, setHours] = useState(
@@ -39,7 +41,7 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
       setError(
         reason instanceof Error
           ? reason.message
-          : "No se pudo seleccionar el ejecutable",
+          : t("modal.error.chooseExecutable"),
       );
     }
   };
@@ -56,11 +58,11 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
     const numericHours = Number(hours.replace(",", "."));
 
     if (!title.trim()) {
-      setError("Escribe un nombre");
+      setError(t("modal.error.gameNameRequired"));
       return;
     }
     if (!Number.isFinite(numericHours) || numericHours < 0) {
-      setError("Introduce unas horas válidas");
+      setError(t("modal.error.invalidHours"));
       return;
     }
 
@@ -75,7 +77,7 @@ export function useEditGameModal({ game, onClose, onUpdated }: EditGameModalOpti
       onUpdated(snapshot);
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No se pudo actualizar");
+      setError(reason instanceof Error ? reason.message : t("modal.error.updateGame"));
     }
   };
 

@@ -10,6 +10,7 @@ import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
 import { accentThemes, type AccentTheme } from "../../shared/presentation";
 import { Button } from "../Button";
 import { useSettingsView } from "./SettingsView.hook";
+import { useTranslation } from "react-i18next";
 
 export function SettingsView({
   settings,
@@ -28,6 +29,7 @@ export function SettingsView({
   onSynced: (snapshot: LibrarySnapshot, settings: FolderSyncSettings) => void;
   onLibraryUpdated: (snapshot: LibrarySnapshot) => void;
 }>) {
+  const { t, i18n } = useTranslation();
   const {
     steamId,
     setSteamId,
@@ -71,9 +73,26 @@ export function SettingsView({
         >
           NEMETON
         </span>
-        <h1>Ajustes</h1>
-        <p>Personaliza la aplicación y conecta tus servicios.</p>
+        <h1>{t("settings.title")}</h1>
+        <p>{t("settings.subtitle")}</p>
       </div>
+      <section className="settings-card language-settings-card">
+        <div>
+          <h2>{t("settings.languageTitle")}</h2>
+          <p>{t("settings.languageDescription")}</p>
+        </div>
+        <label>
+          <span>{t("language.label")}</span>
+          <select
+            aria-label={t("language.label")}
+            value={i18n.resolvedLanguage?.startsWith("en") ? "en" : "es"}
+            onChange={(event) => void i18n.changeLanguage(event.target.value)}
+          >
+            <option value="es">{t("language.spanish")}</option>
+            <option value="en">{t("language.english")}</option>
+          </select>
+        </label>
+      </section>
       <section
         className={
           "settings-card [max-width:850px] [margin-top:30px] [border:1px_solid] appearance-settings-card [&_+_.settings-card]:[margin-top:16px]"
@@ -88,10 +107,10 @@ export function SettingsView({
             <Palette weight="fill" />
           </span>
           <div>
-            <h2>Apariencia</h2>
-            <p>La interfaz permanece oscura; elige los colores de énfasis.</p>
+            <h2>{t("settings.appearance")}</h2>
+            <p>{t("settings.appearanceDescription")}</p>
           </div>
-          <i>OSCURA</i>
+          <i>{t("settings.dark")}</i>
         </div>
         <div
           className={
@@ -119,8 +138,8 @@ export function SettingsView({
                 <i />
               </span>
               <span>
-                <strong>{theme.name}</strong>
-                <small>{theme.description}</small>
+                <strong>{t(`settings.theme.${theme.id}`)}</strong>
+                <small>{t(`settings.themeDescription.${theme.id}`)}</small>
               </span>
               <b aria-hidden="true" />
             </button>
@@ -141,18 +160,17 @@ export function SettingsView({
             <SteamLogo weight="fill" />
           </span>
           <div>
-            <h2>Cuenta de Steam</h2>
+            <h2>{t("settings.steamAccount")}</h2>
             <p>
-              Importa todos los juegos de la cuenta, incluidos los que no están
-              instalados.
+              {t("settings.steamDescription")}
             </p>
           </div>
           <i className={settings?.hasApiKey ? "connected" : ""}>
             {settings?.hasApiKey
-              ? "CONECTADA"
+              ? t("settings.connected")
               : settings?.steamId
-                ? "CLAVE NECESARIA"
-                : "SIN CONFIGURAR"}
+                ? t("settings.keyNeeded")
+                : t("settings.notConfigured")}
           </i>
         </div>
         <div
@@ -177,7 +195,7 @@ export function SettingsView({
               placeholder={
                 settings?.hasApiKey
                   ? "••••••••••••••••••••••••••••••••"
-                  : "32 caracteres"
+                  : t("settings.apiKeyLength")
               }
             />
           </label>
@@ -188,10 +206,10 @@ export function SettingsView({
             variant="primary"
           >
             {saving
-              ? "Conectando…"
+              ? t("settings.connecting")
               : settings?.hasApiKey
-                ? "Actualizar clave"
-                : "Conectar Steam"}
+                ? t("settings.updateKey")
+                : t("settings.connectSteam")}
           </Button>
         </div>
         <div
@@ -200,10 +218,9 @@ export function SettingsView({
           }
         >
           <div>
-            <strong>Instalaciones locales</strong>
+            <strong>{t("settings.localInstalls")}</strong>
             <p>
-              Actualiza los juegos instalados y retira los desinstalados. No requiere
-              conectar una cuenta.
+              {t("settings.localInstallsDescription")}
             </p>
           </div>
           <button
@@ -215,7 +232,7 @@ export function SettingsView({
             onClick={syncSteam}
           >
             <SteamLogo weight="fill" />
-            {syncingSteam ? "Sincronizando…" : "Sincronizar Steam"}
+            {syncingSteam ? t("settings.syncing") : t("settings.syncSteam")}
           </button>
         </div>
         <p
@@ -223,8 +240,7 @@ export function SettingsView({
             "settings-note [margin:16px_0_0] [color:#666975] [font-size:11px] [line-height:1.55]"
           }
         >
-          La clave se usa directamente con la API oficial de Steam y se cifra en este
-          equipo. El perfil debe permitir consultar los detalles de juegos.
+          {t("settings.apiNote")}
         </p>
         {status && (
           <div
@@ -252,22 +268,21 @@ export function SettingsView({
             <FolderOpen weight="fill" />
           </span>
           <div>
-            <h2>Carpeta de sincronización</h2>
+            <h2>{t("settings.syncFolder")}</h2>
             <p>
-              Historial y partidas guardadas; el estado indica la carpeta local, no la
-              subida de Google Drive.
+              {t("settings.syncDescription")}
             </p>
           </div>
           <i className={syncSettings?.status === "ready" ? "connected" : ""}>
             {syncSettings?.status === "ready"
-              ? "DISPONIBLE"
+              ? t("settings.available")
               : syncSettings?.status === "missing"
-                ? "NO DISPONIBLE"
+                ? t("settings.unavailable")
                 : syncSettings?.status === "error"
-                  ? "ERROR"
+                  ? t("settings.error")
                   : syncSettings?.folderPath
-                    ? "COMPROBANDO"
-                    : "SIN CONFIGURAR"}
+                    ? t("settings.checking")
+                    : t("settings.notConfigured")}
           </i>
         </div>
         <div
@@ -276,9 +291,9 @@ export function SettingsView({
           }
         >
           <span>
-            <small>CARPETA ACTUAL</small>
+            <small>{t("settings.currentFolder")}</small>
             <strong>
-              {syncSettings?.folderPath ?? "Ninguna carpeta seleccionada"}
+              {syncSettings?.folderPath ?? t("settings.noFolder")}
             </strong>
           </span>
           <button
@@ -289,7 +304,7 @@ export function SettingsView({
             disabled={syncing}
             onClick={() => chooseSyncFolder()}
           >
-            {syncSettings?.folderPath ? "Cambiar carpeta" : "Elegir carpeta"}
+            {syncSettings?.folderPath ? t("settings.changeFolder") : t("settings.chooseFolder")}
           </button>
           {syncSettings?.folderPath && (
             <Button
@@ -298,7 +313,7 @@ export function SettingsView({
               onClick={() => syncNow()}
               variant="primary"
             >
-              {syncing ? "Sincronizando…" : "Sincronizar ahora"}
+              {syncing ? t("settings.syncing") : t("settings.syncNow")}
             </Button>
           )}
         </div>
@@ -308,8 +323,8 @@ export function SettingsView({
               "settings-note [margin:16px_0_0] [color:#666975] [font-size:11px] [line-height:1.55]"
             }
           >
-            Última sincronización:{" "}
-            {new Date(syncSettings.lastSyncedAt).toLocaleString("es-ES")}
+            {t("settings.lastSync")}{" "}
+            {new Date(syncSettings.lastSyncedAt).toLocaleString(i18n.language.startsWith("en") ? "en-US" : "es-ES")}
           </p>
         )}
         {syncStatus && (
@@ -331,7 +346,7 @@ export function SettingsView({
           disabled={syncing}
           onClick={() => associateLudusavi()}
         >
-          Asociar juegos existentes con Ludusavi
+          {t("settings.associateGames")}
         </button>
       </section>
     </div>

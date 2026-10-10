@@ -1,4 +1,5 @@
 import { LoadingState } from "../LoadingState";
+import { useTranslation } from "react-i18next";
 import { lazy, Suspense } from "react";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { Gear } from "@phosphor-icons/react/Gear";
@@ -53,6 +54,7 @@ const SavegamesPanel = lazy(() =>
 );
 
 export function App() {
+  const { t, i18n } = useTranslation();
   const {
     games,
     libraryLoading,
@@ -154,7 +156,7 @@ export function App() {
               <input
                 value={query}
                 onChange={updateQuery}
-                placeholder="Buscar en tu biblioteca"
+                placeholder={t("app.search")}
               />
             </label>
           ) : (
@@ -165,11 +167,11 @@ export function App() {
             >
               {view === "statistics" ? (
                 <>
-                  <ChartDonut /> Estadísticas
+                  <ChartDonut /> {t("app.statistics")}
                 </>
               ) : (
                 <>
-                  <Gear /> Ajustes
+                  <Gear /> {t("app.settings")}
                 </>
               )}
             </span>
@@ -179,15 +181,15 @@ export function App() {
               "window-controls [position:absolute] [top:0] [right:0] [display:flex] [height:44px] [-webkit-app-region:no-drag] [&_button]:[display:grid] [&_button]:[place-items:center] [&_button]:[width:46px] [&_button]:[border:0] [&_button]:[background:transparent] [&_button]:[color:#8c8f99] [&_button]:[cursor:pointer] [&_button:hover]:[background:#ffffff0b] [&_button:hover]:[color:white] [&_button.window-close:hover]:[background:#d94b55] [&_button.window-close:hover]:[color:white] [&_svg]:[width:15px] [&_svg]:[height:15px]"
             }
           >
-            <button aria-label="Minimizar" onClick={minimizeWindow}>
+            <button aria-label={t("app.minimize")} onClick={minimizeWindow}>
               <Minus />
             </button>
-            <button aria-label="Maximizar" onClick={maximizeWindow}>
+            <button aria-label={t("app.maximize")} onClick={maximizeWindow}>
               <Square />
             </button>
             <button
               className={"window-close"}
-              aria-label="Cerrar"
+              aria-label={t("app.close")}
               onClick={closeWindow}
             >
               <X />
@@ -196,7 +198,7 @@ export function App() {
         </header>
 
         {libraryLoading ? (
-          <LoadingState variant="startup" label="Preparando tu biblioteca" />
+          <LoadingState variant="startup" label={t("app.loadingLibrary")} />
         ) : view === "statistics" ? (
           <Suspense fallback={<LoadingState />}>
             <StatisticsView games={games} sessions={sessions} />
@@ -235,7 +237,7 @@ export function App() {
                     "hero-art [position:absolute] [inset:0] [width:100%] [height:100%] [object-fit:cover] [object-position:center]"
                   }
                   src={gameHeroUrl(selected)!}
-                  alt={`Arte de ${selected.title}`}
+                  alt={t("app.gameArtwork", { title: selected.title })}
                   onError={hideBrokenImage}
                 />
               )}
@@ -255,10 +257,10 @@ export function App() {
                   }
                 >
                   {runningGameIds.has(selected.id)
-                    ? "● JUGANDO AHORA"
+                    ? t("app.nowPlaying")
                     : selected.source === "steam"
-                      ? `STEAM · ${selected.installed ? "INSTALADO" : "EN TU CUENTA"}`
-                      : "JUEGO LOCAL"}
+                      ? `STEAM · ${selected.installed ? t("app.installed") : t("app.inYourAccount")}`
+                      : t("app.localGame")}
                 </span>
                 <h1>{selected.title}</h1>
                 <p>{selected.installPath}</p>
@@ -273,10 +275,14 @@ export function App() {
                         selected.platformPlaytimeMinutes ?? selected.playtimeMinutes,
                       )}
                     </b>{" "}
-                    {selected.source === "steam" ? "en Steam" : "tiempo total"}
+                    {selected.source === "steam" ? t("app.steamTime") : t("app.totalTime")}
                   </span>
                   <span>
-                    <b>{formatLastPlayed(selected.lastPlayedAt)}</b> última partida
+                    <b>{formatLastPlayed(
+                      selected.lastPlayedAt,
+                      i18n.language.startsWith("en") ? "en-US" : "es-ES",
+                      t,
+                    )}</b> {t("app.lastPlayed")}
                   </span>
                 </div>
                 <div className={"hero-actions [display:flex] [gap:10px]"}>
@@ -288,18 +294,18 @@ export function App() {
                   />
                   {selected.source === "local" && (
                     <Button onClick={openEditor} variant="secondary">
-                      <PencilSimple /> Editar
+                      <PencilSimple /> {t("app.edit")}
                     </Button>
                   )}
                   <Button onClick={chooseCover} variant="secondary">
-                    <Image /> Carátula
+                    <Image /> {t("app.cover")}
                   </Button>
                   <Button
                     className="[color:#ee959b] [&:hover]:[background:#ff727d12]"
                     onClick={requestDeleteSelectedGame}
                     variant="secondary"
                   >
-                    <Trash /> Eliminar
+                    <Trash /> {t("app.remove")}
                   </Button>
                 </div>
               </div>
@@ -327,23 +333,23 @@ export function App() {
                         <Trophy />
                       </span>
                       <span>
-                        <small>LOGROS LOCALES</small>
+                        <small>{t("app.localAchievements")}</small>
                         <strong>
                           {achievements.status === "missing-app-id"
-                            ? "Falta identificar el juego"
+                            ? t("app.identifyGame")
                             : achievements.status === "parse-error"
-                              ? "El archivo de logros no se pudo interpretar"
-                              : "Todavía no se encontró un estado local"}
+                              ? t("app.achievementParseError")
+                              : t("app.noLocalAchievementState")}
                         </strong>
                       </span>
                     </div>
                   </div>
                   <p>
                     {achievements.status === "missing-app-id"
-                      ? "Asocia el juego con Ludusavi o añade su Steam AppID desde Editar."
+                      ? t("app.associateLudusavi")
                       : achievements.status === "parse-error"
-                        ? `${achievements.source ?? "Formato desconocido"} · ${achievements.statePath ?? "ruta no disponible"}`
-                        : "Nemeton volverá a buscar mientras juegas. Algunos juegos no generan un archivo de logros compatible."}
+                        ? `${achievements.source ?? (i18n.language.startsWith("en") ? "Unknown format" : "Formato desconocido")} · ${achievements.statePath ?? (i18n.language.startsWith("en") ? "path unavailable" : "ruta no disponible")}`
+                        : t("app.achievementRetry")}
                   </p>
                 </section>
               )}
@@ -368,15 +374,15 @@ export function App() {
                     </span>
                     <span>
                       <small>
-                        LOGROS
+                        {t("app.achievements")}
                         {achievements.source
                           ? ` · ${achievements.source.toLocaleUpperCase()}`
                           : ""}
                       </small>
                       <strong>
                         {achievements.totalKnown === false
-                          ? `${achievements.unlocked} desbloqueados · total pendiente`
-                          : `${achievements.unlocked} de ${achievements.total} desbloqueados`}
+                          ? t("app.unlockedPending", { count: achievements.unlocked })
+                          : t("app.unlockedOf", { unlocked: achievements.unlocked, total: achievements.total })}
                       </strong>
                     </span>
                   </div>
@@ -429,22 +435,22 @@ export function App() {
                       <div>
                         <strong>
                           {achievement.hidden && !achievement.achieved
-                            ? "Logro oculto"
+                            ? t("app.hiddenAchievement")
                             : achievement.name}
                         </strong>
                         <p>
                           {achievement.hidden && !achievement.achieved
-                            ? "Sigue jugando para descubrirlo."
+                            ? t("app.keepPlaying")
                             : achievement.description}
                         </p>
                         <small>
                           {achievement.achieved && achievement.unlockedAt
                             ? new Date(achievement.unlockedAt).toLocaleDateString(
-                                "es-ES",
+                                i18n.language.startsWith("en") ? "en-US" : "es-ES",
                               )
                             : achievement.globalPercentage !== null
-                              ? `${achievement.globalPercentage.toFixed(1)}% de jugadores`
-                              : "Bloqueado"}
+                              ? `${achievement.globalPercentage.toFixed(1)}${t("app.players")}`
+                              : t("app.locked")}
                         </small>
                       </div>
                     </article>
@@ -455,7 +461,7 @@ export function App() {
             {selected.source === "local" && (
               <Suspense
                 fallback={
-                  <LoadingState variant="panel" label="Preparando tus partidas" />
+                  <LoadingState variant="panel" label={t("app.preparingGames")} />
                 }
               >
                 <SavegamesPanel key={selected.id} game={selected} />
@@ -481,41 +487,40 @@ export function App() {
             >
               <SteamLogo weight="fill" />
             </span>
-            <h1>Tu biblioteca, sin ruido</h1>
+            <h1>{t("app.emptyTitle")}</h1>
             <p>
-              Importa los juegos instalados en Steam. Se guardarán únicamente en este
-              ordenador.
+              {t("app.emptyDescription")}
             </p>
             <Button onClick={openSettings} variant="primary">
-              <SteamLogo /> Configurar Steam
+              <SteamLogo /> {t("app.configureSteam")}
             </Button>
           </section>
         )}
         <footer className="app-statusbar">
           {message}
           <div className="statusbar-meta">
-            <span title="Branch Git actual">⎇ {workspaceStatus?.branch ?? "…"}</span>
-            <span title="Versión de Nemeton">
+            <span title={t("app.branch")}>⎇ {workspaceStatus?.branch ?? "…"}</span>
+            <span title={t("app.version")}>
               {workspaceStatus ? `v${workspaceStatus.version}` : "…"}
             </span>
             <span>
               {syncSettings?.folderPath
-                ? "Sincronización automática activa"
-                : "Sin sincronización"}
+                ? t("app.syncActive")
+                : t("app.noSync")}
             </span>
           </div>
         </footer>
       </section>
       {showAddGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
         >
           <AddGameModal onClose={closeAddGame} onCreated={onLocalGameCreated} />
         </Suspense>
       )}
       {artworkGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
         >
           <ArtworkModal
             game={artworkGame}
@@ -526,7 +531,7 @@ export function App() {
       )}
       {editGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
         >
           <EditGameModal
             game={editGame}
@@ -537,7 +542,7 @@ export function App() {
       )}
       {deleteGame && (
         <Suspense
-          fallback={<LoadingState variant="overlay" label="Preparando opciones" />}
+          fallback={<LoadingState variant="overlay" label={t("app.preparingOptions")} />}
         >
           <DeleteGameModal
             game={deleteGame}
@@ -567,12 +572,12 @@ export function App() {
             <button onClick={() => removeGame()}>
               <X weight="bold" />
               {gameMenu.game.source === "steam" && gameMenu.game.installed
-                ? "Desinstalar"
-                : "Quitar de la biblioteca"}
+                ? t("app.uninstall")
+                : t("app.removeFromLibrary")}
             </button>
             <button onClick={requestDeleteGame}>
               <Trash weight="bold" />
-              Eliminar para siempre
+              {t("app.deleteForever")}
             </button>
           </div>
         </div>

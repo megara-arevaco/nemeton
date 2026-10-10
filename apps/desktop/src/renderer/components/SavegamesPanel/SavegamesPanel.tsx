@@ -1,10 +1,12 @@
 import { LoadingState } from "../LoadingState";
 import type { LibraryGame } from "@launcher/core";
+import { useTranslation } from "react-i18next";
 import { FloppyDisk } from "@phosphor-icons/react/FloppyDisk";
 import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { useSavegamesPanel } from "./SavegamesPanel.hook";
 
 export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
+  const { t } = useTranslation();
   const {
     loading,
     data,
@@ -21,7 +23,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
   } = useSavegamesPanel(game);
 
   if (loading) {
-    return <LoadingState variant="panel" label="Preparando tus partidas" />;
+    return <LoadingState variant="panel" label={t("savegames.preparing")} />;
   }
 
   return (
@@ -44,7 +46,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
             <FloppyDisk weight="fill" />
           </span>
           <span>
-            <small>PARTIDAS GUARDADAS</small>
+            <small>{t("savegames.section")}</small>
             <strong>{copy.title}</strong>
           </span>
         </div>
@@ -65,24 +67,24 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
             "[margin-top:16px] [padding:14px] [border:1px_solid_#e9bd7040] [border-radius:12px] [background:#e9bd700c] [&_p]:[margin:0_0_12px] [&_p]:[color:#d9bd86] [&_p]:[font-size:11px] [&_div]:[display:flex] [&_div]:[gap:8px] [&_button]:[border:1px_solid_#ffffff18] [&_button]:[border-radius:9px] [&_button]:[padding:8px_10px] [&_button]:[background:#ffffff0b] [&_button]:[color:#f0f1f4] [&_button]:[font-size:11px] [&_button]:[cursor:pointer] [&_button:disabled]:[opacity:.5]"
           }
         >
-          <p>{conflictCopy} Conserva ambas versiones antes de elegir.</p>
+          <p>{conflictCopy} {t("savegames.conflictHelp")}</p>
           <div>
             <button
               disabled={busy}
-              onClick={() => run(backup, "Tus partidas se guardaron como otra versión")}
+              onClick={() => run(backup, "savegames.keptLocal")}
             >
-              Conservar las mías
+              {t("savegames.keepLocal")}
             </button>
             <button
               disabled={busy}
               onClick={() =>
                 run(
                   restoreLatest,
-                  "Copia remota restaurada; tu estado anterior quedó protegido",
+                  "savegames.restoredRemote",
                 )
               }
             >
-              Restaurar copia remota
+              {t("savegames.restoreRemote")}
             </button>
           </div>
         </div>
@@ -94,9 +96,9 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
               "cover-button [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:12px_16px] [background:#ffffff0b] [cursor:pointer]"
             }
             disabled={busy}
-            onClick={() => run(chooseFolder, "Carpeta de partidas actualizada")}
+            onClick={() => run(chooseFolder, "savegames.folderUpdated")}
           >
-            <FolderOpen /> Indicar carpeta
+            <FolderOpen /> {t("savegames.chooseFolder")}
           </button>
         )}
       {data &&
@@ -106,9 +108,9 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
               "cover-button [display:flex] [align-items:center] [gap:8px] [border:1px_solid_#ffffff18] [border-radius:12px] [padding:12px_16px] [background:#ffffff0b] [cursor:pointer]"
             }
             disabled={busy}
-            onClick={() => run(backup, "Partidas sincronizadas")}
+            onClick={() => run(backup, "savegames.synced")}
           >
-            <FloppyDisk /> Sincronizar ahora
+            <FloppyDisk /> {t("savegames.syncNow")}
           </button>
         )}
       {verificationFailed && (
@@ -117,7 +119,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
           disabled={busy}
           onClick={() => void retryVerification()}
         >
-          Volver a comprobar
+          {t("savegames.retry")}
         </button>
       )}
       {status && (

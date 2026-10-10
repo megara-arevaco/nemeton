@@ -1,5 +1,6 @@
 import { useDeferredValue, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { LibrarySnapshot } from "@launcher/core";
 import {
   useArtworkQuery,
@@ -14,6 +15,7 @@ export interface AddGameModalOptions {
 }
 
 export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState("");
   const [executablePath, setExecutablePath] = useState("");
   const [selectedLudusavi, setSelectedLudusavi] = useState<LudusaviSuggestion | null>(
@@ -54,7 +56,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
       setError(
         reason instanceof Error
           ? reason.message
-          : "No se pudo seleccionar el ejecutable",
+          : t("modal.error.chooseExecutable"),
       );
     }
   };
@@ -75,7 +77,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
 
   const createGame = async () => {
     if (!title.trim()) {
-      setError("Escribe un nombre para el juego");
+      setError(t("modal.error.gameNameRequired"));
       return;
     }
     setError("");
@@ -92,7 +94,7 @@ export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
       onCreated(snapshot);
       onClose();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "No se pudo añadir el juego");
+      setError(reason instanceof Error ? reason.message : t("modal.error.addGame"));
     }
   };
 

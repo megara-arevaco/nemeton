@@ -46,15 +46,19 @@ export const formatPlaytime = (minutes: number) => {
   return `${Math.round((minutes / 60) * 10) / 10} h`;
 };
 
-export const formatLastPlayed = (value: string | null) => {
+export const formatLastPlayed = (
+  value: string | null,
+  locale: string,
+  translate: (key: string) => string,
+) => {
   if (!value) {
-    return "Nunca";
+    return translate("app.never");
   }
 
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
-    return "Nunca";
+    return translate("app.never");
   }
 
   const today = new Date();
@@ -71,12 +75,12 @@ export const formatLastPlayed = (value: string | null) => {
   const daysAgo = Math.round((startOfToday - startOfDate) / 86_400_000);
 
   if (daysAgo === 0) {
-    return "Hoy";
+    return translate("app.today");
   }
   if (daysAgo === 1) {
-    return "Ayer";
+    return translate("app.yesterday");
   }
-  return new Intl.DateTimeFormat("es-ES", {
+  return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: date.getFullYear() === today.getFullYear() ? undefined : "numeric",

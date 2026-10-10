@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type {
   FolderSyncSettings,
   LibrarySnapshot,
@@ -7,6 +8,7 @@ import type {
 } from "@launcher/core";
 import type { AccentTheme } from "../../shared/presentation";
 import { useScanSteamMutation } from "../../queries/library.queries";
+
 export interface SettingsViewOptions {
   settings: SteamAccountSettings | null;
   syncSettings: FolderSyncSettings | null;
@@ -17,12 +19,23 @@ export interface SettingsViewOptions {
   onLibraryUpdated: (snapshot: LibrarySnapshot) => void;
 }
 
+type Feedback =
+  | { key: string; values?: Record<string, string | number> }
+  | { text: string };
+
 export function useSettingsView(options: SettingsViewOptions) {
+  const { t } = useTranslation();
   const { settings, onConnected, onSynced, onLibraryUpdated } = options;
   const [steamIdDraft, setSteamIdDraft] = useState<string | null>(null);
   const [apiKey, setApiKey] = useState("");
-  const [status, setStatus] = useState("");
-  const [syncStatus, setSyncStatus] = useState("");
+  const [status, setStatus] = useState<Feedback | null>(null);
+  const [syncStatus, setSyncStatus] = useState<Feedback | null>(null);
+  const renderFeedback = (feedback: Feedback | null) =>
+    feedback
+      ? "key" in feedback
+        ? t(feedback.key, feedback.values)
+        : feedback.text
+      : "";
   const steamId = steamIdDraft ?? settings?.steamId ?? "";
   const connectMutation = useMutation({
     mutationFn: () => window.launcher.connectSteam(apiKey, steamId || undefined),
@@ -42,67 +55,75 @@ export function useSettingsView(options: SettingsViewOptions) {
   });
 
   const connect = async () => {
-    setStatus("Importando la biblioteca de la cuenta…");
+    setStatus({ key: "settings.feedback.importing" });
 
     try {
       const result = await connectMutation.mutateAsync();
       onConnected(result.snapshot, result.ownedCount);
       setApiKey("");
-      setStatus(`${result.ownedCount} juegos importados desde tu cuenta`);
+      setStatus({
+        key: "settings.feedback.imported",
+        values: { count: result.ownedCount },
+      });
     } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : "No se pudo conectar con Steam",
-      );
+      setStatus({
+        text: error instanceof Error ? error.message : t("settings.feedback.connectError"),
+      });
     }
   };
 
   const chooseSyncFolder = async () => {
-    setSyncStatus("Seleccionando y sincronizando…");
+    setSyncStatus({ key: "settings.feedback.selectingSyncFolder" });
 
     try {
       const result = await chooseSyncFolderMutation.mutateAsync();
 
       if (result) {
         onSynced(result.snapshot, result.settings);
-        setSyncStatus("Sincronización completada");
+        setSyncStatus({ key: "settings.feedback.syncComplete" });
       } else {
-        setSyncStatus("");
+        setSyncStatus(null);
       }
     } catch (error) {
-      setSyncStatus(
-        error instanceof Error ? error.message : "No se pudo configurar la carpeta",
-      );
+      setSyncStatus({
+        text: error instanceof Error ? error.message : t("settings.feedback.configureFolderError"),
+      });
     }
   };
 
   const syncNow = async () => {
-    setSyncStatus("Fusionando el historial…");
+    setSyncStatus({ key: "settings.feedback.mergingHistory" });
 
     try {
       const result = await syncNowMutation.mutateAsync();
       onSynced(result.snapshot, result.settings);
-      setSyncStatus("Sincronización completada");
+      setSyncStatus({ key: "settings.feedback.syncComplete" });
     } catch (error) {
-      setSyncStatus(error instanceof Error ? error.message : "No se pudo sincronizar");
+      setSyncStatus({
+        text: error instanceof Error ? error.message : t("settings.feedback.syncError"),
+      });
     }
   };
 
   const associateLudusavi = async () => {
-    setSyncStatus("Buscando coincidencias exactas en Ludusavi…");
+    setSyncStatus({ key: "settings.feedback.matchingLudusavi" });
 
     try {
       const result = await associateLudusaviMutation.mutateAsync();
       onLibraryUpdated(result.snapshot);
-      setSyncStatus(`${result.count} juegos asociados con Ludusavi`);
+      setSyncStatus({
+        key: "settings.feedback.ludusaviAssociated",
+        values: { count: result.count },
+      });
     } catch (error) {
-      setSyncStatus(
-        error instanceof Error ? error.message : "No se pudo consultar Ludusavi",
-      );
+      setSyncStatus({
+        text: error instanceof Error ? error.message : t("settings.feedback.ludusaviError"),
+      });
     }
   };
 
   const syncSteam = async () => {
-    setStatus("Sincronizando la cuenta y las instalaciones de Steam…");
+    setStatus({ key: "settings.feedback.syncingSteam" });
 
     try {
       let result: Awaited<
@@ -115,7 +136,7 @@ export function useSettingsView(options: SettingsViewOptions) {
           result = await refreshSteamMutation.mutateAsync();
         } catch (error) {
           accountError =
-            error instanceof Error ? error.message : "No se pudo consultar la cuenta";
+            error instanceof Error ? error.message : t("settings.feedback.accountError");
         }
       }
 
@@ -126,17 +147,21 @@ export function useSettingsView(options: SettingsViewOptions) {
       ).length;
       setStatus(
         accountError
-          ? `Instalaciones sincronizadas; cuenta pendiente: ${accountError}`
+          ? { key: "settings.feedback.accountSyncPending", values: { error: accountError } }
           : result
-            ? `Steam sincronizado: ${result.ownedCount} juegos de la cuenta y ${installedCount} instalados`
-            : `Steam sincronizado: ${installedCount} juegos instalados en tu biblioteca`,
+            ? {
+                key: "settings.feedback.steamSynced",
+                values: { owned: result.ownedCount, installed: installedCount },
+              }
+            : {
+                key: "settings.feedback.installsSynced",
+                values: { count: installedCount },
+              },
       );
     } catch (error) {
-      setStatus(
-        error instanceof Error
-          ? error.message
-          : "No se pudo leer la instalación de Steam",
-      );
+      setStatus({
+        text: error instanceof Error ? error.message : t("settings.feedback.readSteamError"),
+      });
     }
   };
 
@@ -147,12 +172,14 @@ export function useSettingsView(options: SettingsViewOptions) {
     setApiKey,
     saving: connectMutation.isPending,
     syncingSteam: syncSteamMutation.isPending || refreshSteamMutation.isPending,
-    status: status || (settings?.hasApiKey ? "Cuenta conectada" : ""),
+    status:
+      renderFeedback(status) ||
+      (settings?.hasApiKey ? t("settings.feedback.accountConnected") : ""),
     syncing:
       chooseSyncFolderMutation.isPending ||
       syncNowMutation.isPending ||
       associateLudusaviMutation.isPending,
-    syncStatus,
+    syncStatus: renderFeedback(syncStatus),
     connect,
     syncSteam,
     chooseSyncFolder,

@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { ChangeEvent, MouseEvent, SyntheticEvent } from "react";
 import type { SetStateAction } from "react";
+import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import type {
   FolderSyncSettings,
@@ -32,6 +33,7 @@ import { useAchievementsQuery, useGameMetadataQuery } from "../../queries/game.q
 import { useWorkspaceStatusQuery } from "../../queries/workspace.queries";
 
 export function useLibraryController() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const libraryQuery = useLibraryQuery();
   const libraryStarted = useRef(performance.now());
@@ -56,7 +58,7 @@ export function useLibraryController() {
   const syncSettingsQuery = useSyncSettingsQuery();
   const runningGamesQuery = useRunningGamesQuery();
   const workspaceStatusQuery = useWorkspaceStatusQuery();
-  const [message, setMessage] = useState("Tu biblioteca vive en este equipo");
+  const [message, setMessage] = useState(() => t("status.libraryStored"));
   useLibrarySubscriptions();
 
   const snapshot = libraryQuery.data ?? { games: [], sessions: [] };
@@ -94,9 +96,9 @@ export function useLibraryController() {
     sessions: snapshot.sessions,
     setSessions,
     message: libraryQuery.error
-      ? "No se pudo cargar la biblioteca. Revisa el archivo de datos antes de continuar."
+      ? t("status.libraryLoadError")
       : libraryQuery.isPending
-        ? "Cargando biblioteca…"
+        ? t("status.loadingLibrary")
         : message,
     setMessage,
     steamSettings: steamSettingsQuery.data ?? null,
@@ -169,6 +171,7 @@ function navigationReducer(
 }
 
 export function useApp() {
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const library = useLibraryController();
   const { accentTheme, setAccentTheme } = useTheme();
@@ -308,13 +311,13 @@ export function useApp() {
       steamId: current?.steamId ?? null,
       hasApiKey: true,
     }));
-    library.setMessage(`${count} juegos en tu cuenta de Steam`);
+    library.setMessage(t("status.steamGames", { count }));
   };
 
   const syncLibrary = (snapshot: LibrarySnapshot, nextSettings: FolderSyncSettings) => {
     updateLibrary(snapshot);
     library.setSyncSettings(nextSettings);
-    library.setMessage("Historial manual sincronizado");
+    library.setMessage(t("status.historySynced"));
   };
 
   const openEditor = () => {
@@ -347,7 +350,7 @@ export function useApp() {
       b.importedAt.localeCompare(a.importedAt),
     )[0];
     dispatchNavigation({ type: "select-game", gameId: newest?.id ?? null });
-    library.setMessage("Juego local añadido");
+    library.setMessage(t("status.localGameAdded"));
   };
 
   const launchSelected = async () => {
@@ -356,12 +359,12 @@ export function useApp() {
     }
 
     try {
-      library.setMessage(`Abriendo ${selected.title}…`);
+      library.setMessage(t("status.startingGame", { title: selected.title }));
       await launchGameMutation.mutateAsync(selected.id);
-      library.setMessage(`${selected.title} iniciado`);
+      library.setMessage(t("status.gameStarted", { title: selected.title }));
     } catch (error) {
       library.setMessage(
-        error instanceof Error ? error.message : `No se pudo iniciar ${selected.title}`,
+        error instanceof Error ? error.message : t("status.launchFailed", { title: selected.title }),
       );
     }
   };
@@ -389,12 +392,12 @@ export function useApp() {
 
       library.setMessage(
         gameMenu.game.source === "steam" && gameMenu.game.installed
-          ? "Desinstalación abierta en Steam; historial conservado"
-          : "Juego retirado de la biblioteca; historial conservado",
+          ? t("status.uninstallOpened")
+          : t("status.gameRemoved"),
       );
     } catch (error) {
       library.setMessage(
-        error instanceof Error ? error.message : "No se pudo retirar el juego",
+        error instanceof Error ? error.message : t("status.removeFailed"),
       );
     } finally {
       closeOverlay();
@@ -444,10 +447,10 @@ export function useApp() {
       queryClient.removeQueries({ queryKey: queryKeys.metadata(deleteGame.id) });
       queryClient.removeQueries({ queryKey: queryKeys.achievements(deleteGame.id) });
       queryClient.removeQueries({ queryKey: queryKeys.savegames(deleteGame.id) });
-      library.setMessage(`${deleteGame.title} eliminado definitivamente`);
+      library.setMessage(t("status.gameDeleted", { title: deleteGame.title }));
     } catch (error) {
       library.setMessage(
-        error instanceof Error ? error.message : "No se pudo eliminar el juego",
+        error instanceof Error ? error.message : t("status.deleteFailed"),
       );
     }
   };

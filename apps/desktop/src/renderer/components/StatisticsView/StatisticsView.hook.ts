@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { GameSession, LibraryGame } from "@launcher/core";
 import { formatPlaytime } from "../../shared/presentation";
 export interface MonthlyActivity {
@@ -135,6 +136,8 @@ export function buildCurrentActivity(
 export type StatisticsPeriod = "all" | "2026" | "week" | "month";
 
 export function useStatisticsView(games: LibraryGame[], sessions: GameSession[]) {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language.startsWith("en") ? "en-US" : "es-ES";
   const [today, setToday] = useState(() => new Date());
   useEffect(() => {
     const now = new Date();
@@ -162,13 +165,13 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
 
   const totalHours = Math.round((statistics.totalMinutes / 60) * 10) / 10;
   const months = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat("es-ES", { month: "long" });
+    const formatter = new Intl.DateTimeFormat(locale, { month: "long" });
     return buildMonthlyActivity(games, sessions, 2026).map(({ month, entries }) => ({
       name: formatter.format(new Date(2026, month, 1)),
       dates: undefined,
       entries,
     }));
-  }, [games, sessions]);
+  }, [games, sessions, locale]);
   const currentActivity = useMemo(
     () =>
       buildCurrentActivity(
@@ -179,8 +182,8 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       ),
     [games, sessions, period, today],
   );
-  const dayFormatter = new Intl.DateTimeFormat("es-ES", { weekday: "long" });
-  const dateFormatter = new Intl.DateTimeFormat("es-ES", {
+  const dayFormatter = new Intl.DateTimeFormat(locale, { weekday: "long" });
+  const dateFormatter = new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -280,14 +283,21 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
     const cards: Array<{ label: string; text: string }> = [];
 
     if (currentSeconds > 0) {
-      const periodName = summaryPeriod === "week" ? "semana" : "mes";
+      const period = summaryPeriod === "week" ? "Week" : "Month";
       const comparison =
         previousSeconds === 0
-          ? `y no registraste actividad ${summaryPeriod === "week" ? "la semana" : "el mes"} anterior`
-          : `${Math.abs(Math.round(((currentSeconds - previousSeconds) / previousSeconds) * 100))} % ${currentSeconds >= previousSeconds ? "más" : "menos"} que ${summaryPeriod === "week" ? "la semana" : "el mes"} anterior`;
+          ? t(`summary.noPrevious${period}`)
+          : t(`summary.${currentSeconds >= previousSeconds ? "more" : "less"}${period}`, {
+              percentage: Math.abs(
+                Math.round(((currentSeconds - previousSeconds) / previousSeconds) * 100),
+              ),
+            });
       cards.push({
-        label: summaryPeriod === "week" ? "ESTA SEMANA" : "ESTE MES",
-        text: `Has jugado ${formatPlaytime(Math.round(currentSeconds / 60))} este ${periodName}, ${comparison}.`,
+        label: t(summaryPeriod === "week" ? "summary.weekLabel" : "summary.monthLabel"),
+        text: t(summaryPeriod === "week" ? "summary.playedWeek" : "summary.playedMonth", {
+          time: formatPlaytime(Math.round(currentSeconds / 60)),
+          comparison,
+        }),
       });
     }
     if (top) {
@@ -295,8 +305,12 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
 
       if (game) {
         cards.push({
-          label: "MÁS JUGADO",
-          text: `${game.title} lidera tu ${summaryPeriod === "week" ? "semana" : "mes"} con ${formatPlaytime(Math.round(top[1] / 60))}.`,
+          label: t("summary.topLabel"),
+          text: t("summary.top", {
+            game: game.title,
+            period: t(summaryPeriod === "week" ? "summary.week" : "summary.month"),
+            time: formatPlaytime(Math.round(top[1] / 60)),
+          }),
         });
       }
     }
@@ -305,8 +319,12 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
 
       if (game) {
         cards.push({
-          label: "SESIÓN MÁS LARGA",
-          text: `${game.title}: ${formatPlaytime(Math.round(longest.durationSeconds / 60))} el ${new Intl.DateTimeFormat("es-ES", { weekday: "long" }).format(longest.ended)}.`,
+          label: t("summary.longestLabel"),
+          text: t("summary.longest", {
+            game: game.title,
+            time: formatPlaytime(Math.round(longest.durationSeconds / 60)),
+            weekday: new Intl.DateTimeFormat(locale, { weekday: "long" }).format(longest.ended),
+          }),
         });
       }
     }
@@ -353,8 +371,8 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
 
       if (game) {
         cards.push({
-          label: "DE VUELTA",
-          text: `Retomaste ${game.title} después de ${resolvedComeback.days} días.`,
+          label: t("summary.comebackLabel"),
+          text: t("summary.comeback", { game: game.title, days: resolvedComeback.days }),
         });
       }
     }
@@ -388,19 +406,19 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
       startOfToday.getTime() - activeDays[0]!.getTime() <= 86_400_000
     ) {
       cards.push({
-        label: "RACHA ACTUAL",
-        text: `Llevas ${streak} días consecutivos jugando.`,
+        label: t("summary.streakLabel"),
+        text: t("summary.streak", { days: streak }),
       });
     }
 
     if (!cards.length) {
       cards.push({
-        label: "SIN ACTIVIDAD RECIENTE",
-        text: `Inicia un juego desde Nemeton para generar tu resumen ${summaryPeriod === "week" ? "semanal" : "mensual"}.`,
+        label: t("summary.noneLabel"),
+        text: t(summaryPeriod === "week" ? "summary.noneWeek" : "summary.noneMonth"),
       });
     }
     return cards;
-  }, [games, sessions, summaryPeriod, today]);
+  }, [games, sessions, summaryPeriod, today, locale, t]);
 
   return {
     period,

@@ -1,4 +1,5 @@
 import { useVirtualCollection } from "../../shared/virtualCollection";
+import { useTranslation } from "react-i18next";
 import { memo } from "react";
 import type { LibraryGame } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
@@ -34,6 +35,7 @@ export const Sidebar = memo(function Sidebar({
   onSelect: (gameId: string) => void;
   onContextMenu: (game: LibraryGame, x: number, y: number) => void;
 }>) {
+  const { t } = useTranslation();
   const { scrollRef, gridRef, range, virtual, activeIndex, setActiveId, onKeyDown } =
     useVirtualCollection(games, {
       itemHeight: 50,
@@ -66,19 +68,19 @@ export const Sidebar = memo(function Sidebar({
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "library" && !selectedId ? "active" : ""}`}
           onClick={onOpenLibrary}
         >
-          <GameController /> Biblioteca
+          <GameController /> {t("sidebar.library")}
         </button>
         <button
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "statistics" ? "active" : ""}`}
           onClick={onOpenStatistics}
         >
-          <ChartDonut /> Estadísticas
+          <ChartDonut /> {t("sidebar.statistics")}
         </button>
         <button
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "settings" ? "active" : ""}`}
           onClick={onOpenSettings}
         >
-          <Gear /> Ajustes
+          <Gear /> {t("sidebar.settings")}
         </button>
         <Button
           className="[justify-content:flex-start] [width:100%]"
@@ -86,7 +88,7 @@ export const Sidebar = memo(function Sidebar({
           size="small"
           variant="secondary"
         >
-          <Plus /> Añadir juego
+          <Plus /> {t("sidebar.addGame")}
         </Button>
       </nav>
       <div
@@ -94,14 +96,14 @@ export const Sidebar = memo(function Sidebar({
           "library-heading [display:flex] [justify-content:space-between] [padding:0_11px_10px] [color:#666976] [font-size:10px] [font-weight:700] [letter-spacing:1.4px]"
         }
       >
-        <span>JUEGOS</span>
+        <span>{t("sidebar.games")}</span>
         <span>{totalCount}</span>
       </div>
       <div
         ref={scrollRef}
         onKeyDown={onKeyDown}
         role="group"
-        aria-label="Lista de juegos. Usa las flechas para recorrerla."
+        aria-label={t("sidebar.gameListLabel")}
         className={
           "game-list [min-height:0] [overflow-x:hidden] [overflow-y:auto] [display:block]"
         }
@@ -117,7 +119,7 @@ export const Sidebar = memo(function Sidebar({
             return (
               <button
                 data-game-index={gameIndex}
-                aria-label={`${game.title}, juego ${gameIndex + 1} de ${games.length}`}
+                aria-label={t("library.gamePosition", { title: game.title, index: gameIndex + 1, total: games.length })}
                 tabIndex={
                   virtual
                     ? gameIndex === activeIndex ||
@@ -161,12 +163,12 @@ export const Sidebar = memo(function Sidebar({
                   <strong>{game.title}</strong>
                   <small>
                     {runningGameIds.has(game.id)
-                      ? "Jugando ahora"
+                      ? t("sidebar.playing")
                       : game.installed
                         ? formatPlaytime(
                             game.platformPlaytimeMinutes ?? game.playtimeMinutes,
                           )
-                        : "No instalado"}
+                        : t("sidebar.notInstalled")}
                   </small>
                 </span>
               </button>

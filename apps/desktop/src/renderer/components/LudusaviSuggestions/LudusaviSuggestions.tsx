@@ -1,4 +1,5 @@
 import { Plus } from "@phosphor-icons/react/Plus";
+import { useTranslation } from "react-i18next";
 import type { LudusaviSuggestion } from "../../types/ludusavi";
 import { useLudusaviSuggestions } from "./LudusaviSuggestions.hook";
 
@@ -11,6 +12,7 @@ export function LudusaviSuggestions({
   loading: boolean;
   onSelect: (item: LudusaviSuggestion) => void;
 }>) {
+  const { t } = useTranslation();
   const {
     handleScroll,
     scrollContainerRef,
@@ -22,14 +24,14 @@ export function LudusaviSuggestions({
   if (loading && items.length === 0) {
     return (
       <small className="[display:block] [padding:10px]">
-        Consultando catálogo de partidas…
+        {t("modal.searchingLudusavi")}
       </small>
     );
   }
 
   return (
     <div
-      aria-label="Sugerencias de Ludusavi"
+      aria-label={t("modal.ludusaviSuggestions")}
       className="[overflow-y:auto] [overscroll-behavior:contain]"
       onScroll={handleScroll}
       ref={scrollContainerRef}

@@ -1,13 +1,15 @@
 import { NemetonMark } from "../NemetonMark";
+import { useTranslation } from "react-i18next";
 import "./LoadingState.css";
 
 export function LoadingState({
   variant = "view",
-  label = "Preparando tu espacio",
+  label,
 }: Readonly<{
   variant?: "view" | "panel" | "overlay" | "startup";
   label?: string;
 }>) {
+  const { t } = useTranslation();
   return (
     <div
       className={`nemeton-loading nemeton-loading--${variant}`}
@@ -23,12 +25,9 @@ export function LoadingState({
         </div>
         <div className="nemeton-loading__copy">
           <span className="nemeton-loading__eyebrow">
-            {variant === "startup" ? "NEMETON" : "UN MOMENTO"}
+            {variant === "startup" ? "NEMETON" : t("loading.wait")}
           </span>
-          <span className="nemeton-loading__label">{label}</span>
-        </div>
-        <div className="nemeton-loading__track" aria-hidden="true">
-          <span />
+          <span className="nemeton-loading__label">{label ?? t("loading.default")}</span>
         </div>
       </div>
     </div>

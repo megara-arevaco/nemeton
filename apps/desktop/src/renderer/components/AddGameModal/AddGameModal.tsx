@@ -1,4 +1,5 @@
 import { Modal } from "../Modal";
+import { useTranslation } from "react-i18next";
 import type { LibrarySnapshot } from "@launcher/core";
 import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { GameController } from "@phosphor-icons/react/GameController";
@@ -15,6 +16,7 @@ export function AddGameModal({
   onClose: () => void;
   onCreated: (snapshot: LibrarySnapshot) => void;
 }>) {
+  const { t } = useTranslation();
   const {
     title,
     executablePath,
@@ -33,8 +35,8 @@ export function AddGameModal({
 
   return (
     <Modal
-      title="Añadir un juego"
-      subtitle="BIBLIOTECA LOCAL"
+      title={t("modal.addTitle")}
+      subtitle={t("modal.localLibrary")}
       icon={<Plus weight="bold" />}
       busy={saving}
       size="wide"
@@ -43,14 +45,14 @@ export function AddGameModal({
       actions={
         <>
           <Button disabled={saving} onClick={onClose} variant="secondary">
-            Cancelar
+            {t("modal.cancel")}
           </Button>
           <Button
             disabled={saving || !title.trim()}
             onClick={createGame}
             variant="primary"
           >
-            {saving ? "Añadiendo…" : "Añadir a la biblioteca"}
+            {saving ? t("modal.adding") : t("modal.addToLibrary")}
           </Button>
         </>
       }
@@ -62,12 +64,12 @@ export function AddGameModal({
           }
         >
           <label className={"game-name-field [position:relative]"}>
-            <span>Nombre del juego</span>
+            <span>{t("modal.gameName")}</span>
             <input
               autoFocus
               value={title}
               onChange={(event) => updateTitle(event.target.value)}
-              placeholder="Por ejemplo, Hollow Knight"
+              placeholder={t("modal.exampleGame")}
             />
             {selectedLudusavi ? (
               <div
@@ -81,8 +83,8 @@ export function AddGameModal({
                   <small>
                     {selectedLudusavi.steamAppId
                       ? `Ludusavi · Steam ${selectedLudusavi.steamAppId}`
-                      : "Asociado con Ludusavi"}
-                    {automaticArtwork ? " · arte completado" : ""}
+                      : t("modal.linkedLudusavi")}
+                    {automaticArtwork ? t("modal.artworkComplete") : ""}
                   </small>
                 </span>
                 <button type="button" onClick={clearLudusavi}>
@@ -105,7 +107,7 @@ export function AddGameModal({
           </label>
           <label>
             <span>
-              Ejecutable <em>Opcional</em>
+              {t("modal.executable")} <em>{t("modal.optional")}</em>
             </span>
             <div
               className={
@@ -115,10 +117,10 @@ export function AddGameModal({
               <input
                 readOnly
                 value={executablePath}
-                placeholder="Puedes configurarlo más adelante"
+                placeholder={t("modal.configureLater")}
               />
               <button onClick={chooseExecutable}>
-                <FolderOpen /> Examinar
+                <FolderOpen /> {t("modal.browse")}
               </button>
             </div>
           </label>
@@ -129,8 +131,7 @@ export function AddGameModal({
           >
             <GameController />
             <span>
-              La carátula, el ejecutable y otros datos se pueden completar después desde
-              la ficha del juego.
+              {t("modal.gameDetailsHint")}
             </span>
           </div>
         </div>

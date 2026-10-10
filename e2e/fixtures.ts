@@ -73,7 +73,7 @@ export const test = base.extend<{
         .tracing.start({ screenshots: true, snapshots: true, sources: true });
       const page = await app.firstWindow();
       await expect(
-        page.getByRole("button", { name: "Añadir juego", exact: true }),
+        page.getByRole("button", { name: /^(Añadir juego|Add game)$/ }),
       ).toBeVisible();
       await page.evaluate(() =>
         (window as unknown as { launcher: LauncherApi }).launcher.listGames(),

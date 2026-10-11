@@ -1,6 +1,8 @@
 import {
   discoverSteamGames,
   fetchOwnedSteamGames,
+  fetchSteamStoreArtwork,
+  isUnresolvedSteamArtwork,
   type LibrarySnapshot,
   type SteamCandidate,
   type SteamOwnedGame,
@@ -8,11 +10,15 @@ import {
 import type { LibraryStore } from "@launcher/core";
 import type { SettingsStore } from "./settings.js";
 
-type Store = Pick<LibraryStore, "importSteamSnapshot" | "importSteam">;
+type Store = Pick<
+  LibraryStore,
+  "importSteamSnapshot" | "importSteam" | "resolveSteamArtwork"
+>;
 
 type Settings = Pick<SettingsStore, "read" | "readApiKey">;
 
 export class SteamSyncService {
+  private readonly artworkRetryAt = new Map<string, number>();
   private accountFailures = 0;
   private retryAccountAt = 0;
   private automaticRefresh: Promise<void> | null = null;
@@ -35,7 +41,9 @@ export class SteamSyncService {
       this.fetchOwned(apiKey, steamId),
       this.discoverInstalled(),
     ]);
-    const snapshot = await this.store.importSteamSnapshot(ownedGames, installedGames);
+    const snapshot = await this.resolveArtwork(
+      await this.store.importSteamSnapshot(ownedGames, installedGames),
+    );
     await this.broadcastLibrary(snapshot);
     return { snapshot, ownedCount: ownedGames.length };
   }
@@ -51,9 +59,49 @@ export class SteamSyncService {
   }
 
   async scanLocal(): Promise<LibrarySnapshot> {
-    const snapshot = await this.store.importSteam(await this.discoverInstalled());
+    const snapshot = await this.resolveArtwork(
+      await this.store.importSteam(await this.discoverInstalled()),
+    );
     await this.broadcastLibrary(snapshot);
     return snapshot;
+  }
+
+  private async resolveArtwork(snapshot: LibrarySnapshot): Promise<LibrarySnapshot> {
+    const pending = snapshot.games.filter(
+      (game) =>
+        game.source === "steam" &&
+        !game.coverPath &&
+        (isUnresolvedSteamArtwork(game.coverUrl) ||
+          isUnresolvedSteamArtwork(game.heroUrl)) &&
+        Date.now() >= (this.artworkRetryAt.get(game.sourceId) ?? 0),
+    );
+    const artwork = new Map<
+      string,
+      Awaited<ReturnType<typeof fetchSteamStoreArtwork>>
+    >();
+    // Bound requests, and retry unavailable assets later rather than on every scan.
+    await Promise.all(
+      Array.from({ length: Math.min(4, pending.length) }, async () => {
+        for (;;) {
+          const game = pending.shift();
+
+          if (!game) {
+            return;
+          }
+          this.artworkRetryAt.set(game.sourceId, Date.now() + 30 * 60_000);
+          try {
+            const resolved = await fetchSteamStoreArtwork(game.sourceId);
+
+            if (!isUnresolvedSteamArtwork(resolved.coverUrl)) {
+              artwork.set(game.sourceId, resolved);
+            }
+          } catch {
+            // Artwork availability must not prevent playtime/install synchronization.
+          }
+        }
+      }),
+    );
+    return artwork.size ? this.store.resolveSteamArtwork(artwork) : snapshot;
   }
 
   refreshAutomatically(): Promise<void> {

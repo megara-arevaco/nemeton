@@ -1,4 +1,5 @@
 import type { LibraryGame } from "@launcher/core";
+import { isUnresolvedSteamArtwork } from "@launcher/core/artwork/steam";
 export type AccentTheme = "forest" | "aurora" | "ember" | "amethyst" | "glacier";
 
 export const accentThemes: Array<{
@@ -109,6 +110,10 @@ export const gameCoverUrl = (game: LibraryGame) =>
 export const gameLibraryCoverUrl = (game: LibraryGame) => {
   if (game.coverPath) {
     return localCoverUrl(game.coverPath);
+  }
+
+  if (game.coverUrl && !isUnresolvedSteamArtwork(game.coverUrl)) {
+    return game.coverUrl;
   }
 
   if (game.source === "steam") {

@@ -1,2 +1,6 @@
 export { searchSteamArtwork } from "./search.js";
-export { fetchSteamStoreArtwork, steamFallbackArtwork } from "./steam.js";
+export {
+  fetchSteamStoreArtwork,
+  isUnresolvedSteamArtwork,
+  steamFallbackArtwork,
+} from "./steam.js";

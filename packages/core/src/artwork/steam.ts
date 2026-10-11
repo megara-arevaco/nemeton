@@ -18,6 +18,13 @@ interface SteamStoreAppDetails {
 const isUrl = (value: unknown): value is string =>
   typeof value === "string" && value.startsWith("https://");
 
+// These fixed paths may return 404s or grey placeholders for newer Steam assets.
+export const isUnresolvedSteamArtwork = (url: string | null | undefined): boolean =>
+  !url ||
+  /^https:\/\/[^/]*steamstatic\.com\/steam\/apps\/\d+\/(?:header|library_600x900_2x|library_hero)\.jpg(?:\?.*)?$/.test(
+    url,
+  );
+
 export const steamFallbackArtwork = (appId: string): SteamArtwork => {
   const base = `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}`;
   return {
@@ -52,7 +59,7 @@ export const fetchSteamStoreArtwork = async (appId: string): Promise<SteamArtwor
   const header = isUrl(data?.header_image) ? data.header_image : fallback.coverUrl;
 
   return {
-    coverUrl: isUrl(data?.capsule_image) ? data.capsule_image : header,
+    coverUrl: header,
     heroUrl: isUrl(data?.background) ? data.background : (screenshot ?? header),
   };
 };

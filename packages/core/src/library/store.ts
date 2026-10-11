@@ -14,7 +14,11 @@ import type {
   SteamCandidate,
   SteamOwnedGame,
 } from "../shared/types.js";
-import { steamFallbackArtwork } from "../artwork/steam.js";
+import {
+  isUnresolvedSteamArtwork,
+  steamFallbackArtwork,
+  type SteamArtwork,
+} from "../artwork/steam.js";
 const emptySnapshot = (): LibrarySnapshot => ({
   version: 1,
   games: [],
@@ -184,6 +188,37 @@ export class LibraryStore {
         snapshot = this.applySteamInstalled(snapshot, installedGames);
       }
       await this.write(snapshot);
+      return snapshot;
+    });
+  }
+
+  async resolveSteamArtwork(
+    artwork: Map<string, SteamArtwork>,
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      let changed = false;
+
+      for (const game of snapshot.games) {
+        const resolved = artwork.get(game.sourceId);
+
+        if (game.source !== "steam" || game.coverPath || !resolved) {
+          continue;
+        }
+        // Recheck under the lock: never overwrite a user's concurrent artwork edit.
+        for (const field of ["coverUrl", "heroUrl"] as const) {
+          if (
+            isUnresolvedSteamArtwork(game[field]) &&
+            !isUnresolvedSteamArtwork(resolved[field])
+          ) {
+            game[field] = resolved[field];
+            changed = true;
+          }
+        }
+      }
+      if (changed) {
+        await this.write(snapshot);
+      }
       return snapshot;
     });
   }

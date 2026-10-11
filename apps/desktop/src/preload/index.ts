@@ -6,6 +6,7 @@ import type {
   SavegameVersionIntegrity,
 } from "../shared/savegames.js";
 import type { LibraryChange, PublishedLibrary } from "../shared/library-updates.js";
+import type { AppUpdateState } from "../shared/app-updates.js";
 import type { IpcArgs, IpcChannel } from "../shared/ipc-contracts.js";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
@@ -48,6 +49,17 @@ const api = {
   minimizeWindow: (): Promise<void> => invoke("window:minimize"),
   toggleMaximizeWindow: (): Promise<void> => invoke("window:toggle-maximize"),
   closeWindow: (): Promise<void> => invoke("window:close"),
+  getAppUpdateState: (): Promise<AppUpdateState> => invoke("updates:status"),
+  checkAppUpdates: (): Promise<AppUpdateState> => invoke("updates:check"),
+  downloadAppUpdate: (): Promise<AppUpdateState> => invoke("updates:download"),
+  installAppUpdate: (): Promise<void> => invoke("updates:install"),
+  openAppRelease: (): Promise<void> => invoke("updates:open-release"),
+  onAppUpdateChanged: (callback: (state: AppUpdateState) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, state: AppUpdateState) =>
+      callback(state);
+    ipcRenderer.on("updates:changed", listener);
+    return () => ipcRenderer.removeListener("updates:changed", listener);
+  },
   listGames: (): Promise<PublishedLibrary> => invoke("library:list"),
   getWorkspaceStatus: (): Promise<{ branch: string | null; version: string }> =>
     invoke("workspace:status"),

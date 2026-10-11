@@ -60,19 +60,12 @@ jobs:
           $version = (Get-Content package.json | ConvertFrom-Json).version
           $releaseDirectory = "apps/desktop/release"
           $artifacts = @(
-            @{
-              Source = "$releaseDirectory/Nemeton Setup $version.exe"
-              Target = "$releaseDirectory/Nemeton-Setup-$version.exe"
-            }
-            @{
-              Source = "$releaseDirectory/Nemeton Portable $version.exe"
-              Target = "$releaseDirectory/Nemeton-Portable-$version.exe"
-            }
+            "$releaseDirectory/Nemeton-Setup-$version.exe"
+            "$releaseDirectory/Nemeton-Portable-$version.exe"
           )
           $checksums = foreach ($artifact in $artifacts) {
-            Move-Item -LiteralPath $artifact.Source -Destination $artifact.Target
-            $hash = (Get-FileHash -Algorithm SHA256 $artifact.Target).Hash.ToLowerInvariant()
-            "$hash  $(Split-Path -Leaf $artifact.Target)"
+            $hash = (Get-FileHash -Algorithm SHA256 $artifact).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path -Leaf $artifact)"
           }
           $checksums | Set-Content -Encoding utf8 "$releaseDirectory/SHA256SUMS.txt"
 
@@ -86,6 +79,8 @@ jobs:
             "apps/desktop/release/Nemeton-Setup-$version.exe"
             "apps/desktop/release/Nemeton-Portable-$version.exe"
             "apps/desktop/release/SHA256SUMS.txt"
+            "apps/desktop/release/latest.yml"
+            "apps/desktop/release/Nemeton-Setup-$version.exe.blockmap"
           )
           gh release create $env:GITHUB_REF_NAME @artifacts `
             --generate-notes `

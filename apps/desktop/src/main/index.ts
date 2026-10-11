@@ -1,3 +1,4 @@
+import { registerAppUpdater } from "./app-updater.js";
 import { LibraryPublisher } from "./library-publisher.js";
 import { startPerformanceLog } from "./performance.js";
 import { registerLibraryHandlers } from "./ipc/library.js";
@@ -161,7 +162,11 @@ const scheduleSteamRefresh = (delayMs = 30_000) => {
 };
 
 const createWindow = () => {
+  // E2E keeps the real Electron/IPC stack without showing desktop windows.
+  const hiddenTestWindow =
+    Boolean(process.env.NEMETON_E2E_DATA) && process.env.NEMETON_E2E_HEADED !== "1";
   const window = new BrowserWindow({
+    show: !hiddenTestWindow,
     width: 1380,
     height: 860,
     minWidth: 980,
@@ -177,6 +182,7 @@ const createWindow = () => {
     webPreferences: {
       preload: path.join(directory, "../preload/index.cjs"),
       contextIsolation: true,
+      backgroundThrottling: !hiddenTestWindow,
       sandbox: true,
       nodeIntegration: false,
       webSecurity: true,
@@ -341,6 +347,7 @@ app
     registerArtworkHandlers(context);
     registerSteamHandlers(context);
     registerSystemHandlers(context);
+    registerAppUpdater();
 
     registerLibraryHandlers(context);
     registerSavegameHandlers(context);

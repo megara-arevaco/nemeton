@@ -1,3 +1,4 @@
+import { AppUpdates } from "./AppUpdates";
 import type { CSSProperties } from "react";
 import type {
   FolderSyncSettings,
@@ -94,6 +95,7 @@ export function SettingsView({
         <h1>{t("settings.title")}</h1>
         <p>{t("settings.subtitle")}</p>
       </div>
+      <AppUpdates />
       <section className="settings-card language-settings-card">
         <div>
           <h2>{t("settings.languageTitle")}</h2>

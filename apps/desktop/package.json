@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "node scripts/render-icon.cjs && electron-vite build",
-    "dist:win": "node scripts/render-icon.cjs && electron-vite build && electron-builder --win nsis portable",
-    "dist:win:installer": "node scripts/render-icon.cjs && electron-vite build && electron-builder --win nsis",
-    "dist:win:portable": "node scripts/render-icon.cjs && electron-vite build && electron-builder --win portable",
+    "dist:win": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win nsis portable",
+    "dist:win:installer": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win nsis",
+    "dist:win:portable": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win portable",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/render-icon.cjs"
   },
@@ -17,6 +17,7 @@
     "@launcher/core": "workspace:*",
     "@phosphor-icons/react": "^2.1.10",
     "@tanstack/react-query": "^5.102.8",
+    "electron-updater": "^6.8.9",
     "i18next": "^26.4.2",
     "js-yaml": "^5.4.1",
     "react": "^19.1.1",
@@ -48,6 +49,11 @@
   "build": {
     "appId": "io.nemeton.desktop",
     "productName": "Nemeton",
+    "publish": {
+      "provider": "github",
+      "owner": "megara-arevaco",
+      "repo": "nemeton"
+    },
     "directories": {
       "output": "release"
     },
@@ -69,7 +75,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "Nemeton Setup ${version}.${ext}",
+      "artifactName": "Nemeton-Setup-${version}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
@@ -80,7 +86,7 @@
       "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "Nemeton Portable ${version}.${ext}"
+      "artifactName": "Nemeton-Portable-${version}.${ext}"
     }
   }
 }

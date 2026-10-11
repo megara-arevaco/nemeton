@@ -154,7 +154,21 @@ navigation and filtering in a 1,000-game library, and save backup/verification/r
 with a safety copy. Each test uses an isolated user-data directory and blocks HTTP
 traffic; only native file-selection and confirmation dialogs are replaced.
 No separate Playwright browser download is required: tests use the workspace Electron.
-On Linux, use a working desktop display or `xvfb-run --auto-servernum corepack pnpm test`.
+E2E windows are hidden by default and do not take focus. These are still real Electron
+integration tests, not browser-only tests; setting Playwright's `headless` option alone
+would not hide Electron windows. Background throttling is disabled for hidden test
+windows so timers continue to run normally.
+
+For visible debugging only, opt in with `NEMETON_E2E_HEADED=1`:
+
+```bash
+NEMETON_E2E_HEADED=1 corepack pnpm test
+```
+
+In PowerShell, set `$env:NEMETON_E2E_HEADED = "1"` before running tests, and remove it
+with `Remove-Item Env:NEMETON_E2E_HEADED` afterwards.
+On Linux, even hidden Electron windows require a working display or
+`xvfb-run --auto-servernum corepack pnpm test` (a virtual display).
 Failure traces and screenshots are available in `test-results/` and the HTML report
 in `playwright-report/` (`corepack pnpm exec playwright show-report`).
 
@@ -177,8 +191,10 @@ corepack pnpm dist:win
 The current package version produces:
 
 ```text
-apps/desktop/release/Nemeton Setup 0.1.7.exe
-apps/desktop/release/Nemeton Portable 0.1.7.exe
+apps/desktop/release/Nemeton-Setup-0.1.7.exe
+apps/desktop/release/Nemeton-Portable-0.1.7.exe
+apps/desktop/release/Nemeton-Setup-0.1.7.exe.blockmap
+apps/desktop/release/latest.yml
 apps/desktop/release/win-unpacked/
 ```
 
@@ -203,6 +219,23 @@ portable path behavior still needs validation in a native Windows run.
 Cross-building from WSL or Linux can work when Wine and the required packaging tools
 are installed. Native Windows or a Windows CI runner remains the recommended release
 environment.
+
+## Application updates
+
+The Windows installed edition checks stable GitHub Releases 30 seconds after startup
+and every six hours. Settings also provides a manual check, download progress, and
+an explicit **Restart and install** button. Downloads are not automatic, and closing
+Nemeton does not install a pending update. Save your work before restarting.
+`electron-updater` verifies downloads against the SHA-512 metadata in `latest.yml`;
+this integrity check does not replace code signing.
+
+Development builds and non-Windows builds do not check or install updates. The
+portable edition offers a link to Releases instead: close Nemeton, replace the
+portable EXE, and keep the adjacent `NemetonData` directory.
+
+The first release containing this feature must be installed manually. Subsequent
+higher-version releases can be installed through the updater. End-to-end installer
+replacement still requires validation on native Windows.
 
 ## Project structure
 
@@ -232,8 +265,11 @@ git push origin v0.1.7
 
 The release workflow validates the tag against `package.json`, runs every quality
 check on a Windows runner, builds the NSIS and portable editions, generates
-`SHA256SUMS.txt`, and publishes all three files to GitHub Releases with generated
-release notes. Published executables use portable asset names such as
+`SHA256SUMS.txt`, and publishes both executables, the checksums, `latest.yml`, and
+the installer's `.exe.blockmap` to GitHub Releases with generated release notes.
+Do not rename the installer after building: `latest.yml` references its exact name.
+Local distribution commands disable automatic publishing; the workflow publishes
+all assets together. Published executables use portable asset names such as
 `Nemeton-Setup-0.1.7.exe` and `Nemeton-Portable-0.1.7.exe`.
 
 The `apps/desktop/release/` directory is intentionally ignored; executables belong

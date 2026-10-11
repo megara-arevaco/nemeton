@@ -1,6 +1,32 @@
 export const resources = {
   es: {
     translation: {
+      "updates.title": "Actualizaciones de Nemeton",
+      "updates.description":
+        "Comprobamos nuevas versiones automáticamente. Tú decides cuándo descargar y reiniciar para instalar.",
+      "updates.version": "Versión actual: {{version}}",
+      "updates.loading": "Cargando estado…",
+      "updates.idle": "Listo para comprobar actualizaciones.",
+      "updates.checking": "Buscando actualizaciones…",
+      "updates.available": "Nueva versión disponible: {{version}}",
+      "updates.up-to-date": "Nemeton está actualizado.",
+      "updates.downloading": "Descargando: {{progress}} %",
+      "updates.downloaded":
+        "Versión {{version}} lista para instalar. Guarda tu trabajo antes de reiniciar.",
+      "updates.error":
+        "No se pudo actualizar. Comprueba tu conexión y vuelve a intentarlo.",
+      "updates.unsupported":
+        "La actualización automática no está disponible en esta edición.",
+      "updates.reason.development":
+        "Desactivada en desarrollo; no se consultan ni descargan versiones.",
+      "updates.reason.portable":
+        "Portable: descarga la nueva edición desde Releases y reemplaza el EXE con Nemeton cerrado. Conserva la carpeta NemetonData.",
+      "updates.reason.platform":
+        "La instalación automática está disponible solo en el instalador de Windows.",
+      "updates.check": "Buscar actualizaciones",
+      "updates.download": "Descargar actualización",
+      "updates.install": "Reiniciar e instalar",
+      "updates.releases": "Abrir Releases",
       "language.label": "Idioma",
       "language.spanish": "Español",
       "language.english": "English",
@@ -493,6 +519,30 @@ export const resources = {
   },
   en: {
     translation: {
+      "updates.title": "Nemeton updates",
+      "updates.description":
+        "We check for new versions automatically. You decide when to download and restart to install.",
+      "updates.version": "Current version: {{version}}",
+      "updates.loading": "Loading status…",
+      "updates.idle": "Ready to check for updates.",
+      "updates.checking": "Checking for updates…",
+      "updates.available": "New version available: {{version}}",
+      "updates.up-to-date": "Nemeton is up to date.",
+      "updates.downloading": "Downloading: {{progress}} %",
+      "updates.downloaded":
+        "Version {{version}} is ready to install. Save your work before restarting.",
+      "updates.error": "Update failed. Check your connection and try again.",
+      "updates.unsupported": "Automatic updates are not available in this edition.",
+      "updates.reason.development":
+        "Disabled in development; no releases are checked or downloaded.",
+      "updates.reason.portable":
+        "Portable: download the new edition from Releases and replace the EXE with Nemeton closed. Keep the NemetonData folder.",
+      "updates.reason.platform":
+        "Automatic installation is only available in the Windows installer.",
+      "updates.check": "Check for updates",
+      "updates.download": "Download update",
+      "updates.install": "Restart and install",
+      "updates.releases": "Open Releases",
       "language.label": "Language",
       "language.spanish": "Español",
       "language.english": "English",

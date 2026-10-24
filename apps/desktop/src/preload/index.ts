@@ -8,6 +8,12 @@ import type {
 import type { LibraryChange, PublishedLibrary } from "../shared/library-updates.js";
 import type { AppUpdateState } from "../shared/app-updates.js";
 import type { IpcArgs, IpcChannel } from "../shared/ipc-contracts.js";
+import type {
+  DownloadsSnapshot,
+  StartDownloadInput,
+  DownloadAction,
+  DownloadFileAction,
+} from "../shared/downloads.js";
 import { contextBridge, ipcRenderer } from "electron";
 import type {
   ArtworkSuggestion,
@@ -42,6 +48,27 @@ const invoke = async <K extends IpcChannel>(channel: K, ...args: IpcArgs<K>) => 
 };
 
 const api = {
+  getDownloads: (): Promise<DownloadsSnapshot> => invoke("downloads:status"),
+  connectRealDebrid: (token: string): Promise<DownloadsSnapshot> =>
+    invoke("downloads:connect", token),
+  disconnectRealDebrid: (): Promise<DownloadsSnapshot> =>
+    invoke("downloads:disconnect"),
+  chooseDownloadDirectory: (): Promise<DownloadsSnapshot> =>
+    invoke("downloads:directory"),
+  chooseDownloadTorrent: (): Promise<{ id: string; name: string } | null> =>
+    invoke("downloads:choose-torrent"),
+  selectDownloadFiles: (id: string, fileIds: string[]): Promise<DownloadsSnapshot> =>
+    invoke("downloads:select", id, fileIds),
+  startDownload: (input: StartDownloadInput): Promise<DownloadsSnapshot> =>
+    invoke("downloads:start", input),
+  controlDownload: (id: string, action: DownloadAction): Promise<DownloadsSnapshot> =>
+    invoke("downloads:control", id, action),
+  controlDownloadFile: (
+    id: string,
+    fileId: string,
+    action: DownloadFileAction,
+  ): Promise<DownloadsSnapshot> => invoke("downloads:file-control", id, fileId, action),
+  openDownload: (id: string): Promise<void> => invoke("downloads:open", id),
   recordPerformance: (
     name: "ui:library-ready" | "ui:game-ready",
     elapsedMs: number,

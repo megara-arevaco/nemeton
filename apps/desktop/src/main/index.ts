@@ -1,4 +1,5 @@
 import { registerAppUpdater } from "./app-updater.js";
+import { registerDownloadHandlers } from "./ipc/downloads.js";
 import { LibraryPublisher } from "./library-publisher.js";
 import { startPerformanceLog } from "./performance.js";
 import { registerLibraryHandlers } from "./ipc/library.js";
@@ -183,6 +184,7 @@ const createWindow = () => {
       preload: path.join(directory, "../preload/index.cjs"),
       contextIsolation: true,
       backgroundThrottling: !hiddenTestWindow,
+      offscreen: hiddenTestWindow,
       sandbox: true,
       nodeIntegration: false,
       webSecurity: true,
@@ -347,6 +349,7 @@ app
     registerArtworkHandlers(context);
     registerSteamHandlers(context);
     registerSystemHandlers(context);
+    await registerDownloadHandlers();
     registerAppUpdater();
 
     registerLibraryHandlers(context);

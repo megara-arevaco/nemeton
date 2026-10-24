@@ -112,7 +112,7 @@ export function useLibraryController() {
   };
 }
 
-export type AppView = "library" | "statistics" | "settings";
+export type AppView = "library" | "statistics" | "settings" | "downloads";
 
 type AppOverlay =
   | { type: "add-game" }
@@ -273,6 +273,9 @@ export function useApp() {
   }, []);
   const openSettings = useCallback(() => {
     dispatchNavigation({ type: "open-view", view: "settings" });
+  }, []);
+  const openDownloads = useCallback(() => {
+    dispatchNavigation({ type: "open-view", view: "downloads" });
   }, []);
   const addGame = useCallback(() => {
     dispatchNavigation({ type: "open-overlay", overlay: { type: "add-game" } });
@@ -531,6 +534,7 @@ export function useApp() {
     openLibrary,
     openStatistics,
     openSettings,
+    openDownloads,
     addGame,
     selectGame,
     openGameMenu,

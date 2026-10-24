@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { downloadUrlSchema, startDownloadSchema } from "./downloads.js";
 
 const id = z
   .string()
@@ -43,6 +44,26 @@ export const savegamePolicySchema = z.object({
 });
 
 export const ipcContracts = {
+  "downloads:status": z.tuple([]),
+  "downloads:connect": z.tuple([
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(4096)
+      .regex(/^[a-zA-Z0-9_-]+$/),
+  ]),
+  "downloads:disconnect": z.tuple([]),
+  "downloads:directory": z.tuple([]),
+  "downloads:choose-torrent": z.tuple([]),
+  "downloads:select": z.tuple([id, z.array(id).min(1).max(10000)]),
+  "downloads:file-control": z.tuple([id, id, z.enum(["pause", "resume", "cancel"])]),
+  "downloads:start": z.tuple([startDownloadSchema]),
+  "downloads:control": z.tuple([
+    id,
+    z.enum(["pause", "resume", "cancel", "retry", "remove"]),
+  ]),
+  "downloads:open": z.tuple([id]),
   "performance:record": z.tuple([
     z.enum([
       "library:list",

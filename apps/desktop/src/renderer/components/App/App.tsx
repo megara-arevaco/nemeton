@@ -5,6 +5,7 @@ import type { BacklogStatus } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { DotsThree } from "@phosphor-icons/react/DotsThree";
 import { Gear } from "@phosphor-icons/react/Gear";
+import { DownloadSimple } from "@phosphor-icons/react/DownloadSimple";
 import { Image } from "@phosphor-icons/react/Image";
 import { LockKey } from "@phosphor-icons/react/LockKey";
 import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
@@ -46,6 +47,12 @@ const EditGameModal = lazy(() =>
 
 const SettingsView = lazy(() =>
   import("../SettingsView").then((module) => ({ default: module.SettingsView })),
+);
+
+const DownloadsView = lazy(() =>
+  import("../DownloadsView/DownloadsView").then((module) => ({
+    default: module.DownloadsView,
+  })),
 );
 
 const StatisticsView = lazy(() =>
@@ -94,6 +101,7 @@ export function App() {
     openLibrary,
     openStatistics,
     openSettings,
+    openDownloads,
     addGame,
     selectGame,
     openGameMenu,
@@ -159,6 +167,7 @@ export function App() {
         onOpenLibrary={openLibrary}
         onOpenStatistics={openStatistics}
         onOpenSettings={openSettings}
+        onOpenDownloads={openDownloads}
         onAddGame={addGame}
         onSelect={selectGame}
         onContextMenu={openGameMenu}
@@ -219,7 +228,11 @@ export function App() {
                 "topbar-title [display:flex] [align-items:center] [gap:9px] [color:#a4a7b1] [font-size:13px] [font-weight:600]"
               }
             >
-              {view === "statistics" ? (
+              {view === "downloads" ? (
+                <>
+                  <DownloadSimple /> {t("downloads.title")}
+                </>
+              ) : view === "statistics" ? (
                 <>
                   <ChartDonut /> {t("app.statistics")}
                 </>
@@ -256,6 +269,10 @@ export function App() {
         ) : view === "statistics" ? (
           <Suspense fallback={<LoadingState />}>
             <StatisticsView games={games} sessions={sessions} />
+          </Suspense>
+        ) : view === "downloads" ? (
+          <Suspense fallback={<LoadingState />}>
+            <DownloadsView />
           </Suspense>
         ) : view === "settings" ? (
           <Suspense fallback={<LoadingState />}>

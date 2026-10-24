@@ -5,6 +5,7 @@ import type { LibraryGame } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { GameController } from "@phosphor-icons/react/GameController";
 import { Gear } from "@phosphor-icons/react/Gear";
+import { DownloadSimple } from "@phosphor-icons/react/DownloadSimple";
 import { Plus } from "@phosphor-icons/react/Plus";
 import { Button } from "../Button";
 import { formatPlaytime, gameCoverUrl } from "../../shared/presentation";
@@ -18,6 +19,7 @@ export const Sidebar = memo(function Sidebar({
   onOpenLibrary,
   onOpenStatistics,
   onOpenSettings,
+  onOpenDownloads,
   onAddGame,
   onSelect,
   onContextMenu,
@@ -27,10 +29,11 @@ export const Sidebar = memo(function Sidebar({
   totalCount: number;
   selectedId: string | null;
   runningGameIds: Set<string>;
-  view: "library" | "statistics" | "settings";
+  view: "library" | "statistics" | "settings" | "downloads";
   onOpenLibrary: () => void;
   onOpenStatistics: () => void;
   onOpenSettings: () => void;
+  onOpenDownloads: () => void;
   onAddGame: () => void;
   onSelect: (gameId: string) => void;
   onContextMenu: (game: LibraryGame, x: number, y: number) => void;
@@ -75,6 +78,12 @@ export const Sidebar = memo(function Sidebar({
           onClick={onOpenStatistics}
         >
           <ChartDonut /> {t("sidebar.statistics")}
+        </button>
+        <button
+          className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "downloads" ? "active" : ""}`}
+          onClick={onOpenDownloads}
+        >
+          <DownloadSimple /> {t("downloads.title")}
         </button>
         <button
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "settings" ? "active" : ""}`}

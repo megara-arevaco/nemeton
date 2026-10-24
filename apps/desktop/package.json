@@ -26,6 +26,7 @@
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-i18next": "^17.0.16",
+    "webtorrent": "^3.0.21",
     "yauzl": "^3.4.0",
     "yazl": "^3.3.1",
     "zod": "^4.5.4"
@@ -37,6 +38,7 @@
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
+    "@types/webtorrent": "^3.0.0",
     "@types/yauzl": "^3.4.0",
     "@types/yazl": "^3.3.1",
     "@vitejs/plugin-react": "^4.7.0",

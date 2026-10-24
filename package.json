@@ -6,7 +6,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "electron",
-      "esbuild"
+      "esbuild",
+      "node-datachannel"
     ]
   },
   "scripts": {

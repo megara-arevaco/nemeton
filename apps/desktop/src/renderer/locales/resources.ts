@@ -1,6 +1,9 @@
+import { downloadTranslations } from "./downloads";
+
 export const resources = {
   es: {
     translation: {
+      ...downloadTranslations.es,
       "updates.title": "Actualizaciones de Nemeton",
       "updates.description":
         "Comprobamos nuevas versiones automáticamente. Tú decides cuándo descargar y reiniciar para instalar.",
@@ -519,6 +522,7 @@ export const resources = {
   },
   en: {
     translation: {
+      ...downloadTranslations.en,
       "updates.title": "Nemeton updates",
       "updates.description":
         "We check for new versions automatically. You decide when to download and restart to install.",

@@ -136,7 +136,9 @@ export const test = base.extend<{
     try {
       const page = await launch();
       await use({
-        app: app!,
+        get app() {
+          return app!;
+        },
         page,
         directory,
         restart: async () => {

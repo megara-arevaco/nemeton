@@ -1,0 +1,325 @@
+.downloads-view {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px var(--page-gutter) 36px;
+  scrollbar-gutter: stable;
+}
+.downloads-heading h1 {
+  font-size: 28px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  margin: 0 0 8px;
+}
+.downloads-heading p,
+.downloads-config p {
+  color: var(--text-secondary);
+  line-height: 1.65;
+  max-width: 72ch;
+}
+.downloads-heading p {
+  margin: 0;
+}
+.downloads-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--border-default);
+  margin: 26px 0 24px;
+}
+.downloads-tabs button {
+  padding: 0 0 12px;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+}
+.downloads-tabs button[aria-current] {
+  color: var(--accent-a);
+  border-bottom-color: var(--accent-a);
+}
+.downloads-view h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+.downloads-view h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.downloads-view input,
+.downloads-view select,
+.downloads-view textarea {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--border-default);
+  background: var(--surface-canvas);
+  border-radius: var(--radius-field);
+  padding: 11px 12px;
+  color: var(--text-primary);
+  font: inherit;
+  caret-color: var(--accent-a);
+}
+.downloads-view textarea {
+  resize: vertical;
+  min-height: 76px;
+}
+.downloads-view input::placeholder,
+.downloads-view textarea::placeholder {
+  color: #9b9eaa;
+}
+.downloads-view :is(input, textarea, select, button, summary):focus-visible {
+  outline: 2px solid var(--accent-a);
+  outline-offset: 3px;
+}
+.downloads-view label {
+  display: grid;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  min-width: 0;
+}
+.downloads-view button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.downloads-tabs button:hover {
+  color: var(--text-primary);
+}
+.downloads-empty {
+  padding: 32px 0;
+  color: var(--text-secondary);
+}
+.downloads-empty h2 {
+  color: var(--text-primary);
+  margin-top: 12px;
+}
+.downloads-empty p {
+  max-width: 65ch;
+  line-height: 1.7;
+}
+.downloads-add-panel {
+  border-bottom: 1px solid var(--border-default);
+}
+.downloads-add-panel summary {
+  padding: 12px 0 18px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+.downloads-add-panel summary:hover {
+  color: var(--text-primary);
+}
+.downloads-add-panel summary h2 {
+  display: inline;
+}
+.downloads-add {
+  display: grid;
+  gap: 14px;
+  padding: 8px 0 28px;
+}
+.downloads-add h2 {
+  margin-bottom: 2px;
+}
+.downloads-add-fields {
+  display: grid;
+  grid-template-columns: 1fr minmax(180px, 0.6fr);
+  gap: 16px;
+}
+.downloads-add .downloads-actions {
+  margin-top: 0;
+}
+.downloads-selected-torrent {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  overflow-wrap: anywhere;
+}
+.downloads-queue-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 4px;
+}
+.downloads-queue-heading span {
+  font-size: 12px;
+  color: #a5a8b6;
+}
+.downloads-inline-form {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  margin: 20px 0 28px;
+}
+.downloads-inline-form label {
+  flex: 1;
+}
+.downloads-inline-form button {
+  flex-shrink: 0;
+}
+.downloads-job {
+  padding: 22px 0;
+  border-bottom: 1px solid var(--border-default);
+}
+.downloads-row-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+.downloads-row-heading > span {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.downloads-muted {
+  color: #a5a8b6;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.downloads-folder {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.downloads-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+.downloads-config section {
+  padding: 0 0 26px;
+  margin-bottom: 26px;
+  border-bottom: 1px solid var(--border-default);
+}
+.downloads-config section p {
+  margin: 8px 0 16px;
+}
+.downloads-view .downloads-error {
+  color: #ffb4b4;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+.downloads-view .downloads-notice {
+  color: var(--accent-a);
+  line-height: 1.6;
+}
+.downloads-hint {
+  color: #dfd0a4;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.downloads-hint button {
+  background: none;
+  border: 0;
+  color: var(--accent-a);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.downloads-job progress {
+  display: block;
+  width: 100%;
+  height: 7px;
+  appearance: none;
+  border: 0;
+  border-radius: 4px;
+  overflow: hidden;
+  accent-color: var(--accent-a);
+  margin: 12px 0;
+}
+.downloads-job progress::-webkit-progress-bar {
+  background: #ffffff18;
+}
+.downloads-job progress::-webkit-progress-value {
+  background: var(--accent-a);
+}
+.downloads-transfer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.downloads-status.is-completed {
+  color: var(--accent-a);
+}
+.downloads-status.is-error {
+  color: #ffb4b4;
+}
+.downloads-files {
+  margin-top: 20px;
+}
+.downloads-file {
+  padding: 18px 0 18px 18px;
+  border-left: 1px solid var(--border-default);
+}
+.downloads-file + .downloads-file {
+  border-top: 1px solid var(--border-default);
+}
+.downloads-file .downloads-actions {
+  margin-top: 10px;
+}
+.downloads-cloud {
+  margin-top: 18px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+.downloads-selection {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+.downloads-selection > button {
+  justify-self: start;
+}
+.downloads-view .downloads-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.downloads-check span {
+  overflow-wrap: anywhere;
+}
+.downloads-check small {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.downloads-check input {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  accent-color: var(--accent-a);
+  flex-shrink: 0;
+}
+@media (max-width: 1050px) {
+  .downloads-add-fields {
+    grid-template-columns: 1fr;
+  }
+  .downloads-inline-form {
+    flex-wrap: wrap;
+  }
+  .downloads-inline-form label {
+    flex-basis: 100%;
+  }
+  .downloads-file {
+    padding-left: 12px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .downloads-tabs button {
+    transition:
+      color 0.16s ease,
+      border-color 0.16s ease;
+  }
+}

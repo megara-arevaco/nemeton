@@ -23,7 +23,10 @@
     "typecheck": "corepack pnpm -r typecheck && corepack pnpm --filter @launcher/desktop exec tsc --noEmit -p ../../e2e/tsconfig.json",
     "test": "corepack pnpm test:e2e",
     "benchmark:performance": "corepack pnpm --filter @launcher/core exec tsx ../../scripts/benchmark-performance.mts",
-    "test:e2e": "corepack pnpm build && playwright test"
+    "test:e2e": "corepack pnpm build && playwright test",
+    "dist:linux": "corepack pnpm --filter @launcher/desktop dist:linux",
+    "dist:linux:deb": "corepack pnpm --filter @launcher/desktop dist:linux:deb",
+    "dist:linux:appimage": "corepack pnpm --filter @launcher/desktop dist:linux:appimage"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

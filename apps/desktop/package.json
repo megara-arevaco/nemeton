@@ -11,7 +11,10 @@
     "dist:win:installer": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win nsis",
     "dist:win:portable": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win portable",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/render-icon.cjs"
+    "icons": "node scripts/render-icon.cjs",
+    "dist:linux": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --linux deb AppImage --x64",
+    "dist:linux:deb": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --linux deb --x64",
+    "dist:linux:appimage": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --linux AppImage --x64"
   },
   "dependencies": {
     "@launcher/core": "workspace:*",
@@ -87,6 +90,24 @@
     },
     "portable": {
       "artifactName": "Nemeton-Portable-${version}.${ext}"
+    },
+    "linux": {
+      "icon": "resources/icon.png",
+      "target": [
+        "deb",
+        "AppImage"
+      ],
+      "category": "Game",
+      "maintainer": "megara-arevaco <megara-arevaco@users.noreply.github.com>",
+      "artifactName": "Nemeton-${version}-${arch}.${ext}",
+      "executableName": "nemeton",
+      "desktop": {
+        "entry": {
+          "Name": "Nemeton"
+        }
+      }
     }
-  }
+  },
+  "description": "Nemeton desktop game library",
+  "homepage": "https://github.com/megara-arevaco/nemeton"
 }

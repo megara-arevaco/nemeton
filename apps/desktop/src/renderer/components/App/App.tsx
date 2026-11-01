@@ -1,3 +1,7 @@
+import { LibraryFilters } from "../LibraryFilters/LibraryFilters";
+import { GameSessions } from "../GameSessions/GameSessions";
+import { ProviderActions } from "../GameCopies/ProviderActions";
+import { GameCopies } from "../GameCopies/GameCopies";
 import { LoadingState } from "../LoadingState";
 import { useTranslation } from "react-i18next";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -67,6 +71,14 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     games,
+    rawGames,
+    selectedGroup,
+    storeFilter,
+    setStoreFilter,
+    collectionFilter,
+    setCollectionFilter,
+    installedOnly,
+    setInstalledOnly,
     libraryLoading,
     sessions,
     setSessions,
@@ -89,6 +101,7 @@ export function App() {
     metadata,
     view,
     showAddGame,
+    downloadedGame,
     artworkGame,
     editGame,
     deleteGame,
@@ -104,6 +117,7 @@ export function App() {
     openDownloads,
     addGame,
     selectGame,
+    selectCopy,
     openGameMenu,
     updateQuery,
     updateCollectionState,
@@ -133,6 +147,17 @@ export function App() {
     deletingGame,
     deleteGameError,
   } = useApp();
+  const libraryFilters = (
+    <LibraryFilters
+      games={rawGames}
+      store={storeFilter}
+      collection={collectionFilter}
+      installed={installedOnly}
+      onStore={setStoreFilter}
+      onCollection={setCollectionFilter}
+      onInstalled={setInstalledOnly}
+    />
+  );
   const [allAchievementsVisible, setAllAchievementsVisible] = useState(false);
   const [achievementFilter, setAchievementFilter] = useState<
     "all" | "unlocked" | "locked"
@@ -197,17 +222,18 @@ export function App() {
                   placeholder={t("app.search")}
                 />
               </label>
-              <button
+              <Button
+                size="small"
+                variant={favoritesOnly ? "setup" : "secondary"}
                 type="button"
                 aria-label={t("library.favorites")}
                 aria-pressed={favoritesOnly}
                 title={t("library.favorites")}
                 onClick={() => setFavoritesOnly(!favoritesOnly)}
-                className={`[display:flex] [align-items:center] [gap:6px] [min-height:38px] [border:1px_solid_#ffffff12] [border-radius:10px] [padding:0_10px] [background:#ffffff06] [color:#a4a7b1] [cursor:pointer] [&_svg]:[width:16px] ${favoritesOnly ? "[border-color:color-mix(in_srgb,_var(--accent-a)_48%,_transparent)] [background:color-mix(in_srgb,_var(--accent-a)_10%,_transparent)] [color:var(--accent-a)]" : ""}`}
               >
                 <Star weight={favoritesOnly ? "fill" : "regular"} />
                 <span>{t("library.favorites")}</span>
-              </button>
+              </Button>
               <select
                 aria-label={t("library.backlogFilter")}
                 value={backlogFilter}
@@ -307,6 +333,7 @@ export function App() {
                   className={
                     "hero-art [position:absolute] [inset:0] [width:100%] [height:100%] [object-fit:cover] [object-position:center]"
                   }
+                  key={gameHeroUrl(selected)}
                   src={gameHeroUrl(selected)!}
                   alt={t("app.gameArtwork", { title: selected.title })}
                   onError={hideBrokenImage}
@@ -331,7 +358,7 @@ export function App() {
                     ? t("app.nowPlaying")
                     : selected.source === "steam"
                       ? `STEAM · ${selected.installed ? t("app.installed") : t("app.inYourAccount")}`
-                      : t("app.localGame")}
+                      : `${t(`stores.${selected.source}`)} · ${selected.installed ? t("app.installed") : t("app.inYourAccount")}`}
                 </span>
                 <h1>{selected.title}</h1>
                 <p>{selected.installPath}</p>
@@ -343,12 +370,11 @@ export function App() {
                   <span>
                     <b>
                       {formatPlaytime(
-                        selected.platformPlaytimeMinutes ?? selected.playtimeMinutes,
+                        (selectedGroup?.totalSeconds ?? selected.playtimeMinutes * 60) /
+                          60,
                       )}
                     </b>{" "}
-                    {selected.source === "steam"
-                      ? t("app.steamTime")
-                      : t("app.totalTime")}
+                    {t("app.totalTime")}
                   </span>
                   <span>
                     <b>
@@ -362,7 +388,9 @@ export function App() {
                   </span>
                 </div>
                 <div className="[display:flex] [align-items:center] [gap:8px] [margin-bottom:12px] [-webkit-app-region:no-drag]">
-                  <button
+                  <Button
+                    size="small"
+                    variant={selected.favorite ? "setup" : "secondary"}
                     type="button"
                     aria-pressed={selected.favorite === true}
                     onClick={() =>
@@ -370,11 +398,10 @@ export function App() {
                         favorite: selected.favorite !== true,
                       })
                     }
-                    className="[display:inline-flex] [align-items:center] [gap:6px] [min-height:34px] [border:1px_solid_#ffffff18] [border-radius:9px] [padding:0_10px] [background:#ffffff08] [color:#d1d2d8] [cursor:pointer] [&_svg]:[width:15px]"
                   >
                     <Star weight={selected.favorite ? "fill" : "regular"} />
                     {selected.favorite ? t("app.favorite") : t("app.addFavorite")}
-                  </button>
+                  </Button>
                   <select
                     aria-label={t("app.backlogStatus")}
                     value={selected.backlogStatus ?? ""}
@@ -423,6 +450,28 @@ export function App() {
               </div>
               {metadata && <GameMetadata metadata={metadata} />}
             </section>
+            {(selected.source === "epic" || selected.source === "gog") && (
+              <ProviderActions key={`provider-${selected.id}`} game={selected} />
+            )}
+            {selectedGroup && (
+              <GameCopies
+                key={selected.id}
+                group={selectedGroup}
+                selected={selected}
+                games={rawGames}
+                onSelect={selectCopy}
+                onUpdated={updateLibrary}
+              />
+            )}
+            {selectedGroup && (
+              <GameSessions
+                key={`sessions-${selectedGroup.id}`}
+                sessions={sessions.filter(
+                  (session) => session.gameId === selectedGroup.game.id,
+                )}
+                copies={selectedGroup.copies}
+              />
+            )}
             {selected.source === "local" &&
               achievements &&
               achievements.total === 0 && (
@@ -503,18 +552,19 @@ export function App() {
                   </div>
                   <div className="[display:flex] [align-items:center] [gap:10px]">
                     {achievements.items.length > 8 && (
-                      <button
+                      <Button
+                        size="small"
+                        variant="ghost"
                         type="button"
                         aria-expanded={allAchievementsVisible}
                         onClick={() =>
                           setAllAchievementsVisible(!allAchievementsVisible)
                         }
-                        className="achievement-control [min-height:32px] [border:0] [border-radius:7px] [padding:0_8px] [background:transparent] [color:var(--accent-a)] [font-size:12px] [font-weight:600] [cursor:pointer]"
                       >
                         {allAchievementsVisible
                           ? t("app.showFeaturedAchievements")
                           : t("app.viewAllAchievements")}
-                      </button>
+                      </Button>
                     )}
                     {allAchievementsVisible && achievements.items.length > 8 && (
                       <select
@@ -612,7 +662,7 @@ export function App() {
                 )}
               </section>
             )}
-            {selected.source === "local" && (
+            {
               <Suspense
                 fallback={
                   <LoadingState variant="panel" label={t("app.preparingGames")} />
@@ -620,16 +670,60 @@ export function App() {
               >
                 <SavegamesPanel key={selected.id} game={selected} />
               </Suspense>
-            )}
+            }
           </div>
         ) : visibleGames.length > 0 ? (
           <LibraryCollection
             games={visibleGames}
             runningGameIds={runningGameIds}
             onSelect={selectGame}
+            intro={
+              <>
+                {libraryFilters}
+                {!query && !favoritesOnly && backlogFilter === "all" && (
+                  <div className="home-suggestions">
+                    {[
+                      {
+                        title: "home.continue",
+                        items: [...games]
+                          .filter((game) => game.lastPlayedAt && game.installed)
+                          .sort((a, b) =>
+                            (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? ""),
+                          )
+                          .slice(0, 3),
+                      },
+                      {
+                        title: "home.pending",
+                        items: games
+                          .filter((game) => game.backlogStatus === "pending")
+                          .slice(0, 3),
+                      },
+                    ]
+                      .filter((section) => section.items.length)
+                      .map((section) => (
+                        <section key={section.title}>
+                          <h2>{t(section.title)}</h2>
+                          <div>
+                            {section.items.map((game) => (
+                              <Button
+                                key={game.id}
+                                variant="secondary"
+                                onClick={() => selectGame(game.id)}
+                              >
+                                {game.title}
+                              </Button>
+                            ))}
+                          </div>
+                        </section>
+                      ))}
+                  </div>
+                )}
+              </>
+            }
           />
         ) : libraryGames.length > 0 ? (
           <section className="[display:grid] [place-content:center] [justify-items:center] [gap:14px] [margin:0_34px] [padding:32px] [border:1px_dashed_#ffffff17] [border-radius:20px] [background:#ffffff04] [text-align:center]">
+            {libraryFilters}
             <h1 className="[margin:0] [font-size:24px]">{t("library.noResults")}</h1>
             <p className="[max-width:440px] [margin:0] [color:#9699a4] [font-size:13px] [line-height:1.55]">
               {t("library.noResultsHelp")}
@@ -668,13 +762,9 @@ export function App() {
                 {t("app.addLocalGame")}
               </Button>
             </div>
-            <button
-              type="button"
-              className="[border:0] [background:transparent] [color:#9ca0ab] [font-size:11px] [text-decoration:underline] [text-underline-offset:3px] [cursor:pointer]"
-              onClick={openSettings}
-            >
+            <Button size="small" variant="ghost" type="button" onClick={openSettings}>
               {t("app.connectFullLibraryOptional")}
-            </button>
+            </Button>
           </section>
         )}
         <footer className="app-statusbar">
@@ -696,7 +786,12 @@ export function App() {
             <LoadingState variant="overlay" label={t("app.preparingOptions")} />
           }
         >
-          <AddGameModal onClose={closeAddGame} onCreated={onLocalGameCreated} />
+          <AddGameModal
+            onClose={closeAddGame}
+            onCreated={onLocalGameCreated}
+            initialTitle={downloadedGame?.title}
+            initialExecutablePath={downloadedGame?.executablePath}
+          />
         </Suspense>
       )}
       {artworkGame && (

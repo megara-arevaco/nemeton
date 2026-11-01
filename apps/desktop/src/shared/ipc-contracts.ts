@@ -44,7 +44,35 @@ export const savegamePolicySchema = z.object({
 });
 
 export const ipcContracts = {
+  "providers:status": z.tuple([]),
+  "providers:cancel": z.tuple([z.enum(["epic", "gog"])]),
+  "providers:playtime": z.tuple([id]),
+  "providers:helper": z.tuple([z.enum(["epic", "gog"])]),
+  "providers:login": z.tuple([z.enum(["epic", "gog"])]),
+  "providers:helper-site": z.tuple([z.enum(["epic", "gog"])]),
+  "providers:connect": z.tuple([
+    z.enum(["epic", "gog"]),
+    z.string().trim().min(8).max(8192),
+  ]),
+  "providers:disconnect": z.tuple([z.enum(["epic", "gog"])]),
+  "providers:refresh": z.tuple([z.enum(["epic", "gog"])]),
+  "providers:operate": z.tuple([id, z.enum(["install", "update", "verify"])]),
+  "providers:import-installed": z.tuple([id]),
   "downloads:status": z.tuple([]),
+  "downloads:control-all": z.tuple([z.enum(["pause", "resume"])]),
+  "downloads:configure": z.tuple([
+    z
+      .object({
+        maxConcurrent: z.number().int().min(1).max(6),
+        downloadLimitBytesPerSecond: z
+          .number()
+          .int()
+          .min(0)
+          .max(1024 * 1024 * 1024),
+      })
+      .strict(),
+  ]),
+  "downloads:priority": z.tuple([id, z.number().int().min(-1).max(1)]),
   "downloads:connect": z.tuple([
     z
       .string()
@@ -64,6 +92,8 @@ export const ipcContracts = {
     z.enum(["pause", "resume", "cancel", "retry", "remove"]),
   ]),
   "downloads:open": z.tuple([id]),
+  "downloads:choose-executable": z.tuple([id]),
+  "diagnostics:export": z.tuple([]),
   "performance:record": z.tuple([
     z.enum([
       "library:list",
@@ -87,9 +117,20 @@ export const ipcContracts = {
   "updates:install": z.tuple([]),
   "updates:open-release": z.tuple([]),
   "library:list": z.tuple([]),
+  "library:link-copies": z.tuple([z.array(id).min(1).max(100), id.nullable()]),
+  "library:organize": z.tuple([
+    id,
+    z
+      .object({
+        tags: z.array(title).max(50).optional(),
+        collections: z.array(title).max(50).optional(),
+      })
+      .strict(),
+  ]),
   "library:metadata": z.tuple([id]),
   "library:achievements": z.tuple([id]),
   "steam:settings": z.tuple([]),
+  "steam:disconnect": z.tuple([]),
   "steam:refresh-account": z.tuple([]),
   "steam:connect": z.tuple([
     z
@@ -99,8 +140,15 @@ export const ipcContracts = {
     z
       .string()
       .trim()
-      .regex(/^7656119\d{10}$/)
-      .or(z.literal(""))
+      .max(256)
+      .refine(
+        (value) =>
+          value === "" ||
+          /^7656119\d{10}$/.test(value) ||
+          /^https:\/\/steamcommunity\.com\/(profiles|id)\/[a-zA-Z0-9_-]+\/?$/.test(
+            value,
+          ),
+      )
       .optional(),
   ]),
   "library:scan-steam": z.tuple([]),

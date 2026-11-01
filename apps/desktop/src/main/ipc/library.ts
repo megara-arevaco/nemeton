@@ -1,3 +1,4 @@
+import { savegameStorageKey } from "../../shared/game-identity.js";
 import fs from "node:fs";
 import path from "node:path";
 import { BrowserWindow, dialog } from "electron";
@@ -8,6 +9,7 @@ import { openExternal } from "../platform.js";
 export function registerLibraryHandlers({
   awaitStartupReady,
   store,
+  broadcastLibrary,
   publishLibrarySnapshot,
   achievementService,
   coversDirectory,
@@ -15,6 +17,16 @@ export function registerLibraryHandlers({
   settingsStore,
   scheduleAutoSync,
 }: MainContext) {
+  handle("library:link-copies", async (_event, ids, canonicalId) => {
+    const snapshot = await store.linkCopies(ids, canonicalId);
+    await broadcastLibrary(snapshot);
+    return snapshot;
+  });
+  handle("library:organize", async (_event, id, state) => {
+    const snapshot = await store.organizeGame(id, state);
+    await broadcastLibrary(snapshot);
+    return snapshot;
+  });
   handle("library:list", async () => {
     await awaitStartupReady();
     return publishLibrarySnapshot(await store.read());
@@ -268,7 +280,7 @@ export function registerLibraryHandlers({
       await savegameManager.purgeGame(
         game.id,
         game.title,
-        game.sourceId,
+        savegameStorageKey(game),
         settings.syncFolderPath,
       );
       await achievementService.purgeGame(game.sourceId);

@@ -77,7 +77,17 @@ export function useSavegamesPanel(game: LibraryGame) {
   }, [verifiedVersion, displayedVersion, savegamesQuery.refetch]);
   const data =
     base && verification.data && verifiedVersion === displayedVersion
-      ? { ...base, ...verification.data }
+      ? {
+          ...base,
+          ...verification.data,
+          lastVerification:
+            verification.data.verifiedAt && verification.data.versionId
+              ? {
+                  verifiedAt: verification.data.verifiedAt,
+                  versionId: verification.data.versionId,
+                }
+              : base.lastVerification,
+        }
       : base;
   const busy =
     backupMutation.isPending ||

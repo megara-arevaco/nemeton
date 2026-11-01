@@ -12,7 +12,11 @@ import { useAddGameModal } from "./AddGameModal.hook";
 export function AddGameModal({
   onClose,
   onCreated,
+  initialTitle,
+  initialExecutablePath,
 }: Readonly<{
+  initialTitle?: string;
+  initialExecutablePath?: string;
   onClose: () => void;
   onCreated: (snapshot: LibrarySnapshot) => void;
 }>) {
@@ -31,7 +35,7 @@ export function AddGameModal({
     clearLudusavi,
     updateTitle,
     createGame,
-  } = useAddGameModal({ onClose, onCreated });
+  } = useAddGameModal({ onClose, onCreated, initialTitle, initialExecutablePath });
 
   return (
     <Modal
@@ -87,9 +91,15 @@ export function AddGameModal({
                     {automaticArtwork ? t("modal.artworkComplete") : ""}
                   </small>
                 </span>
-                <button type="button" onClick={clearLudusavi}>
+                <Button
+                  size="small"
+                  variant="ghost"
+                  type="button"
+                  aria-label={t("modal.unlinkLudusavi")}
+                  onClick={clearLudusavi}
+                >
                   <X />
-                </button>
+                </Button>
               </div>
             ) : searchingLudusavi || ludusaviSuggestions.length > 0 ? (
               <div
@@ -111,7 +121,7 @@ export function AddGameModal({
             </span>
             <div
               className={
-                "file-field [display:grid] [grid-template-columns:minmax(0,_1fr)_auto] [gap:8px] [&_button]:[display:flex] [&_button]:[align-items:center] [&_button]:[gap:7px] [&_button]:[border:1px_solid_#ffffff16] [&_button]:[border-radius:10px] [&_button]:[padding:0_13px] [&_button]:[background:#ffffff08] [&_button]:[cursor:pointer]"
+                "file-field [display:grid] [grid-template-columns:minmax(0,_1fr)_auto] [gap:8px]"
               }
             >
               <input
@@ -119,9 +129,9 @@ export function AddGameModal({
                 value={executablePath}
                 placeholder={t("modal.configureLater")}
               />
-              <button onClick={chooseExecutable}>
+              <Button variant="secondary" onClick={chooseExecutable}>
                 <FolderOpen /> {t("modal.browse")}
-              </button>
+              </Button>
             </div>
           </label>
           <div

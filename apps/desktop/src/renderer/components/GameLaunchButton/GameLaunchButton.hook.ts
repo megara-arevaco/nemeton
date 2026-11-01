@@ -9,6 +9,9 @@ export interface UseGameLaunchButtonOptions {
 export function useGameLaunchButton({ game, isRunning }: UseGameLaunchButtonOptions) {
   const { t } = useTranslation();
 
+  if (game.installationState === "installing") {
+    return { disabled: true, label: t("steam.installing"), status: "running" as const };
+  }
   if (isRunning) {
     return {
       disabled: true,

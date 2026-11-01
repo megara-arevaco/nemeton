@@ -1,3 +1,4 @@
+import { Button } from "../Button";
 import { LoadingState } from "../LoadingState";
 import type { LibraryGame } from "@launcher/core";
 import { useTranslation } from "react-i18next";
@@ -66,6 +67,15 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
       <p className="[margin:7px_0_0] [color:#9295a0] [font-size:11px] [line-height:1.5]">
         {t("savegames.providerNote")}
       </p>
+      {data?.lastVerification && (
+        <p className="save-sync-detail">
+          {t("savegames.lastVerified", {
+            date: new Date(data.lastVerification.verifiedAt).toLocaleString(
+              i18n.language,
+            ),
+          })}
+        </p>
+      )}
       {data?.backupFailure && (
         <p
           role="alert"
@@ -87,20 +97,22 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
             {conflictCopy} {t("savegames.conflictHelp")}
           </p>
           <div className="[display:flex] [flex-wrap:wrap] [gap:8px]">
-            <button
-              className="save-action"
+            <Button
+              variant="secondary"
+              size="small"
               disabled={busy}
               onClick={() => run(backup, "savegames.keptLocal")}
             >
               <FloppyDisk /> {t("savegames.keepLocal")}
-            </button>
-            <button
-              className="save-action"
+            </Button>
+            <Button
+              variant="secondary"
+              size="small"
               disabled={busy}
               onClick={() => run(restoreLatest, "savegames.restoredRemote")}
             >
               <ShieldCheck /> {t("savegames.restoreRemote")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -120,15 +132,16 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
                 >
                   {folderPath}
                 </span>
-                <button
-                  className="save-link"
+                <Button
+                  variant="ghost"
+                  size="small"
                   disabled={busy}
                   onClick={() =>
                     run(() => removeFolder(folderPath), "savegames.folderRemoved")
                   }
                 >
                   {t("savegames.removeFolder")}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -161,42 +174,46 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
         </div>
       )}
       <div className="[display:flex] [flex-wrap:wrap] [gap:8px] [margin-top:14px]">
-        <button
-          className="save-action"
+        <Button
+          variant="secondary"
+          size="small"
           disabled={busy}
           onClick={() => run(addFolder, "savegames.folderAdded")}
         >
           <FolderOpen /> {t("savegames.addFolder")}
-        </button>
+        </Button>
         {data &&
           data.paths.length > 0 &&
           data.syncConfigured &&
           data.syncState !== "path-missing" && (
-            <button
-              className="save-action save-action-primary"
+            <Button
+              variant="setup"
+              size="small"
               disabled={busy}
               onClick={() => run(backup, "savegames.synced")}
             >
               <FloppyDisk /> {t("savegames.createBackup")}
-            </button>
+            </Button>
           )}
         {verificationFailed && (
-          <button
-            className="save-action"
+          <Button
+            variant="secondary"
+            size="small"
             disabled={busy}
             onClick={() => void retryVerification()}
           >
             {t("savegames.retry")}
-          </button>
+          </Button>
         )}
         {data && data.syncConfigured && data.missingPaths.length > 0 && (
-          <button
-            className="save-action"
+          <Button
+            variant="secondary"
+            size="small"
             disabled={busy}
             onClick={() => run(chooseFolder, "savegames.folderUpdated")}
           >
             <FolderOpen /> {t("savegames.replaceMissingFolder")}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -322,15 +339,17 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
                     </small>
                   </div>
                   <div className="[display:flex] [flex-wrap:wrap] [justify-content:flex-end] [gap:6px]">
-                    <button
-                      className="save-link"
+                    <Button
+                      variant="ghost"
+                      size="small"
                       disabled={busy || state === "checking"}
                       onClick={() => void verifyVersion(version.id)}
                     >
                       {t("savegames.verifyVersion")}
-                    </button>
-                    <button
-                      className="save-link"
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="small"
                       disabled={busy}
                       onClick={() =>
                         run(
@@ -340,9 +359,10 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
                       }
                     >
                       {version.pinned ? t("savegames.unpin") : t("savegames.pin")}
-                    </button>
-                    <button
-                      className="save-action save-action-primary"
+                    </Button>
+                    <Button
+                      variant="setup"
+                      size="small"
                       disabled={busy || !data.syncConfigured || data.paths.length === 0}
                       onClick={() =>
                         run(
@@ -352,7 +372,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
                       }
                     >
                       {t("savegames.restoreVersion")}
-                    </button>
+                    </Button>
                   </div>
                 </article>
               );

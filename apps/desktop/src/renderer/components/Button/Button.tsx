@@ -7,12 +7,15 @@ type ButtonSize = "small" | "medium" | "large";
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  loading?: boolean;
   children: ReactNode;
 }
 
 export function Button({
   className = "",
   children,
+  loading = false,
+  disabled,
   size = "medium",
   type = "button",
   variant = "secondary",
@@ -22,6 +25,8 @@ export function Button({
     <button
       className={`${styles.button} ${styles[variant]} ${styles[size]} ${className}`}
       type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...props}
     >
       {children}

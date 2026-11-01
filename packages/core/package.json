@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./artwork/steam": "./src/artwork/steam.ts"
+    "./artwork/steam": "./src/artwork/steam.ts",
+    "./library/groups": "./src/library/groups.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

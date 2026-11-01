@@ -1,6 +1,35 @@
 # Matriz de implementación — revisión de mejoras de Nemeton
 
-Alcance de este bloque: cambios locales en `apps/desktop` y `packages/core` derivados de `/home/baul/Projects/REVISION-nemeton.md`. No se implementó monetización, distribución comercial ni despliegue. Esta matriz no implica que todo el informe esté resuelto.
+## Ampliación autorizada el 1 de noviembre de 2026
+
+El usuario autorizó implementar la revisión UI/UX y las mejoras conversadas de biblioteca, descargas, protección e integraciones. Se mantiene la opción 1: aplicación local, sin backend propio, con Steam Web API personal y herramientas locales para Epic y GOG.
+
+| Área                | Implementación actual                                                                                                                                                                                                    | Comprobación y límites                                                                                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UI y Descargas      | Botones comunes; cola e historial separados; errores por tarea; filtros; progreso y tiempo aproximado; configuración reorganizada.                                                                                       | Electron real, cinco acentos oscuros, ventana compacta y teclado.                                                                                                                |
+| Descargas avanzadas | Indicador lateral; pausa global que respeta pausas individuales; prioridad; concurrencia y límite compartido de velocidad; alta en biblioteca desde una descarga completada.                                             | Prioridad, pausa, persistencia y flujo de alta cubiertos por pruebas.                                                                                                            |
+| Biblioteca          | Juegos no instalados visibles; colecciones y etiquetas; búsqueda y filtros persistentes; accesos a juegos recientes y pendientes.                                                                                        | La colección y la selección de copia se conservan al reiniciar.                                                                                                                  |
+| Ficha unificada     | Agrupación explícita y reversible; selección de copia preferida; horas totales y por tienda; sesiones con procedencia.                                                                                                   | No se fusionan juegos por título. Las instalaciones y sesiones originales se conservan.                                                                                          |
+| Horas               | Reconciliación de incrementos de tienda con sesiones ya medidas, antes de sumar copias. Histórico de Epic en la importación; GOG bajo demanda con caché.                                                                 | Prueba de 20 h Steam + 8 h Epic + 5 h GOG = 33 h. Un histórico no consultable o con solapamiento inicial indeterminable se indica como parcial.                                  |
+| Steam local         | API key protegida; perfil por URL o SteamID64; cuentas locales; privacidad diferenciada de biblioteca vacía; logros de cuenta con caché; instalación delegada y seguimiento de manifiestos; Flatpak y raíz configurable. | No requiere servidor de Nemeton. El acceso depende de la privacidad y disponibilidad de Valve.                                                                                   |
+| Epic y GOG          | Adaptadores de Legendary y gogdl; autenticación por navegador y código; biblioteca, instalación, actualización, verificación y lanzamiento; transferencias visibles y cancelables.                                       | Las herramientas se configuran localmente. Integración probada con procesos auxiliares y respuestas simulados; hace falta validación con cuentas reales.                         |
+| Protección          | Panel y copias para todas las tiendas; claves de almacenamiento separadas por origen; fecha de última verificación correcta; copias de tiendas incluidas en paquetes portables.                                          | La nube de Steam/GOG no se sustituye ni se verifica su subida.                                                                                                                   |
+| Fiabilidad          | Recuperación visual ante un error de render; corrección de imágenes fallidas; diagnóstico exportable sin claves, cuentas, títulos ni rutas personales; cierre coordinado de transferencias y credenciales temporales.    | El diagnóstico se guarda solo cuando el usuario lo solicita.                                                                                                                     |
+| Distribución        | Smoke test de aplicación empaquetada; pasos de instalación nativa y firma condicional en CI de Windows.                                                                                                                  | Compilación nativa, arranque empaquetado e instalación/desinstalación aislada comprobados en Windows. Portable generado; falta probar su modo portable y firmar con certificado. |
+
+No se han publicado releases ni subido artefactos. La verificación de inicio de sesión con cuentas reales y la firma con un certificado real son dependencias externas pendientes, no resultados de las pruebas simuladas.
+
+### Validación de esta ampliación
+
+- Linux/WSL: **45/45 pruebas** correctas con Electron real, datos temporales y respuestas de tiendas simuladas.
+- Windows nativo: **44 correctas y una omitida**, correspondiente al auxiliar de pruebas POSIX de Epic/GOG. Compilación de instalador y portable correcta; arranque empaquetado y persistencia tras reiniciar comprobados.
+- Instalación silenciosa, arranque, persistencia y desinstalación comprobados con una identidad de aplicación exclusiva de prueba, sin reemplazar la instalación del usuario.
+- Tipos, lint y formato comprobados. No se han empleado credenciales ni partidas personales.
+- Evidencia visual guardada en `docs/evidence/ui/`: descargas, ventana compacta, configuración, ajustes y horas unificadas.
+
+Quedan pendientes cuentas reales de las tres tiendas, lector de pantalla, escalados/DPI adicionales, comportamiento de subida de servicios externos, ejecución del envoltorio portable y firma con certificado. Los auxiliares Legendary y gogdl deben instalarse/configurarse; no se distribuyen dentro de Nemeton. Los históricos sin información suficiente se muestran como parciales.
+
+La matriz histórica que sigue corresponde a revisiones anteriores; esta ampliación describe los cambios posteriores de la conversación actual.
 
 ## Funcionalidad y seguridad
 

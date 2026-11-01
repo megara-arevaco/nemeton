@@ -1,3 +1,4 @@
+import type { ProviderService } from "./providers.js";
 import type { LibrarySnapshot, LibraryStore } from "@launcher/core";
 import type { AchievementService } from "./achievements.js";
 import type { FolderSyncService } from "./folder-sync.js";
@@ -6,6 +7,7 @@ import type { SavegameManager } from "./savegames.js";
 import type { SettingsStore } from "./settings.js";
 import type { SteamSyncService } from "./steam-sync.js";
 export interface MainContext {
+  providerService: ProviderService;
   awaitStartupRecovery: () => Promise<void>;
   awaitStartupReady: () => Promise<void>;
   achievementService: AchievementService;

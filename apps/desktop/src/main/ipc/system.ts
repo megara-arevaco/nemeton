@@ -1,3 +1,4 @@
+import { savegameStorageKey } from "../../shared/game-identity.js";
 import { recordOperation } from "../operation-metrics.js";
 import { withFileLock } from "@launcher/core";
 import { savegamePolicySchema } from "../../shared/ipc-contracts.js";
@@ -141,6 +142,11 @@ export const registerSystemHandlers = ({
       id: game.id,
       source: game.source,
       sourceId: game.sourceId,
+      canonicalId: game.canonicalId ?? null,
+      platformCreditedSeconds: game.platformCreditedSeconds,
+      playtimeOverlapUnknown: game.playtimeOverlapUnknown,
+      tags: game.tags,
+      collections: game.collections,
       steamAppId: game.steamAppId ?? null,
       achievementStateId: game.achievementStateId ?? null,
       ludusaviGameName: game.ludusaviGameName ?? null,
@@ -164,10 +170,9 @@ export const registerSystemHandlers = ({
       Awaited<ReturnType<typeof savegameManager.getPolicy>>
     > = {};
 
-    for (const game of snapshot.games.filter((item) => item.source === "local")) {
-      savegamePolicies[`local:${game.sourceId}`] = await savegameManager.getPolicy(
-        game.id,
-      );
+    for (const game of snapshot.games) {
+      savegamePolicies[`${game.source}:${game.sourceId}`] =
+        await savegameManager.getPolicy(game.id);
     }
 
     const portable = portableDataSchema.parse({
@@ -277,14 +282,12 @@ export const registerSystemHandlers = ({
         let remaining = MAX_PORTABLE_BACKUPS_BYTES;
         let index = 0;
 
-        for (const [gameIndex, game] of snapshot.games
-          .filter((item) => item.source === "local")
-          .entries()) {
+        for (const [gameIndex, game] of snapshot.games.entries()) {
           const gameStage = path.join(staging, `game-${gameIndex}`);
           await fs.promises.mkdir(gameStage);
           const files = await savegameManager.createPortableBackupFiles(
             syncSettings.syncFolderPath,
-            game.sourceId,
+            savegameStorageKey(game),
             gameStage,
             remaining,
           );
@@ -294,7 +297,7 @@ export const registerSystemHandlers = ({
             const packagePath = `backups/backup-${index++}.zip`;
             backups.push({
               path: packagePath,
-              gameKey: `local:${game.sourceId}`,
+              gameKey: `${game.source}:${game.sourceId}`,
               versionId: backup.versionId,
               size: backup.size,
               sha256: backup.sha256,
@@ -444,7 +447,15 @@ export const registerSystemHandlers = ({
           }
 
           for (const backup of prepared.backups) {
-            const sourceId = backup.gameKey.slice("local:".length);
+            const separator = backup.gameKey.indexOf(":");
+            const source = backup.gameKey.slice(
+              0,
+              separator,
+            ) as import("@launcher/core").GameSource;
+            const sourceId = savegameStorageKey({
+              source,
+              sourceId: backup.gameKey.slice(separator + 1),
+            });
             const imported = await savegameManager.importPortableBackup(
               syncSettings.syncFolderPath!,
               sourceId!,

@@ -1,7 +1,10 @@
+import { toWindowsPath, toLocalPath } from "../shared/system-paths.js";
 import { execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { app, shell } from "electron";
+
+export { toWindowsPath, toLocalPath, toLinuxPath } from "../shared/system-paths.js";
 const execFileAsync = promisify(execFile);
 const powershellPath = "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe";
 
@@ -11,33 +14,8 @@ export function delay(milliseconds: number) {
   });
 }
 
-export function toWindowsPath(input: string) {
-  const match = /^\/mnt\/([a-z])\/(.*)$/i.exec(input);
-
-  if (!match) {
-    return input;
-  }
-
-  return `${match[1]!.toUpperCase()}:\\${match[2]!.replaceAll("/", "\\")}`;
-}
-
-export function toLocalPath(input: string) {
-  const normalized = input.trim();
-  const match = /^([a-z]):[\\/](.*)$/i.exec(normalized);
-
-  if (!process.env.WSL_DISTRO_NAME || !match) {
-    return normalized;
-  }
-
-  return `/mnt/${match[1]!.toLowerCase()}/${match[2]!.replaceAll("\\", "/")}`;
-}
-
-export function toLinuxPath(input: string) {
-  return toLocalPath(input);
-}
-
 export async function openExternal(target: string) {
-  if (!/^steam:\/\/(rungameid|uninstall)\/\d+$/.test(target)) {
+  if (!/^steam:\/\/(rungameid|uninstall|install)\/\d+$/.test(target)) {
     throw new Error("Enlace de Steam no permitido");
   }
   if (!process.env.WSL_DISTRO_NAME) {

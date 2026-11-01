@@ -1,3 +1,4 @@
+import { queryKeys } from "../../queries/queryKeys";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -87,6 +88,11 @@ export function useSettingsView(options: SettingsViewOptions) {
     try {
       const result = await connectMutation.mutateAsync();
       onConnected(result.snapshot, result.ownedCount);
+      queryClient.setQueryData(
+        queryKeys.steamSettings,
+        await window.launcher.getSteamSettings(),
+      );
+      setSteamIdDraft(null);
       setApiKey("");
       setStatus({
         key: "settings.feedback.imported",
@@ -309,6 +315,7 @@ export function useSettingsView(options: SettingsViewOptions) {
 
       const snapshot = result?.snapshot ?? (await syncSteamMutation.mutateAsync());
       onLibraryUpdated(snapshot);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.steamSettings });
       const installedCount = snapshot.games.filter(
         (game) => game.source === "steam" && game.installed && !game.hiddenFromLibrary,
       ).length;

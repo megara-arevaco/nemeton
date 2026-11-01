@@ -1,9 +1,11 @@
+import { productTranslations } from "./product";
 import { downloadTranslations } from "./downloads";
 
 export const resources = {
   es: {
     translation: {
       ...downloadTranslations.es,
+      ...productTranslations.es,
       "updates.title": "Actualizaciones de Nemeton",
       "updates.description":
         "Comprobamos nuevas versiones automáticamente. Tú decides cuándo descargar y reiniciar para instalar.",
@@ -305,6 +307,7 @@ export const resources = {
       "modal.artworkTitle": "Carátula y arte",
       "modal.artworkTitleFor": "Arte para {{title}}",
       "modal.close": "Cerrar",
+      "modal.unlinkLudusavi": "Quitar asociación con Ludusavi",
       "modal.searchingArtwork": "Buscando arte…",
       "modal.removeExecutable": "Quitar",
       "modal.ludusaviHint":
@@ -523,6 +526,7 @@ export const resources = {
   en: {
     translation: {
       ...downloadTranslations.en,
+      ...productTranslations.en,
       "updates.title": "Nemeton updates",
       "updates.description":
         "We check for new versions automatically. You decide when to download and restart to install.",
@@ -821,6 +825,7 @@ export const resources = {
       "modal.artworkTitle": "Artwork",
       "modal.artworkTitleFor": "Artwork for {{title}}",
       "modal.close": "Close",
+      "modal.unlinkLudusavi": "Remove Ludusavi association",
       "modal.searchingArtwork": "Searching for artwork…",
       "modal.removeExecutable": "Remove",
       "modal.ludusaviHint":

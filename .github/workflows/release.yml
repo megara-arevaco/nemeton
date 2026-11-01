@@ -52,7 +52,43 @@ jobs:
         run: pnpm test
 
       - name: Build installer and portable executable
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
         run: pnpm dist:win
+
+      - name: Verify signatures when a signing certificate is configured
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+        run: |
+          if (-not [string]::IsNullOrWhiteSpace($env:CSC_LINK)) {
+            $version = (Get-Content package.json | ConvertFrom-Json).version
+            foreach ($artifact in @("apps/desktop/release/Nemeton-Setup-$version.exe", "apps/desktop/release/Nemeton-Portable-$version.exe")) {
+              if ((Get-AuthenticodeSignature $artifact).Status -ne 'Valid') {
+                throw "The release artifact does not have a valid Authenticode signature."
+              }
+            }
+          }
+
+      - name: Smoke test the packaged Windows application
+        run: node scripts/smoke-packaged.mjs apps/desktop/release/win-unpacked/Nemeton.exe
+
+      - name: Smoke test the installed Windows application
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $destination = Join-Path $env:RUNNER_TEMP "Nemeton-installed-smoke"
+          $installer = Resolve-Path "apps/desktop/release/Nemeton-Setup-$version.exe"
+          $installation = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
+          if ($installation.ExitCode -ne 0) { throw "Installer failed." }
+          try {
+            node scripts/smoke-packaged.mjs "$destination/Nemeton.exe"
+            if ($LASTEXITCODE -ne 0) { throw "Installed application smoke test failed." }
+          } finally {
+            $uninstaller = Get-ChildItem -LiteralPath $destination -Filter 'Uninstall*.exe' | Select-Object -First 1
+            if ($uninstaller) { Start-Process -FilePath $uninstaller.FullName -ArgumentList '/S' -Wait }
+          }
 
       - name: Generate checksums
         shell: pwsh

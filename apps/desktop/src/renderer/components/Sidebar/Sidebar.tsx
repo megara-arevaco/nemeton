@@ -1,3 +1,4 @@
+import { DownloadIndicator } from "./DownloadIndicator";
 import { useVirtualCollection } from "../../shared/virtualCollection";
 import { useTranslation } from "react-i18next";
 import { memo } from "react";
@@ -82,8 +83,10 @@ export const Sidebar = memo(function Sidebar({
         <button
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "downloads" ? "active" : ""}`}
           onClick={onOpenDownloads}
+          aria-label={t("downloads.title")}
         >
           <DownloadSimple /> {t("downloads.title")}
+          <DownloadIndicator />
         </button>
         <button
           className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "settings" ? "active" : ""}`}
@@ -164,11 +167,14 @@ export const Sidebar = memo(function Sidebar({
                   {game.title.slice(0, 1).toUpperCase()}
                   {cover ? (
                     <img
+                      key={cover}
                       src={cover}
                       alt=""
                       loading="lazy"
                       decoding="async"
-                      onError={(event) => event.currentTarget.remove()}
+                      onError={(event) =>
+                        (event.currentTarget.style.visibility = "hidden")
+                      }
                     />
                   ) : null}
                 </span>

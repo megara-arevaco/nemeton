@@ -1,4 +1,4 @@
-export type GameSource = "steam" | "local";
+export type GameSource = "steam" | "local" | "epic" | "gog";
 
 export const isValidSteamAppId = (value: string): boolean =>
   /^[1-9]\d{0,11}$/.test(value);
@@ -9,6 +9,12 @@ export interface LibraryGame {
   id: string;
   source: GameSource;
   sourceId: string;
+  canonicalId?: string | null;
+  platformCreditedSeconds?: number;
+  playtimeOverlapUnknown?: boolean;
+  tags?: string[];
+  collections?: string[];
+  providerAccountId?: string | null;
   steamAppId?: string | null;
   achievementStateId?: string | null;
   ludusaviGameName?: string | null;
@@ -23,6 +29,7 @@ export interface LibraryGame {
   platformPlaytimeMinutes: number | null;
   trackedPlaytimeSeconds: number;
   installed: boolean;
+  installationState?: "installed" | "installing" | "update-required";
   hiddenFromLibrary?: boolean;
   favorite?: boolean;
   backlogStatus?: BacklogStatus | null;
@@ -32,6 +39,7 @@ export interface LibraryGame {
 }
 
 export interface SteamCandidate {
+  installationState?: "installed" | "installing" | "update-required";
   appId: string;
   title: string;
   installPath: string;
@@ -48,12 +56,13 @@ export interface LibrarySnapshot {
 }
 
 export interface GameSession {
+  copyId?: string;
   id: string;
   gameId: string;
   startedAt: string;
   endedAt: string;
   durationSeconds: number;
-  origin?: "launcher" | "steam-sync";
+  origin?: "launcher" | "steam-sync" | "provider-sync";
 }
 
 export interface SteamOwnedGame {
@@ -64,6 +73,9 @@ export interface SteamOwnedGame {
 }
 
 export interface SteamAccountSettings {
+  accounts?: Array<{ steamId: string; name: string }>;
+  lastSyncedAt?: string | null;
+  persistentApiKey?: boolean;
   steamId: string | null;
   hasApiKey: boolean;
 }

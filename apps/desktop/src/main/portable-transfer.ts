@@ -140,8 +140,8 @@ export async function readPortableImport(
     let backupBytes = 0;
 
     for (const [index, backup] of portable.backups.entries()) {
-      if (!gameKeys.has(backup.gameKey) || !backup.gameKey.startsWith("local:")) {
-        throw new Error("A save backup does not belong to a local library game.");
+      if (!gameKeys.has(backup.gameKey)) {
+        throw new Error("A save backup does not belong to a library game.");
       }
 
       const target = path.join(stagingDirectory, `save-backup-${index}.zip`);

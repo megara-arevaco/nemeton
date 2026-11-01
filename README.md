@@ -3,7 +3,7 @@
   <h1>Nemeton</h1>
   <p><strong>Your games, play history, achievements, and saves — in one local-first library.</strong></p>
   <p>
-    <img alt="Electron" src="https://img.shields.io/badge/Electron-40-47848F?logo=electron&logoColor=white">
+    <img alt="Electron" src="https://img.shields.io/badge/Electron-44-47848F?logo=electron&logoColor=white">
     <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=0B1320">
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white">
     <img alt="License" src="https://img.shields.io/badge/License-MIT-B7FF64">
@@ -27,9 +27,14 @@ a hosted Nemeton service: your library and credentials remain on your computer.
 - Discovers installed Steam libraries on Windows, Linux, macOS, and WSL.
 - Imports owned games and Steam playtime through the official Steam Web API.
 - Adds local games with editable executables, artwork, playtime, and Steam AppIDs.
-- Launches games through Steam or directly from a local executable.
+- Imports Epic and GOG libraries using locally configured Legendary and gogdl helpers.
+- Groups explicitly matched store copies into one game with total and per-store playtime.
+- Reconciles store counters with tracked sessions to avoid counting the same time twice.
+- Organizes games with collections, tags, remembered filters, and recent/pending shortcuts.
+- Launches games through their store adapter or directly from a local executable.
 - Tracks local sessions and presents recent, monthly, yearly, and all-time statistics.
-- Detects local achievements from Steam and supported Steam-compatible formats.
+- Reads Steam account achievements with a local cache, alongside local achievement formats.
+- Manages Real-Debrid and BitTorrent transfers with priority, global pause, bandwidth limits, and a completed-download-to-library flow.
 - Discovers save locations using the Ludusavi manifest.
 - Creates versioned save backups, validates archives, and enforces retention.
 - Synchronizes manual history, achievement history, and saves through a folder you
@@ -77,13 +82,57 @@ optional and only needed for importing the full account library.
 ### Import a complete Steam account library
 
 1. Open **Settings → Steam**.
-2. Enter your SteamID64 and personal Steam Web API key.
+2. Enter your SteamID64 or Steam profile URL and personal Steam Web API key.
 3. Select **Connect Steam**.
 4. Refresh the account later to merge newly owned games and updated Steam playtime.
 
 Steam controls which library details the Web API exposes. A private game-details
 setting can prevent account-wide imports; local installed-game discovery continues
 to work independently.
+
+### Connect Epic Games or GOG
+
+Open **Settings** and find the store connection. Download a standalone helper from
+[Legendary releases](https://github.com/derrod/legendary/releases/latest) for Epic or
+[gogdl releases](https://github.com/Heroic-Games-Launcher/heroic-gogdl/releases/latest)
+for GOG, then select its executable. Helpers already on the application's PATH are
+detected automatically. Use the browser sign-in button and paste the authorization
+code or GOG return URL into Nemeton. No Nemeton server or account is required.
+
+After import, a game's installation panel provides installation discovery, updates,
+and verification. Installs use a folder selected by the user; store transfers also
+appear in Downloads. Running Windows games on Linux may require the helper's Wine
+configuration. Native Windows and Linux builds should use helpers for their own OS.
+
+Tokens are sealed with the operating system's secure storage between helper calls.
+When secure storage is unavailable, they are kept for the session only. Helpers
+receive a private credential file during execution; Nemeton removes it after the
+operation and during orderly shutdown. Store adapters use community-maintained
+interfaces, and live-account validation remains separate from mocked integration tests.
+
+### Group copies and combine playtime
+
+Open a game and use **Copies and playtime** to explicitly match another copy of the
+same game and edition. Copies keep their own IDs, installations, sessions and store
+counters. They can be separated again, and the preferred copy is remembered locally.
+Nemeton never merges editions solely because their titles look similar.
+
+20 hours on Steam, 8 on Epic and 5 on GOG produce a 33-hour total. New store counter
+increments first acknowledge sessions already measured by Nemeton. Epic history is
+queried during library import; GOG history is refreshed on demand when its grouped
+game is opened. If a store cannot supply history, the total is marked partial and
+Nemeton's recorded sessions remain available. If history is first discovered after
+offline tracking and its overlap cannot be established, the total remains explicitly
+partial rather than presenting an exact reconciliation.
+
+### Control downloads
+
+Downloads separates activity from completed/cancelled history. Global pause records
+which tasks it paused, so resuming that group leaves manually paused tasks alone.
+Queued tasks support priority. Configuration sets concurrency and a shared transfer
+speed limit in KiB/s; zero means unlimited. Cleaning completed history preserves files.
+After completion, **Add to library** lets you choose an executable and opens a prefilled
+local-game form without running it.
 
 ### Add a local game
 
@@ -93,7 +142,7 @@ save-location detection.
 
 ### Back up and restore saves
 
-Open a local game's save panel to review protected folders, detection suggestions,
+Open a game's save panel to review protected folders, detection suggestions,
 backup policy, and version history. Each version shows its date, size, file count,
 origin, and integrity check; restoring a selected version first preserves the current
 state in another backup and asks for confirmation. Exact restore can remove extra files
@@ -107,6 +156,12 @@ In **Settings → Synchronization**, choose a local or cloud-synchronized folder
 Conflicts show local and folder versions side by side so you can keep the local state
 as another version or restore a chosen version without silently overwriting current
 saves.
+
+### Export diagnostics
+
+Settings offers a local JSON diagnostic report with app/runtime versions, aggregate
+library counts and operation timings. It excludes credentials, account identities,
+game titles, executable/save paths and raw logs. It is not uploaded automatically.
 
 ### Export, import, and portable data
 
@@ -275,10 +330,14 @@ all assets together. Published executables use portable asset names such as
 The `apps/desktop/release/` directory is intentionally ignored; executables belong
 in GitHub Releases, not in source control.
 
-Current artifacts are not code-signed. Windows SmartScreen may warn when an unsigned
+The release workflow reads optional `WINDOWS_CSC_LINK` and `WINDOWS_CSC_KEY_PASSWORD`
+repository secrets and verifies Authenticode signatures when a certificate is configured.
+Without a configured certificate, artifacts remain unsigned. Windows SmartScreen may warn when an unsigned
 installer or portable executable is downloaded. An official public release process
-builds in CI and publishes checksums. A future signing step should sign both artifacts
-without storing signing credentials in the repository.
+builds in CI and publishes checksums. Signing credentials must remain in CI secrets. The release workflow also smoke-tests
+the unpacked and silently installed Windows application with temporary data. These
+steps require a native Windows runner; they are not proof that a local Linux build
+was installed on Windows.
 
 ## Data locations and privacy
 
@@ -308,3 +367,14 @@ node apps/desktop/scripts/render-icon.cjs
 
 Nemeton is available under the [MIT License](LICENSE). Third-party acknowledgements
 are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+### Custom Steam roots and packaged validation
+
+`NEMETON_STEAM_ROOT` selects one explicit Steam root, including nonstandard or portable
+client installations. `NEMETON_EPIC_MANIFESTS` and `NEMETON_GOG_ROOT` select explicit
+Epic manifest and GOG installation directories. Test fixtures use temporary empty
+roots so they never import installed games from the host computer.
+
+After packaging, run `node scripts/smoke-packaged.mjs <path-to-Nemeton-executable>`
+to check renderer startup, preload/IPC and persistence using temporary application data.
+The script closes the test instance and removes only its temporary data.

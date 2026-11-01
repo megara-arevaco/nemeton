@@ -10,14 +10,21 @@ import {
 import type { LudusaviSuggestion } from "../../types/ludusavi";
 
 export interface AddGameModalOptions {
+  initialTitle?: string;
+  initialExecutablePath?: string;
   onClose: () => void;
   onCreated: (snapshot: LibrarySnapshot) => void;
 }
 
-export function useAddGameModal({ onClose, onCreated }: AddGameModalOptions) {
+export function useAddGameModal({
+  onClose,
+  onCreated,
+  initialTitle = "",
+  initialExecutablePath = "",
+}: AddGameModalOptions) {
   const { t } = useTranslation();
-  const [title, setTitle] = useState("");
-  const [executablePath, setExecutablePath] = useState("");
+  const [title, setTitle] = useState(initialTitle);
+  const [executablePath, setExecutablePath] = useState(initialExecutablePath);
   const [selectedLudusavi, setSelectedLudusavi] = useState<LudusaviSuggestion | null>(
     null,
   );

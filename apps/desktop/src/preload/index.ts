@@ -1,4 +1,9 @@
 import type {
+  StoreProvider,
+  ProviderState,
+  ProviderOperation,
+} from "../shared/providers.js";
+import type {
   SavegameVerification,
   SavegameState,
   SavegamePolicy,
@@ -48,7 +53,38 @@ const invoke = async <K extends IpcChannel>(channel: K, ...args: IpcArgs<K>) => 
 };
 
 const api = {
+  cancelProviderTransfer: (provider: StoreProvider): Promise<ProviderState[]> =>
+    invoke("providers:cancel", provider),
+  refreshCopyPlaytime: (id: string): Promise<LibrarySnapshot | null> =>
+    invoke("providers:playtime", id),
+  getProviderStates: (): Promise<ProviderState[]> => invoke("providers:status"),
+  chooseProviderHelper: (provider: StoreProvider): Promise<ProviderState[]> =>
+    invoke("providers:helper", provider),
+  openProviderLogin: (provider: StoreProvider): Promise<void> =>
+    invoke("providers:login", provider),
+  openProviderHelperSite: (provider: StoreProvider): Promise<void> =>
+    invoke("providers:helper-site", provider),
+  connectProvider: (provider: StoreProvider, code: string): Promise<ProviderState[]> =>
+    invoke("providers:connect", provider, code),
+  disconnectProvider: (provider: StoreProvider): Promise<ProviderState[]> =>
+    invoke("providers:disconnect", provider),
+  refreshProvider: (provider: StoreProvider): Promise<LibrarySnapshot> =>
+    invoke("providers:refresh", provider),
+  operateProviderGame: (
+    gameId: string,
+    action: ProviderOperation,
+  ): Promise<ProviderState[]> => invoke("providers:operate", gameId, action),
+  importProviderInstallation: (gameId: string): Promise<LibrarySnapshot | null> =>
+    invoke("providers:import-installed", gameId),
   getDownloads: (): Promise<DownloadsSnapshot> => invoke("downloads:status"),
+  controlAllDownloads: (action: "pause" | "resume"): Promise<DownloadsSnapshot> =>
+    invoke("downloads:control-all", action),
+  configureDownloads: (options: {
+    maxConcurrent: number;
+    downloadLimitBytesPerSecond: number;
+  }): Promise<DownloadsSnapshot> => invoke("downloads:configure", options),
+  setDownloadPriority: (id: string, priority: number): Promise<DownloadsSnapshot> =>
+    invoke("downloads:priority", id, priority),
   connectRealDebrid: (token: string): Promise<DownloadsSnapshot> =>
     invoke("downloads:connect", token),
   disconnectRealDebrid: (): Promise<DownloadsSnapshot> =>
@@ -69,6 +105,11 @@ const api = {
     action: DownloadFileAction,
   ): Promise<DownloadsSnapshot> => invoke("downloads:file-control", id, fileId, action),
   openDownload: (id: string): Promise<void> => invoke("downloads:open", id),
+  chooseDownloadedExecutable: (
+    id: string,
+  ): Promise<{ title: string; executablePath: string } | null> =>
+    invoke("downloads:choose-executable", id),
+  exportDiagnostics: (): Promise<boolean> => invoke("diagnostics:export"),
   recordPerformance: (
     name: "ui:library-ready" | "ui:game-ready",
     elapsedMs: number,
@@ -88,11 +129,20 @@ const api = {
     return () => ipcRenderer.removeListener("updates:changed", listener);
   },
   listGames: (): Promise<PublishedLibrary> => invoke("library:list"),
+  linkGameCopies: (
+    gameIds: string[],
+    canonicalId: string | null,
+  ): Promise<LibrarySnapshot> => invoke("library:link-copies", gameIds, canonicalId),
+  organizeGame: (
+    gameId: string,
+    state: { tags?: string[]; collections?: string[] },
+  ): Promise<LibrarySnapshot> => invoke("library:organize", gameId, state),
   getWorkspaceStatus: (): Promise<{ branch: string | null; version: string }> =>
     invoke("workspace:status"),
   getGameMetadata: (gameId: string): Promise<GameMetadata | null> =>
     invoke("library:metadata", gameId),
   getSteamSettings: (): Promise<SteamAccountSettings> => invoke("steam:settings"),
+  disconnectSteam: (): Promise<SteamAccountSettings> => invoke("steam:disconnect"),
   getSyncSettings: (): Promise<FolderSyncSettings> => invoke("sync:settings"),
   getDataLocation: (): Promise<{ portable: boolean; dataDirectory: string }> =>
     invoke("runtime:data-location"),

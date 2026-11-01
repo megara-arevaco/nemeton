@@ -1,3 +1,4 @@
+import { ProviderTransfers } from "./ProviderTransfers";
 import { useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -12,9 +13,7 @@ import {
   type DownloadMethod,
   type DownloadsSnapshot,
   type DownloadJob,
-  type DownloadFile,
   type DownloadAction,
-  type DownloadFileAction,
 } from "../../../shared/downloads";
 import "./DownloadsView.css";
 
@@ -36,8 +35,20 @@ export function DownloadsView() {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [tab, setTab] = useState<"queue" | "configuration">("queue");
+  const [filter, setFilter] = useState<"all" | "activity" | "history">("all");
+  const [adding, setAdding] = useState<boolean | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const providers = useQuery({
+    queryKey: ["providers", "status"],
+    queryFn: window.launcher.getProviderStates,
+    refetchInterval: 2000,
+  });
+  const externalTransfers =
+    providers.data?.filter(
+      (state) =>
+        state.operation && ["install", "update"].includes(state.operation.action),
+    ).length ?? 0;
   const status = useQuery({
     queryKey: statusKey,
     queryFn: window.launcher.getDownloads,
@@ -90,12 +101,44 @@ export function DownloadsView() {
       </div>
     );
   }
+
+  const history = snapshot.jobs.filter((job) =>
+    ["completed", "cancelled"].includes(job.status),
+  );
+  const activity = snapshot.jobs.filter(
+    (job) => !["completed", "cancelled"].includes(job.status),
+  );
+  const speed = activity.reduce(
+    (sum, job) => sum + (job.status === "downloading" ? job.speed : 0),
+    0,
+  );
+  const composerOpen = adding ?? snapshot.jobs.length === 0;
+  const groups =
+    filter === "activity"
+      ? [["activity", activity] as const]
+      : filter === "history"
+        ? [["history", history] as const]
+        : [["activity", activity] as const, ["history", history] as const];
   return (
     <div className="downloads-view">
-      <div className="downloads-heading">
-        <h1>{t("downloads.title")}</h1>
-        <p>{t("downloads.description")}</p>
-      </div>
+      <header className="downloads-heading">
+        <div>
+          <h1>{t("downloads.title")}</h1>
+          <p>{t("downloads.description")}</p>
+        </div>
+        <Button
+          variant="primary"
+          aria-expanded={tab === "queue" && composerOpen}
+          aria-controls="download-composer"
+          onClick={() => {
+            setTab("queue");
+            setAdding(!composerOpen);
+          }}
+        >
+          <DownloadSimple aria-hidden="true" />
+          {t("downloads.addDownload")}
+        </Button>
+      </header>
       <nav className="downloads-tabs" aria-label={t("downloads.title")}>
         {(["queue", "configuration"] as const).map((item) => (
           <button
@@ -122,43 +165,146 @@ export function DownloadsView() {
           {notice}
         </p>
       )}
-      {tab === "configuration" ? (
+      {tab === "configuration" && (
         <DownloadConfiguration snapshot={snapshot} run={run} busy={busy} />
-      ) : (
-        <>
-          {!snapshot.directory && (
-            <p className="downloads-hint">
-              {t("downloads.noFolder")}{" "}
-              <button type="button" onClick={() => setTab("configuration")}>
-                {t("downloads.configuration")}
-              </button>
-            </p>
-          )}
-          <AddDownload snapshot={snapshot} run={run} busy={busy} />
-          <div className="downloads-queue-heading">
-            <h2>{t("downloads.queue")}</h2>
-            <span>{t("downloads.parallel", { count: snapshot.maxConcurrent })}</span>
+      )}
+      <div hidden={tab !== "queue"}>
+        <div className="downloads-overview" aria-label={t("downloads.overview")}>
+          <div>
+            <span>{t("downloads.activity")}</span>
+            <strong>{activity.length + externalTransfers}</strong>
           </div>
-          {!snapshot.jobs.length && (
-            <div className="downloads-empty">
-              <DownloadSimple size={28} />
-              <h2>{t("downloads.emptyQueue")}</h2>
-              <p>{t("downloads.emptyQueueHelp")}</p>
-            </div>
-          )}
-          <div className="downloads-queue">
-            {snapshot.jobs.map((job) => (
-              <DownloadTask
-                key={job.id}
-                job={job}
-                run={run}
-                busy={busy}
-                hasToken={snapshot.hasToken}
-              />
+          <div>
+            <span>{t("downloads.speed")}</span>
+            <strong>
+              {formatDownloadBytes(speed)}
+              <small>/s</small>
+            </strong>
+          </div>
+          <div>
+            <span>{t("downloads.completedCount")}</span>
+            <strong>
+              {history.filter((job) => job.status === "completed").length}
+            </strong>
+          </div>
+        </div>
+        {!snapshot.directory && (
+          <div className="downloads-setup">
+            <p>{t("downloads.noFolder")}</p>
+            <Button size="small" onClick={() => setTab("configuration")}>
+              {t("downloads.chooseFolder")}
+            </Button>
+          </div>
+        )}
+        <AddDownload
+          snapshot={snapshot}
+          run={run}
+          busy={busy}
+          expanded={composerOpen}
+          setExpanded={setAdding}
+          configure={() => setTab("configuration")}
+        />
+        <div className="downloads-queue-heading">
+          <div className="downloads-filters" aria-label={t("downloads.filter")}>
+            {(["all", "activity", "history"] as const).map((item) => (
+              <Button
+                key={item}
+                size="small"
+                variant={filter === item ? "setup" : "ghost"}
+                aria-pressed={filter === item}
+                onClick={() => setFilter(item)}
+              >
+                {t(`downloads.${item}`)}{" "}
+                <span>
+                  {item === "all"
+                    ? snapshot.jobs.length + externalTransfers
+                    : item === "activity"
+                      ? activity.length + externalTransfers
+                      : history.length}
+                </span>
+              </Button>
             ))}
           </div>
-        </>
-      )}
+          <div className="downloads-queue-tools">
+            <Button
+              size="small"
+              variant="secondary"
+              title={t("downloads.bulkScope")}
+              disabled={
+                busy ||
+                !snapshot.jobs.some((job) => activeStatuses.includes(job.status))
+              }
+              onClick={() =>
+                void run(() => window.launcher.controlAllDownloads("pause"))
+              }
+            >
+              {t("downloads.pauseAll")}
+            </Button>
+            <Button
+              size="small"
+              variant="secondary"
+              title={t("downloads.resumeAllHelp")}
+              disabled={busy || !snapshot.bulkPausedIds?.length}
+              onClick={() =>
+                void run(() => window.launcher.controlAllDownloads("resume"))
+              }
+            >
+              {t("downloads.resumeAll")}
+            </Button>
+            <span>{t("downloads.parallel", { count: snapshot.maxConcurrent })}</span>
+            {filter !== "activity" &&
+              history.some((job) => job.status === "completed") && (
+                <Button
+                  size="small"
+                  variant="ghost"
+                  loading={busy}
+                  title={t("downloads.removeHelp")}
+                  onClick={() =>
+                    void run(async () => {
+                      for (const job of history.filter(
+                        (item) => item.status === "completed",
+                      )) {
+                        await window.launcher.controlDownload(job.id, "remove");
+                      }
+                    }, t("downloads.historyCleared"))
+                  }
+                >
+                  {t("downloads.clearCompleted")}
+                </Button>
+              )}
+          </div>
+        </div>
+        {!snapshot.jobs.length && !externalTransfers && (
+          <div className="downloads-empty">
+            <DownloadSimple size={32} aria-hidden="true" />
+            <h2>{t("downloads.emptyQueue")}</h2>
+            <p>{t("downloads.emptyQueueHelp")}</p>
+          </div>
+        )}
+        <ProviderTransfers hidden={filter === "history"} />
+        {groups.map(([name, jobs]) => (
+          <section
+            className="downloads-group"
+            key={name}
+            aria-label={t(`downloads.${name}`)}
+          >
+            {jobs.length > 0 && (
+              <h2 className="downloads-group-title">
+                {t(`downloads.${name}`)} <span>{jobs.length}</span>
+              </h2>
+            )}
+            {jobs.map((job) => (
+              <DownloadTask key={job.id} job={job} hasToken={snapshot.hasToken} />
+            ))}
+            {!jobs.length &&
+              filter !== "all" &&
+              snapshot.jobs.length > 0 &&
+              !(name === "activity" && externalTransfers > 0) && (
+                <p className="downloads-empty-filter">{t("downloads.noMatches")}</p>
+              )}
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -167,7 +313,13 @@ function AddDownload({
   snapshot,
   run,
   busy,
+  configure,
+  expanded,
+  setExpanded,
 }: {
+  expanded: boolean;
+  setExpanded: (value: boolean) => void;
+  configure: () => void;
   snapshot: DownloadsSnapshot;
   run: Run;
   busy: boolean;
@@ -175,10 +327,17 @@ function AddDownload({
   const { t } = useTranslation();
   const [torrent, setTorrent] = useState<{ id: string; name: string } | null>(null);
   const [links, setLinks] = useState("");
-  const [method, setMethod] = useState<DownloadMethod | "">("");
+  const [method, setMethod] = useState<DownloadMethod>(() =>
+    localStorage.getItem("nemeton.downloadMethod") === "torrent"
+      ? "torrent"
+      : "real-debrid",
+  );
   const [invalid, setInvalid] = useState(false);
-  const [expanded, setExpanded] = useState(snapshot.jobs.length === 0);
-  const selectedMethod = method || (snapshot.hasToken ? "real-debrid" : "torrent");
+  const selectedMethod = method;
+  const unsupportedLinks =
+    method === "torrent" &&
+    !torrent &&
+    links.split(/\r?\n/).some((link) => link.trim().startsWith("https:"));
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -188,6 +347,10 @@ function AddDownload({
       .map((line) => line.trim())
       .filter(Boolean);
 
+    if (unsupportedLinks) {
+      setInvalid(true);
+      return;
+    }
     if (
       !torrent &&
       (!uris.length ||
@@ -233,6 +396,8 @@ function AddDownload({
   };
   return (
     <details
+      hidden={!expanded}
+      id="download-composer"
       className="downloads-add-panel"
       open={expanded}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
@@ -265,39 +430,16 @@ function AddDownload({
             />
           </label>
         )}
-        {invalid && (
+        {(invalid || unsupportedLinks) && (
           <p className="downloads-error" role="alert">
-            {t("downloads.invalidLinks")}
+            {t(
+              unsupportedLinks
+                ? "downloads.torrentLinksOnly"
+                : "downloads.invalidLinks",
+            )}
           </p>
         )}
-        <div className="downloads-add-fields">
-          <label>
-            {t("downloads.name")}
-            <input name="title" maxLength={500} placeholder={t("downloads.optional")} />
-          </label>
-          <label>
-            {t("downloads.method")}
-            <select
-              name="method"
-              value={selectedMethod}
-              onChange={(event) => setMethod(event.target.value as DownloadMethod)}
-            >
-              <option value="real-debrid" disabled={!snapshot.hasToken}>
-                Real-Debrid
-              </option>
-              <option value="torrent">{t("downloads.torrent")}</option>
-            </select>
-          </label>
-        </div>
-        <div className="downloads-actions">
-          <Button
-            type="submit"
-            variant="primary"
-            disabled={busy || !snapshot.directory || (!torrent && !links.trim())}
-          >
-            <DownloadSimple />
-            {t("downloads.addQueue")}
-          </Button>
+        <div className="downloads-source-actions">
           <Button
             disabled={busy}
             onClick={() =>
@@ -316,34 +458,108 @@ function AddDownload({
             {t("downloads.openTorrent")}
           </Button>
         </div>
-        {!snapshot.hasToken && (
-          <p className="downloads-muted">{t("downloads.connectHint")}</p>
+        <details className="downloads-add-fields">
+          <summary>{t("downloads.customName")}</summary>
+          <label>
+            {t("downloads.name")}
+            <input name="title" maxLength={500} placeholder={t("downloads.optional")} />
+          </label>
+        </details>
+        <fieldset className="downloads-methods">
+          <legend>{t("downloads.method")}</legend>
+          {(["real-debrid", "torrent"] as const).map((option) => (
+            <label key={option} className="downloads-method">
+              <input
+                type="radio"
+                name="method"
+                value={option}
+                checked={method === option}
+                onChange={() => {
+                  setMethod(option);
+                  localStorage.setItem("nemeton.downloadMethod", option);
+                  setInvalid(false);
+                }}
+              />
+              <span>
+                <strong>
+                  {option === "real-debrid" ? "Real-Debrid" : t("downloads.torrent")}
+                </strong>
+                <small>
+                  {t(
+                    option === "real-debrid"
+                      ? "downloads.realDebridHelp"
+                      : "downloads.directTorrentHelp",
+                  )}
+                </small>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+        <div className="downloads-actions">
+          {method === "real-debrid" && !snapshot.hasToken && (
+            <Button onClick={configure}>{t("downloads.connectRealDebrid")}</Button>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={
+              busy ||
+              unsupportedLinks ||
+              !snapshot.directory ||
+              (method === "real-debrid" && !snapshot.hasToken) ||
+              (!torrent && !links.trim())
+            }
+          >
+            <DownloadSimple />
+            {t("downloads.addQueue")}
+          </Button>
+        </div>
+        {method === "real-debrid" && !snapshot.hasToken && (
+          <p className="downloads-job-meta">{t("downloads.connectHint")}</p>
         )}
       </form>
     </details>
   );
 }
 
-function DownloadTask({
-  job,
-  run,
-  busy,
-  hasToken,
-}: {
-  job: DownloadJob;
-  run: Run;
-  busy: boolean;
-  hasToken: boolean;
-}) {
+function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }) {
   const { t } = useTranslation();
+  const client = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState("");
+  const run = async (action: () => Promise<unknown>) => {
+    if (busy) {
+      return;
+    }
+    setBusy(true);
+    setActionError("");
+    try {
+      await action();
+      await client.invalidateQueries({ queryKey: statusKey });
+    } catch (failure) {
+      const code =
+        failure instanceof Error
+          ? failure.message.match(/([a-z][a-z0-9-]+)$/)?.[1]
+          : undefined;
+      setActionError(
+        t(`downloads.failure.${code}`, { defaultValue: t("downloads.failure") }),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const blocked = busy || (job.method === "real-debrid" && !hasToken);
   const active = activeStatuses.includes(job.status);
   const control = (action: DownloadAction) =>
     void run(() => window.launcher.controlDownload(job.id, action));
   return (
-    <article className="downloads-job" aria-label={job.title}>
+    <article
+      className={`downloads-job is-${job.status}`}
+      aria-label={job.title}
+      aria-busy={busy}
+    >
       <div className="downloads-row-heading">
-        <h2>{job.title}</h2>
+        <h3>{job.title}</h3>
         <span className={`downloads-status is-${job.status}`}>
           {t(`downloads.${job.status}`)}
         </span>
@@ -356,26 +572,93 @@ function DownloadTask({
           job.method === "torrent" &&
           ` · ${t("downloads.peers", { count: job.peers })}`}
       </p>
-      {job.status === "preparing" && job.method === "real-debrid" && job.torrentId && (
-        <div className="downloads-cloud">
+      <progress
+        aria-label={t("downloads.fileProgress", { name: job.title })}
+        value={
+          job.status === "preparing" && job.torrentId ? job.cloudProgress : job.progress
+        }
+        max={100}
+      />
+      <div className="downloads-transfer">
+        <span>
+          {job.status === "preparing" && job.torrentId
+            ? t("downloads.cloudProgress", { progress: Math.round(job.cloudProgress) })
+            : `${Math.floor(job.progress)} %`}
+        </span>
+        {job.status === "downloading" && job.speed > 0 && job.total > job.bytes && (
           <span>
-            {t("downloads.cloudProgress", { progress: Math.round(job.cloudProgress) })}
+            {t("downloads.remaining", {
+              minutes: Math.max(1, Math.ceil((job.total - job.bytes) / job.speed / 60)),
+            })}
           </span>
-          <progress
-            aria-label={t("downloads.cloudPreparation")}
-            value={job.cloudProgress}
-            max={100}
-          />
-        </div>
-      )}
-      {job.error && (
+        )}
+      </div>
+      {actionError && (
         <p className="downloads-error" role="alert">
-          {t(`downloads.failure.${job.error}`, {
-            defaultValue: t("downloads.failure"),
-          })}
+          {actionError}
+        </p>
+      )}
+      {!hasToken &&
+        job.method === "real-debrid" &&
+        ["paused", "error", "interrupted", "cancelled"].includes(job.status) && (
+          <p className="downloads-hint">{t("downloads.connectHint")}</p>
+        )}
+      {(job.error || job.files.some((file) => file.selected && file.error)) && (
+        <p className="downloads-error" role="alert">
+          {t(
+            `downloads.failure.${job.error || job.files.find((file) => file.selected && file.error)?.error}`,
+            {
+              defaultValue: t("downloads.failure"),
+            },
+          )}
         </p>
       )}
       <div className="downloads-actions">
+        {job.status === "completed" && (
+          <Button
+            size="small"
+            variant="setup"
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const selected = await window.launcher.chooseDownloadedExecutable(
+                  job.id,
+                );
+
+                if (selected) {
+                  window.dispatchEvent(
+                    new CustomEvent("nemeton:add-downloaded-game", {
+                      detail: selected,
+                    }),
+                  );
+                }
+              })
+            }
+          >
+            {t("downloads.addToLibrary")}
+          </Button>
+        )}
+        {job.status === "queued" && (
+          <label className="download-priority">
+            {t("downloads.priority")}
+            <select
+              value={job.priority ?? 0}
+              disabled={busy}
+              onChange={(event) =>
+                void run(() =>
+                  window.launcher.setDownloadPriority(
+                    job.id,
+                    Number(event.target.value),
+                  ),
+                )
+              }
+            >
+              <option value={1}>{t("downloads.priorityHigh")}</option>
+              <option value={0}>{t("downloads.priorityNormal")}</option>
+              <option value={-1}>{t("downloads.priorityLow")}</option>
+            </select>
+          </label>
+        )}
         {active && (
           <Button size="small" disabled={busy} onClick={() => control("pause")}>
             <Pause />
@@ -383,13 +666,23 @@ function DownloadTask({
           </Button>
         )}
         {["paused", "interrupted", "error", "cancelled"].includes(job.status) && (
-          <Button size="small" disabled={blocked} onClick={() => control("resume")}>
+          <Button
+            size="small"
+            variant="setup"
+            disabled={blocked}
+            onClick={() => control("resume")}
+          >
             <Play />
             {t("downloads.resume")}
           </Button>
         )}
         {!["completed", "cancelled"].includes(job.status) && (
-          <Button size="small" disabled={busy} onClick={() => control("cancel")}>
+          <Button
+            size="small"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => control("cancel")}
+          >
             <X />
             {t("downloads.cancel")}
           </Button>
@@ -398,6 +691,7 @@ function DownloadTask({
           <Button
             size="small"
             disabled={busy}
+            variant="ghost"
             title={t("downloads.removeHelp")}
             onClick={() => control("remove")}
           >
@@ -406,169 +700,16 @@ function DownloadTask({
         )}
         <Button
           size="small"
-          disabled={busy || job.status === "queued"}
+          className="downloads-open"
+          variant={job.status === "completed" ? "secondary" : "ghost"}
+          disabled={busy || !job.directory || job.status === "queued"}
           onClick={() => void run(() => window.launcher.openDownload(job.id))}
         >
           <FolderOpen />
           {t("downloads.open")}
         </Button>
       </div>
-      {job.status === "waiting-selection" ? (
-        <FileSelection job={job} run={run} busy={blocked} />
-      ) : (
-        <div className="downloads-files">
-          {job.files
-            .filter((file) => file.selected)
-            .map((file) => (
-              <DownloadFileRow
-                key={file.id}
-                job={job}
-                file={file}
-                run={run}
-                busy={busy}
-                blocked={blocked}
-              />
-            ))}
-        </div>
-      )}
     </article>
-  );
-}
-
-function FileSelection({
-  job,
-  run,
-  busy,
-}: {
-  job: DownloadJob;
-  run: Run;
-  busy: boolean;
-}) {
-  const { t } = useTranslation();
-  const [selected, setSelected] = useState(
-    () => new Set(job.files.map((file) => file.id)),
-  );
-  return (
-    <form
-      className="downloads-selection"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void run(() => window.launcher.selectDownloadFiles(job.id, [...selected]));
-      }}
-    >
-      <h3>{t("downloads.selectFiles")}</h3>
-      <label className="downloads-check">
-        <input
-          type="checkbox"
-          checked={selected.size === job.files.length}
-          onChange={(event) =>
-            setSelected(
-              new Set(event.target.checked ? job.files.map((file) => file.id) : []),
-            )
-          }
-        />
-        {t("downloads.selectAll")}
-      </label>
-      {job.files.map((file) => (
-        <label key={file.id} className="downloads-check">
-          <input
-            type="checkbox"
-            checked={selected.has(file.id)}
-            onChange={(event) =>
-              setSelected((previous) => {
-                const next = new Set(previous);
-
-                if (event.target.checked) {
-                  next.add(file.id);
-                } else {
-                  next.delete(file.id);
-                }
-                return next;
-              })
-            }
-          />
-          <span>{file.name}</span>
-          <small>{formatDownloadBytes(file.total)}</small>
-        </label>
-      ))}
-      <Button
-        type="submit"
-        variant="primary"
-        size="small"
-        disabled={busy || !selected.size}
-      >
-        {t("downloads.downloadSelected", { count: selected.size })}
-      </Button>
-    </form>
-  );
-}
-
-function DownloadFileRow({
-  job,
-  file,
-  run,
-  busy,
-  blocked,
-}: {
-  job: DownloadJob;
-  file: DownloadFile;
-  run: Run;
-  busy: boolean;
-  blocked: boolean;
-}) {
-  const { t } = useTranslation();
-  const control = (action: DownloadFileAction) =>
-    void run(() => window.launcher.controlDownloadFile(job.id, file.id, action));
-  const active = ["queued", "downloading"].includes(file.status);
-  return (
-    <div className="downloads-file" role="group" aria-label={file.name}>
-      <div className="downloads-row-heading">
-        <h3>{file.name}</h3>
-        <span>{t(`downloads.${file.status}`)}</span>
-      </div>
-      <progress
-        aria-label={t("downloads.fileProgress", { name: file.name })}
-        value={file.progress}
-        max={100}
-      />
-      <div className="downloads-transfer">
-        <span>
-          {Math.floor(file.progress)} % · {formatDownloadBytes(file.bytes)} /{" "}
-          {formatDownloadBytes(file.total)}
-        </span>
-        {file.status === "downloading" && (
-          <span>{formatDownloadBytes(file.speed)}/s</span>
-        )}
-      </div>
-      {file.restarted && <p className="downloads-hint">{t("downloads.restarted")}</p>}
-      {file.error && (
-        <p className="downloads-error">
-          {t(`downloads.failure.${file.error}`, {
-            defaultValue: t("downloads.failure"),
-          })}
-        </p>
-      )}
-      <div className="downloads-actions">
-        {active && (
-          <Button size="small" disabled={busy} onClick={() => control("pause")}>
-            <Pause />
-            {t("downloads.pauseFile")}
-          </Button>
-        )}
-        {["paused", "error", "cancelled", "interrupted"].includes(file.status) && (
-          <Button size="small" disabled={blocked} onClick={() => control("resume")}>
-            <Play />
-            {t("downloads.resumeFile")}
-          </Button>
-        )}
-        {!["completed", "cancelled"].includes(file.status) && (
-          <Button size="small" disabled={busy} onClick={() => control("cancel")}>
-            <X />
-            {t("downloads.cancelFile")}
-          </Button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -587,6 +728,66 @@ function DownloadConfiguration({
     : "";
   return (
     <div className="downloads-config">
+      <section>
+        <h2>{t("downloads.folder")}</h2>
+        <p className="downloads-folder">
+          {snapshot.directory ?? t("downloads.noFolder")}
+        </p>
+        <Button
+          disabled={busy}
+          onClick={() => void run(() => window.launcher.chooseDownloadDirectory())}
+        >
+          <FolderOpen />
+          {t("downloads.chooseFolder")}
+        </Button>
+      </section>
+
+      <section>
+        <h2>{t("downloads.transferSettings")}</h2>
+        <form
+          key={`${snapshot.maxConcurrent}-${snapshot.downloadLimitBytesPerSecond ?? 0}`}
+          className="downloads-limit-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const data = new FormData(event.currentTarget);
+            void run(
+              () =>
+                window.launcher.configureDownloads({
+                  maxConcurrent: Number(data.get("concurrent")),
+                  downloadLimitBytesPerSecond: Number(data.get("limit")) * 1024,
+                }),
+              t("downloads.saved"),
+            );
+          }}
+        >
+          <label>
+            {t("downloads.concurrent")}
+            <input
+              type="number"
+              name="concurrent"
+              min={1}
+              max={6}
+              defaultValue={snapshot.maxConcurrent}
+              required
+            />
+          </label>
+          <label>
+            {t("downloads.speedLimit")}
+            <input
+              type="number"
+              name="limit"
+              min={0}
+              max={1048576}
+              defaultValue={(snapshot.downloadLimitBytesPerSecond ?? 0) / 1024}
+              required
+            />
+            <small>{t("downloads.unlimitedHelp")}</small>
+          </label>
+          <Button type="submit" loading={busy}>
+            {t("downloads.saveSettings")}
+          </Button>
+        </form>
+      </section>
       <section>
         <h2>Real-Debrid</h2>
         <p>{t("downloads.tokenHelp")}</p>
@@ -640,27 +841,14 @@ function DownloadConfiguration({
           </form>
         )}
       </section>
-      <section>
-        <h2>{t("downloads.folder")}</h2>
-        <p className="downloads-folder">
-          {snapshot.directory ?? t("downloads.noFolder")}
-        </p>
-        <Button
-          disabled={busy}
-          onClick={() => void run(() => window.launcher.chooseDownloadDirectory())}
-        >
-          <FolderOpen />
-          {t("downloads.chooseFolder")}
-        </Button>
-      </section>
-      <section>
-        <h2>{t("downloads.pauseResume")}</h2>
+      <details className="downloads-help">
+        <summary>{t("downloads.pauseResume")}</summary>
         <p>{t("downloads.pauseHelp")}</p>
-      </section>
-      <section>
-        <h2>{t("downloads.torrent")}</h2>
+      </details>
+      <details className="downloads-help">
+        <summary>{t("downloads.torrent")}</summary>
         <p>{t("downloads.torrentHelp")}</p>
-      </section>
+      </details>
     </div>
   );
 }

@@ -22,7 +22,16 @@ function buildActivity(
   const gamesById = new Map(games.map((game) => [game.id, game]));
   const buckets = Array.from(
     { length: count },
-    () => new Map<string, { launcherSeconds: number; steamSeconds: number }>(),
+    () =>
+      new Map<
+        string,
+        {
+          gameId: string;
+          launcherSeconds: number;
+          steamSeconds: number;
+          externalSeconds: number;
+        }
+      >(),
   );
 
   for (const session of sessions) {
@@ -33,17 +42,22 @@ function buildActivity(
     }
 
     const activity = buckets[bucketFor(date)]!;
-    const previous = activity.get(session.gameId) ?? {
+    const copyKey = `${session.gameId}\0${session.copyId ?? session.gameId}`;
+    const previous = activity.get(copyKey) ?? {
+      gameId: session.gameId,
       launcherSeconds: 0,
       steamSeconds: 0,
+      externalSeconds: 0,
     };
 
-    if (session.origin === "steam-sync") {
+    if (session.origin === "provider-sync") {
+      previous.externalSeconds += session.durationSeconds;
+    } else if (session.origin === "steam-sync") {
       previous.steamSeconds += session.durationSeconds;
     } else {
       previous.launcherSeconds += session.durationSeconds;
     }
-    activity.set(session.gameId, previous);
+    activity.set(copyKey, previous);
   }
 
   for (const game of games) {
@@ -53,26 +67,39 @@ function buildActivity(
 
     const date = new Date(game.lastPlayedAt);
 
-    if (includesDate(date) && !buckets[bucketFor(date)]!.has(game.id)) {
+    if (
+      includesDate(date) &&
+      ![...buckets[bucketFor(date)]!.values()].some((entry) => entry.gameId === game.id)
+    ) {
       buckets[bucketFor(date)]!.set(game.id, {
+        gameId: game.id,
         launcherSeconds: 0,
         steamSeconds: 0,
+        externalSeconds: 0,
       });
     }
   }
 
-  return buckets.map((activity) =>
-    [...activity.entries()]
-      .flatMap(([gameId, data]) => {
+  return buckets.map((activity) => {
+    const combined = new Map<string, number>();
+
+    for (const entry of activity.values()) {
+      combined.set(
+        entry.gameId,
+        (combined.get(entry.gameId) ?? 0) +
+          Math.max(entry.launcherSeconds, entry.steamSeconds) +
+          entry.externalSeconds,
+      );
+    }
+    return [...combined]
+      .flatMap(([gameId, seconds]) => {
         const game = gamesById.get(gameId);
-        return game
-          ? [{ game, seconds: Math.max(data.launcherSeconds, data.steamSeconds) }]
-          : [];
+        return game ? [{ game, seconds }] : [];
       })
       .sort(
         (a, b) => b.seconds - a.seconds || a.game.title.localeCompare(b.game.title),
-      ),
-  );
+      );
+  });
 }
 
 export function buildMonthlyActivity(
@@ -153,9 +180,7 @@ export function useStatisticsView(games: LibraryGame[], sessions: GameSession[])
   const [summaryPeriod, setSummaryPeriod] = useState<"week" | "month">("week");
   const statistics = useMemo(() => {
     const minutesFor = (game: LibraryGame) =>
-      game.source === "steam"
-        ? (game.platformPlaytimeMinutes ?? 0)
-        : game.trackedPlaytimeSeconds / 60;
+      game.playtimeMinutes + (game.playtimeSecondsRemainder ?? 0) / 60;
     const played = games
       .filter((game) => minutesFor(game) > 0)
       .sort((a, b) => minutesFor(b) - minutesFor(a));

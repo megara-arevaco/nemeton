@@ -1,3 +1,7 @@
+import { registerDiagnosticHandlers } from "./ipc/diagnostics.js";
+import { SteamAccountAchievements } from "./steam-achievements.js";
+import { ProviderService } from "./providers.js";
+import { registerProviderHandlers } from "./ipc/providers.js";
 import { registerAppUpdater } from "./app-updater.js";
 import { registerDownloadHandlers } from "./ipc/downloads.js";
 import { LibraryPublisher } from "./library-publisher.js";
@@ -49,6 +53,10 @@ if (process.env.PORTABLE_EXECUTABLE_DIR) {
     "userData",
     path.join(process.env.PORTABLE_EXECUTABLE_DIR, "NemetonData"),
   );
+}
+
+if (process.env.NEMETON_E2E_DATA) {
+  app.setPath("userData", process.env.NEMETON_E2E_DATA);
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -238,12 +246,17 @@ app
         return fetchLimitedText(url, net.fetch);
       },
     );
+    const steamAchievements = new SteamAccountAchievements(
+      path.join(app.getPath("userData"), "steam-achievements"),
+      settingsStore,
+    );
     achievementService = new AchievementService(
       path.join(app.getPath("userData"), "achievements-history.json"),
       new AchievementCatalogue(
         path.join(app.getPath("userData"), "achievement-catalogue"),
         () => settingsStore.readApiKey(),
       ),
+      (appId) => steamAchievements.get(appId),
     );
     folderSyncService = new FolderSyncService(store, settingsStore, achievementService);
     steamSyncService = new SteamSyncService(store, settingsStore, broadcastLibrary);
@@ -284,7 +297,14 @@ app
       }
       return net.fetch(pathToFileURL(imagePath).href);
     });
+    const providerService = new ProviderService(
+      path.join(app.getPath("userData"), "providers"),
+      store,
+      broadcastLibrary,
+    );
+    await providerService.initialize();
     const context: MainContext = {
+      providerService,
       awaitStartupRecovery: () => startupRecovery,
       awaitStartupReady: () => startupReady,
       achievementService,
@@ -306,6 +326,9 @@ app
       store,
       watchSteamSession: createSteamSessionWatcher({
         store,
+        savegameManager,
+        settingsStore,
+        broadcastSavegameChanged,
         broadcastLibrary,
         broadcastGameRunning,
         scheduleSteamRefresh,
@@ -348,8 +371,21 @@ app
     });
     registerArtworkHandlers(context);
     registerSteamHandlers(context);
+    registerProviderHandlers(context);
     registerSystemHandlers(context);
-    await registerDownloadHandlers();
+    registerDiagnosticHandlers(context);
+    const downloadManager = await registerDownloadHandlers();
+    let shuttingDown = false;
+    app.on("before-quit", (event) => {
+      if (shuttingDown) {
+        return;
+      }
+      event.preventDefault();
+      shuttingDown = true;
+      void Promise.allSettled([providerService.stop(), downloadManager.stop()]).finally(
+        () => app.quit(),
+      );
+    });
     registerAppUpdater();
 
     registerLibraryHandlers(context);

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { defaultSteamRoots } from "./discovery.js";
+import { defaultSteamRoots, parseVdf } from "./discovery.js";
 import type { SteamOwnedGame } from "../shared/types.js";
 const STEAM_ID64_BASE = 76_561_197_960_265_728n;
 
@@ -43,6 +43,7 @@ export const detectLocalSteamId = async (): Promise<string | null> => {
 
 interface OwnedGamesResponse {
   response?: {
+    game_count?: number;
     games?: Array<{
       appid?: number;
       name?: string;
@@ -82,6 +83,12 @@ export const fetchOwnedSteamGames = async (
   }
 
   const payload = (await response.json()) as OwnedGamesResponse;
+
+  if (!Array.isArray(payload.response?.games) && payload.response?.game_count !== 0) {
+    throw new Error(
+      "Steam no permite consultar la biblioteca. Revisa la privacidad de los detalles de juegos del perfil.",
+    );
+  }
   return (payload.response?.games ?? [])
     .filter((game) => Number.isSafeInteger(game.appid) && typeof game.name === "string")
     .map((game) => ({
@@ -93,3 +100,93 @@ export const fetchOwnedSteamGames = async (
         : null,
     }));
 };
+
+export async function detectLocalSteamAccounts(): Promise<
+  Array<{ steamId: string; name: string }>
+> {
+  const accounts = new Map<string, string>();
+
+  for (const root of defaultSteamRoots()) {
+    try {
+      const parsed = parseVdf(
+        await fs.promises.readFile(path.join(root, "config/loginusers.vdf"), "utf8"),
+      );
+      const users = parsed.users;
+
+      if (users && typeof users === "object") {
+        for (const [steamId, value] of Object.entries(users)) {
+          if (!/^7656119\d{10}$/.test(steamId) || typeof value !== "object") {
+            continue;
+          }
+          accounts.set(
+            steamId,
+            typeof value.PersonaName === "string" ? value.PersonaName : steamId,
+          );
+        }
+      }
+    } catch {
+      /* A client can be absent or updating its configuration. */
+    }
+  }
+  return [...accounts].map(([steamId, name]) => ({ steamId, name }));
+}
+
+export async function resolveSteamAccountId(
+  apiKey: string,
+  input: string,
+): Promise<string> {
+  const value = input.trim();
+
+  if (/^7656119\d{10}$/.test(value)) {
+    return value;
+  }
+
+  let url: URL;
+
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Introduce un SteamID64 o una URL de perfil de Steam");
+  }
+  if (
+    url.protocol !== "https:" ||
+    url.hostname !== "steamcommunity.com" ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error("URL de perfil de Steam no válida");
+  }
+
+  const match = /^\/(profiles|id)\/([a-zA-Z0-9_-]+)\/?$/.exec(url.pathname);
+
+  if (!match) {
+    throw new Error("URL de perfil de Steam no válida");
+  }
+  if (match[1] === "profiles" && /^7656119\d{10}$/.test(match[2]!)) {
+    return match[2]!;
+  }
+  if (match[1] !== "id") {
+    throw new Error("SteamID64 no válido");
+  }
+
+  const response = await fetch(
+    `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v1/?${new URLSearchParams({ vanityurl: match[2]! })}`,
+    { headers: { "x-webapi-key": apiKey }, signal: AbortSignal.timeout(15_000) },
+  );
+
+  if (!response.ok) {
+    throw new Error("No se pudo resolver el perfil de Steam");
+  }
+
+  const data = (await response.json()) as {
+    response?: { success?: number; steamid?: string };
+  };
+
+  if (
+    data.response?.success !== 1 ||
+    !/^7656119\d{10}$/.test(data.response.steamid ?? "")
+  ) {
+    throw new Error("No se encontró ese perfil de Steam");
+  }
+  return data.response.steamid!;
+}

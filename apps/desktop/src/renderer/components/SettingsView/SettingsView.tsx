@@ -1,3 +1,5 @@
+import { SteamAccountTools } from "./SteamAccountTools";
+import { StoreConnections } from "./StoreConnections";
 import { AppUpdates } from "./AppUpdates";
 import type { CSSProperties } from "react";
 import type {
@@ -191,17 +193,18 @@ export function SettingsView({
                 : t("settings.notConfigured")}
           </i>
         </div>
+        <SteamAccountTools settings={settings} onChoose={setSteamId} />
         <div
           className={
             "settings-form [display:grid] [grid-template-columns:1fr_1.25fr_auto] [align-items:end] [gap:12px] [margin-top:24px] [&_label_span]:[display:block] [&_label_span]:[margin:0_0_7px_2px] [&_label_span]:[color:#777a86] [&_label_span]:[font-size:11px] [&_input]:[width:100%] [&_input]:[height:43px] [&_input]:[border:1px_solid_#ffffff12] [&_input]:[border-radius:10px] [&_input]:[outline:none] [&_input]:[padding:0_12px] [&_input]:[background:#090a0f99] [&_input]:[color:white] [&_input:focus]:[border-color:#a9fb766b] [&_input:focus]:[box-shadow:0_0_0_3px_#a9fb760d] [&_.play]:[height:43px] [&_.play]:[white-space:nowrap] [&_input:focus]:[border-color:color-mix(in_srgb,_var(--accent-a)_42%,_transparent)] [&_input:focus]:[box-shadow:0_0_0_3px_color-mix(in_srgb,_var(--accent-a)_5%,_transparent)]"
           }
         >
           <label>
-            <span>SteamID64</span>
+            <span>{t("steam.profile")}</span>
             <input
               value={steamId}
               onChange={(event) => setSteamId(event.target.value)}
-              placeholder="7656119…"
+              placeholder="7656119… / https://steamcommunity.com/id/…"
             />
           </label>
           <label>
@@ -219,7 +222,8 @@ export function SettingsView({
           </label>
           <Button
             className="play"
-            disabled={saving || apiKey.length === 0}
+            loading={saving}
+            disabled={apiKey.length === 0}
             onClick={() => connect()}
             variant="primary"
           >
@@ -239,17 +243,15 @@ export function SettingsView({
             <strong>{t("settings.localInstalls")}</strong>
             <p>{t("settings.localInstallsDescription")}</p>
           </div>
-          <button
+          <Button
+            variant="secondary"
             type="button"
-            className={
-              "[display:inline-flex] [align-items:center] [gap:7px] [min-height:38px] [border:1px_solid_color-mix(in_srgb,_var(--accent-a)_40%,_transparent)] [border-radius:10px] [padding:0_13px] [background:color-mix(in_srgb,_var(--accent-a)_10%,_transparent)] [color:var(--accent-a)] [font-size:11px] [font-weight:700] [cursor:pointer] [transition:background_.16s_ease,_transform_.16s_ease] [&:hover:not(:disabled)]:[background:color-mix(in_srgb,_var(--accent-a)_18%,_transparent)] [&:hover:not(:disabled)]:[transform:translateY(-1px)] [&:focus-visible]:[outline:2px_solid_var(--accent-a)] [&:focus-visible]:[outline-offset:3px] [&:disabled]:[opacity:.5]"
-            }
-            disabled={syncingSteam}
+            loading={syncingSteam}
             onClick={syncSteam}
           >
             <SteamLogo weight="fill" />
             {syncingSteam ? t("settings.syncing") : t("settings.syncSteam")}
-          </button>
+          </Button>
         </div>
         <p
           className={
@@ -270,6 +272,7 @@ export function SettingsView({
           </div>
         )}
       </section>
+      <StoreConnections />
       <section
         className={
           "settings-card [max-width:850px] [margin-top:30px] [border:1px_solid] sync-settings-card [margin-top:16px]"
@@ -308,22 +311,20 @@ export function SettingsView({
             <small>{t("settings.currentFolder")}</small>
             <strong>{syncSettings?.folderPath ?? t("settings.noFolder")}</strong>
           </span>
-          <button
+          <Button
+            variant="secondary"
             type="button"
-            className={
-              "cancel-button [border:1px_solid_#ffffff14] [border-radius:11px] [padding:11px_17px] [background:transparent] [color:#a2a4ad] [cursor:pointer]"
-            }
             disabled={syncing}
             onClick={() => chooseSyncFolder()}
           >
             {syncSettings?.folderPath
               ? t("settings.changeFolder")
               : t("settings.chooseFolder")}
-          </button>
+          </Button>
           {syncSettings?.folderPath && (
             <Button
               className="play"
-              disabled={syncing}
+              loading={syncing}
               onClick={() => syncNow()}
               variant="primary"
             >
@@ -354,16 +355,14 @@ export function SettingsView({
             {syncStatus}
           </div>
         )}
-        <button
+        <Button
+          variant="secondary"
           type="button"
-          className={
-            "cancel-button [border:1px_solid_#ffffff14] [border-radius:11px] [padding:11px_17px] [background:transparent] [color:#a2a4ad] [cursor:pointer]"
-          }
           disabled={syncing}
           onClick={() => associateLudusavi()}
         >
           {t("settings.associateGames")}
-        </button>
+        </Button>
       </section>
       <section className="settings-card [max-width:850px] [margin-top:16px]">
         <div className="[display:flex] [align-items:center] [justify-content:space-between] [gap:16px]">
@@ -467,16 +466,16 @@ export function SettingsView({
                       {new Date(backup.createdAt).toLocaleString(i18n.language)}
                     </small>
                   </span>
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
-                    className="save-action"
                     disabled={transferringData}
                     onClick={() =>
                       void restoreImportBackup(backup.category, backup.fileName)
                     }
                   >
                     {t("settings.restoreSafetyCopy")}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

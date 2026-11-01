@@ -107,6 +107,9 @@ const integerValue = (value: VdfValue | undefined): number | null => {
 };
 
 export const defaultSteamRoots = (): string[] => {
+  if (process.env.NEMETON_STEAM_ROOT) {
+    return [path.resolve(process.env.NEMETON_STEAM_ROOT)];
+  }
   if (process.platform === "win32") {
     return ["C:\\Program Files (x86)\\Steam", "C:\\Program Files\\Steam"];
   }
@@ -116,6 +119,7 @@ export const defaultSteamRoots = (): string[] => {
   return [
     path.join(os.homedir(), ".steam/steam"),
     path.join(os.homedir(), ".local/share/Steam"),
+    path.join(os.homedir(), ".var/app/com.valvesoftware.Steam/.local/share/Steam"),
     "/mnt/c/Program Files (x86)/Steam",
     "/mnt/c/Program Files/Steam",
   ];
@@ -178,6 +182,8 @@ const parseManifest = (content: string, libraryPath: string): SteamCandidate | n
   return {
     appId,
     title,
+    installationState:
+      Number(stringValue(state.StateFlags) ?? "4") & 4 ? "installed" : "installing",
     installPath: path.join(libraryPath, "steamapps/common", installDir),
     libraryPath,
     playtimeMinutes: 0,

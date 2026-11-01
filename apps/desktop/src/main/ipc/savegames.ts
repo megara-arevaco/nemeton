@@ -1,3 +1,4 @@
+import { savegameStorageKey } from "../../shared/game-identity.js";
 import { readSavegameState } from "../savegame-state.js";
 import type { SavegameState } from "../../shared/savegames.js";
 import fs from "node:fs";
@@ -45,7 +46,7 @@ export function registerSavegameHandlers({
       await awaitStartupRecovery();
       const game = await store.getGame(gameId);
 
-      if (!game || game.source !== "local") {
+      if (!game) {
         throw new Error("No se encontró el juego local");
       }
 
@@ -59,7 +60,11 @@ export function registerSavegameHandlers({
           localSummary: null,
         };
       }
-      return savegameManager.verify(gameId, game.sourceId, settings.syncFolderPath);
+      return savegameManager.verify(
+        gameId,
+        savegameStorageKey(game),
+        settings.syncFolderPath,
+      );
     }),
   );
   handle(
@@ -68,12 +73,12 @@ export function registerSavegameHandlers({
       const game = await store.getGame(gameId);
       const settings = await settingsStore.read();
 
-      if (!game || game.source !== "local" || !settings.syncFolderPath) {
+      if (!game || !settings.syncFolderPath) {
         throw new Error("No se puede verificar esta copia");
       }
       return savegameManager.verifyVersion(
         settings.syncFolderPath,
-        game.sourceId,
+        savegameStorageKey(game),
         versionId,
       );
     },
@@ -107,7 +112,7 @@ export function registerSavegameHandlers({
         const game = await store.getGame(gameId);
         const settings = await settingsStore.read();
 
-        if (!game || game.source !== "local") {
+        if (!game) {
           throw new Error("No se encontró el juego manual");
         }
         if (!settings.syncFolderPath) {
@@ -115,10 +120,13 @@ export function registerSavegameHandlers({
         }
         await savegameManager.backupWithOutcome(
           game.id,
-          game.sourceId,
+          savegameStorageKey(game),
           settings.syncFolderPath,
         );
-        return savegameManager.listVersions(settings.syncFolderPath, game.sourceId);
+        return savegameManager.listVersions(
+          settings.syncFolderPath,
+          savegameStorageKey(game),
+        );
       });
     } finally {
       broadcastSavegameChanged(gameId);
@@ -135,7 +143,7 @@ export function registerSavegameHandlers({
       }
       return savegameManager.setPinned(
         settings.syncFolderPath,
-        game.sourceId,
+        savegameStorageKey(game),
         versionId,
         pinned,
       );
@@ -151,7 +159,10 @@ export function registerSavegameHandlers({
     }
 
     const version = (
-      await savegameManager.listVersions(settings.syncFolderPath, game.sourceId)
+      await savegameManager.listVersions(
+        settings.syncFolderPath,
+        savegameStorageKey(game),
+      )
     ).find((item) => item.id === versionId);
 
     if (!version) {
@@ -181,13 +192,13 @@ export function registerSavegameHandlers({
     try {
       await savegameManager.backupWithOutcome(
         game.id,
-        game.sourceId,
+        savegameStorageKey(game),
         settings.syncFolderPath,
         versionId,
       );
       return await savegameManager.restore(
         game.id,
-        game.sourceId,
+        savegameStorageKey(game),
         settings.syncFolderPath,
         versionId,
       );

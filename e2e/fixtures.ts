@@ -12,6 +12,7 @@ export async function launchIsolatedDesktop(directory: string) {
   const data = path.join(directory, "data");
   const roamingAppData = path.join(directory, "roaming-appdata");
   await fs.mkdir(data, { recursive: true });
+  await fs.mkdir(path.join(directory, "steam/steamapps"), { recursive: true });
   await fs.mkdir(roamingAppData, { recursive: true });
   const catalogPath = path.join(data, "ludusavi-catalog.json");
   const libraryPath = path.join(data, "library.json");
@@ -42,6 +43,9 @@ export async function launchIsolatedDesktop(directory: string) {
       HOME: directory,
       APPDATA: roamingAppData,
       NEMETON_E2E_DATA: data,
+      NEMETON_STEAM_ROOT: path.join(directory, "steam"),
+      NEMETON_EPIC_MANIFESTS: path.join(directory, "epic-manifests"),
+      NEMETON_GOG_ROOT: path.join(directory, "gog-games"),
       ELECTRON_RENDERER_URL: "",
     },
   });
@@ -68,6 +72,7 @@ export const test = base.extend<{
     const data = path.join(directory, "data");
     const roamingAppData = path.join(directory, "roaming-appdata");
     await fs.mkdir(data);
+    await fs.mkdir(path.join(directory, "steam/steamapps"), { recursive: true });
     await fs.mkdir(roamingAppData);
     await fs.writeFile(
       path.join(data, "ludusavi-catalog.json"),
@@ -115,6 +120,9 @@ export const test = base.extend<{
           HOME: directory,
           APPDATA: roamingAppData,
           NEMETON_E2E_DATA: data,
+          NEMETON_STEAM_ROOT: path.join(directory, "steam"),
+          NEMETON_EPIC_MANIFESTS: path.join(directory, "epic-manifests"),
+          NEMETON_GOG_ROOT: path.join(directory, "gog-games"),
           ELECTRON_RENDERER_URL: "",
         },
       });

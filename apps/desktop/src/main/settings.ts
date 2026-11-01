@@ -4,6 +4,7 @@ import fs from "node:fs";
 import { safeStorage } from "electron";
 export interface StoredSettings {
   steamId: string | null;
+  lastSteamSyncedAt?: string | null;
   encryptedSteamApiKey: string | null;
   syncFolderPath?: string | null;
   lastSyncedAt?: string | null;
@@ -61,7 +62,11 @@ export class SettingsStore {
         return unprotectWithWindows(settings.encryptedSteamApiKey.slice(6));
       }
 
-      if (!safeStorage.isEncryptionAvailable()) {
+      if (
+        !safeStorage.isEncryptionAvailable() ||
+        (process.platform === "linux" &&
+          safeStorage.getSelectedStorageBackend() === "basic_text")
+      ) {
         return null;
       }
 
@@ -73,15 +78,26 @@ export class SettingsStore {
     }
   }
 
+  async clearSteamCredentials() {
+    this.sessionApiKey = null;
+    return this.update({
+      steamId: null,
+      encryptedSteamApiKey: null,
+      lastSteamSyncedAt: null,
+    });
+  }
   async writeSteamCredentials(steamId: string, apiKey: string) {
     return withFileLock(this.filePath, async () => {
       this.sessionApiKey = apiKey;
 
-      const encryptedSteamApiKey = safeStorage.isEncryptionAvailable()
-        ? safeStorage.encryptString(apiKey).toString("base64")
-        : process.env.WSL_DISTRO_NAME
-          ? await protectWithWindows(apiKey)
-          : null;
+      const encryptedSteamApiKey =
+        safeStorage.isEncryptionAvailable() &&
+        (process.platform !== "linux" ||
+          safeStorage.getSelectedStorageBackend() !== "basic_text")
+          ? safeStorage.encryptString(apiKey).toString("base64")
+          : process.env.WSL_DISTRO_NAME
+            ? await protectWithWindows(apiKey).catch(() => null)
+            : null;
 
       await this.write({
         ...(await this.read()),
@@ -127,14 +143,14 @@ function runPowerShellWithInput(script: string, input: string) {
 
 async function protectWithWindows(value: string) {
   const script =
-    "$v=[Console]::In.ReadToEnd();$b=[Text.Encoding]::UTF8.GetBytes($v);$p=[Security.Cryptography.ProtectedData]::Protect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($p))";
+    "$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;$v=[Console]::In.ReadToEnd();$b=[Text.Encoding]::UTF8.GetBytes($v);$p=[Security.Cryptography.ProtectedData]::Protect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Convert]::ToBase64String($p))";
 
   return `dpapi:${await runPowerShellWithInput(script, value)}`;
 }
 
 function unprotectWithWindows(value: string) {
   const script =
-    "$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Text.Encoding]::UTF8.GetString($p))";
+    "$ErrorActionPreference='Stop';Add-Type -AssemblyName System.Security;$v=[Console]::In.ReadToEnd();$b=[Convert]::FromBase64String($v);$p=[Security.Cryptography.ProtectedData]::Unprotect($b,$null,[Security.Cryptography.DataProtectionScope]::CurrentUser);[Console]::Out.Write([Text.Encoding]::UTF8.GetString($p))";
 
   return runPowerShellWithInput(script, value);
 }

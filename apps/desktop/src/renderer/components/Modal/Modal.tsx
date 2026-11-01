@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import type { ReactNode } from "react";
 import { X } from "@phosphor-icons/react/X";
 import { Button } from "../Button";
@@ -26,6 +27,7 @@ export function Modal({
   size = "standard",
   tone = "neutral",
 }: Readonly<ModalProps>) {
+  const { t } = useTranslation();
   const { dialogRef, titleId, cancel, dismissBackdrop } = useModal(busy, onClose);
 
   return (
@@ -61,7 +63,7 @@ export function Modal({
           </div>
         </div>
         <Button
-          aria-label="Cerrar"
+          aria-label={t("modal.close")}
           disabled={busy}
           onClick={onClose}
           variant="ghost"

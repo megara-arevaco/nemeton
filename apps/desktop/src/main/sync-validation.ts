@@ -21,8 +21,18 @@ export const remoteLibrarySchema = z.object({
     .array(
       z.object({
         id,
-        source: z.enum(["local", "steam"]),
+        source: z.enum(["local", "steam", "epic", "gog"]),
         sourceId: id,
+        playtimeOverlapUnknown: z.boolean().optional(),
+        canonicalId: z
+          .string()
+          .max(240)
+          .regex(/^[a-zA-Z0-9_-]+$/)
+          .nullable()
+          .optional(),
+        platformCreditedSeconds: z.number().int().min(0).max(6_000_000_000).optional(),
+        tags: z.array(z.string().min(1).max(500)).max(50).optional(),
+        collections: z.array(z.string().min(1).max(500)).max(50).optional(),
         title: text.min(1),
         installPath: text,
         launchUri: text.nullable(),
@@ -56,7 +66,7 @@ export const remoteLibrarySchema = z.object({
         startedAt: text,
         endedAt: text,
         durationSeconds: nonnegative,
-        origin: z.enum(["launcher", "steam-sync"]).optional(),
+        origin: z.enum(["launcher", "steam-sync", "provider-sync"]).optional(),
       }),
     )
     .max(1_000_000),

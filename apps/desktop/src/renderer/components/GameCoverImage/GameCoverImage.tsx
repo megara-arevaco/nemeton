@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { LibraryGame } from "@launcher/core";
 import type { ComponentPropsWithoutRef, SyntheticEvent } from "react";
 import { gameCoverUrl, gameLibraryCoverUrl } from "../../shared/presentation";
@@ -9,22 +10,26 @@ type GameCoverImageProps = Omit<ComponentPropsWithoutRef<"img">, "onError" | "sr
 export function GameCoverImage({ game, ...imageProps }: GameCoverImageProps) {
   const source = gameLibraryCoverUrl(game);
   const fallback = gameCoverUrl(game);
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  const [fallbackSource, setFallbackSource] = useState<string | null>(null);
 
-  if (!source) {
+  if (!source || failedSource === source) {
     return null;
   }
 
-  const handleError = (event: SyntheticEvent<HTMLImageElement>) => {
-    const image = event.currentTarget;
-
-    if (fallback && fallback !== source && image.dataset.fallbackUsed !== "true") {
-      image.dataset.fallbackUsed = "true";
-      image.src = fallback;
-      return;
+  const handleError = (_event: SyntheticEvent<HTMLImageElement>) => {
+    if (fallback && fallback !== source && fallbackSource !== source) {
+      setFallbackSource(source);
+    } else {
+      setFailedSource(source);
     }
-
-    image.remove();
   };
 
-  return <img {...imageProps} src={source} onError={handleError} />;
+  return (
+    <img
+      {...imageProps}
+      src={fallbackSource === source ? fallback! : source}
+      onError={handleError}
+    />
+  );
 }

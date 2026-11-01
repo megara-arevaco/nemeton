@@ -41,6 +41,7 @@ interface SavegameConfig {
   policies?: Record<string, SavegamePolicy>;
   learned?: Record<string, string[]>;
   backupFailures?: Record<string, { failedAt: string; message: string }>;
+  lastVerifications?: Record<string, { verifiedAt: string; versionId: string }>;
 }
 
 interface SnapshotFile {
@@ -122,6 +123,7 @@ export class SavegameManager {
           policies: parsed.policies ?? {},
           learned: parsed.learned ?? {},
           backupFailures: parsed.backupFailures ?? {},
+          lastVerifications: parsed.lastVerifications ?? {},
         };
       } catch {
         throw new Error("La configuración de partidas está dañada");
@@ -145,6 +147,21 @@ export class SavegameManager {
     });
   }
 
+  async getLastVerification(gameId: string) {
+    return (await this.readConfig()).lastVerifications?.[gameId] ?? null;
+  }
+  private async recordVerification(gameId: string, versionId: string) {
+    return withFileLock(this.configPath, async () => {
+      const config = await this.readConfig();
+      config.lastVerifications ??= {};
+      config.lastVerifications[gameId] = {
+        verifiedAt: new Date().toISOString(),
+        versionId,
+      };
+      await this.writeConfig(config);
+      return config.lastVerifications[gameId];
+    });
+  }
   async getBackupOutcome(gameId: string) {
     return (await this.readConfig()).backupFailures?.[gameId] ?? null;
   }
@@ -624,7 +641,15 @@ export class SavegameManager {
         versionId,
         localSummary,
       };
-    })().finally(() => this.verifications.delete(key));
+    })()
+      .then(async (result) => {
+        if (result.syncState === "synced" && result.versionId) {
+          const record = await this.recordVerification(gameId, result.versionId);
+          return { ...result, verifiedAt: record.verifiedAt };
+        }
+        return result;
+      })
+      .finally(() => this.verifications.delete(key));
     this.verifications.set(key, request);
     return request;
   }

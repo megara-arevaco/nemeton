@@ -5,16 +5,12 @@ import { handle } from "./handle.js";
 export async function registerDownloadHandlers() {
   const manager = new DownloadManager(app.getPath("userData"));
   await manager.initialize();
-  let stopping = false;
-  app.on("before-quit", (event) => {
-    if (stopping) {
-      return;
-    }
-    stopping = true;
-    event.preventDefault();
-    void manager.stop().finally(() => app.quit());
-  });
   handle("downloads:status", () => manager.snapshot());
+  handle("downloads:control-all", (_event, action) => manager.controlAll(action));
+  handle("downloads:configure", (_event, options) => manager.configure(options));
+  handle("downloads:priority", (_event, id, priority) =>
+    manager.setPriority(id, priority),
+  );
   handle("downloads:connect", (_event, token) => manager.connect(token));
   handle("downloads:disconnect", () => manager.disconnect());
   handle("downloads:directory", async (event) => {
@@ -46,6 +42,29 @@ export async function registerDownloadHandlers() {
   );
   handle("downloads:start", (_event, input) => manager.start(input));
   handle("downloads:control", (_event, id, action) => manager.control(id, action));
+  handle("downloads:choose-executable", async (event, id) => {
+    const snapshot = manager.snapshot();
+    const job = snapshot.jobs.find((item) => item.id === id);
+
+    if (!job || job.status !== "completed") {
+      throw new Error("download-not-completed");
+    }
+
+    const result = await dialog.showOpenDialog(
+      BrowserWindow.fromWebContents(event.sender)!,
+      {
+        defaultPath: job.directory,
+        properties: ["openFile"],
+        filters:
+          process.platform === "win32"
+            ? [{ name: "Executable", extensions: ["exe"] }]
+            : [],
+      },
+    );
+    return result.canceled || !result.filePaths[0]
+      ? null
+      : { title: job.title, executablePath: result.filePaths[0] };
+  });
   handle("downloads:open", async (_event, id) => {
     const error = await shell.openPath(manager.directoryFor(id));
 
@@ -53,4 +72,5 @@ export async function registerDownloadHandlers() {
       throw new Error(error);
     }
   });
+  return manager;
 }

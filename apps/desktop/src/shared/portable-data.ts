@@ -32,8 +32,18 @@ const imageUrl = z
 const game = z
   .object({
     id: portableId,
-    source: z.enum(["steam", "local"]),
+    source: z.enum(["steam", "local", "epic", "gog"]),
     sourceId,
+    playtimeOverlapUnknown: z.boolean().optional(),
+    canonicalId: z
+      .string()
+      .max(240)
+      .regex(/^[a-zA-Z0-9_-]+$/)
+      .nullable()
+      .optional(),
+    platformCreditedSeconds: z.number().int().min(0).max(6_000_000_000).optional(),
+    tags: z.array(z.string().min(1).max(500)).max(50).optional(),
+    collections: z.array(z.string().min(1).max(500)).max(50).optional(),
     steamAppId: z.string().refine(isValidSteamAppId).nullable().optional(),
     achievementStateId: safeText.nullable().optional(),
     ludusaviGameName: safeText.nullable().optional(),
@@ -82,7 +92,7 @@ export const portableDataSchema = z
                 startedAt: dateText,
                 endedAt: dateText,
                 durationSeconds: z.number().int().min(0).max(31_536_000),
-                origin: z.enum(["launcher", "steam-sync"]).optional(),
+                origin: z.enum(["launcher", "steam-sync", "provider-sync"]).optional(),
               })
               .strict(),
           )
@@ -92,7 +102,9 @@ export const portableDataSchema = z
             z
               .string()
               .max(260)
-              .regex(/^(?:steam:[1-9]\d{0,11}|local:[a-zA-Z0-9_-]{1,240})$/),
+              .regex(
+                /^(?:steam:[1-9]\d{0,11}|(?:local|epic|gog):[a-zA-Z0-9_-]{1,240})$/,
+              ),
           )
           .max(50_000)
           .optional(),
@@ -195,11 +207,11 @@ export const portableDataSchema = z
     );
 
     for (const key of Object.keys(data.savegamePolicies)) {
-      if (!key.startsWith("local:") || !gameKeys.has(key)) {
+      if (!gameKeys.has(key)) {
         context.addIssue({
           code: "custom",
           path: ["savegamePolicies", key],
-          message: "Policy references an unknown local game",
+          message: "Policy references an unknown game",
         });
       }
     }
@@ -208,7 +220,7 @@ export const portableDataSchema = z
 const portableAssetSchema = z
   .object({
     path: z.string().regex(/^assets\/covers\/[a-zA-Z0-9_-]+\.(?:png|jpe?g|webp)$/i),
-    source: z.enum(["steam", "local"]),
+    source: z.enum(["steam", "local", "epic", "gog"]),
     sourceId,
     extension: z.enum([".png", ".jpg", ".jpeg", ".webp"]),
     size: z
@@ -226,7 +238,7 @@ const portableBackupSchema = z
     gameKey: z
       .string()
       .max(260)
-      .regex(/^local:[a-zA-Z0-9_-]{1,240}$/),
+      .regex(/^(?:local|steam|epic|gog):[a-zA-Z0-9_-]{1,240}$/),
     versionId: z
       .string()
       .min(1)

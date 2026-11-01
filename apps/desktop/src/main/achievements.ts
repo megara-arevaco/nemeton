@@ -35,6 +35,7 @@ export class AchievementService {
   constructor(
     private readonly historyPath: string,
     private readonly catalogue?: AchievementCatalogue,
+    private readonly steamAccount?: (appId: string) => Promise<GameAchievements | null>,
   ) {}
 
   async captureGoldbergState(): Promise<GoldbergAchievementStateSnapshot> {
@@ -65,10 +66,29 @@ export class AchievementService {
       game.source === "steam"
         ? game.sourceId
         : (game.achievementStateId ?? game.steamAppId ?? discoveredAppId);
-    const [local, catalogue] = await Promise.all([
+    const [discovered, catalogue, account] = await Promise.all([
       this.discoverLocal(game, discoveredAppId),
       appId ? this.catalogue?.get(appId) : null,
+      game.source === "steam" && appId ? this.steamAccount?.(appId) : null,
     ]);
+    const local = account
+      ? {
+          ...account,
+          items: account.items.map((item) => {
+            const previous = discovered.items.find(
+              (entry) => entry.id.toLowerCase() === item.id.toLowerCase(),
+            );
+            return previous?.achieved
+              ? {
+                  ...item,
+                  achieved: true,
+                  unlockedAt: item.unlockedAt ?? previous.unlockedAt,
+                }
+              : item;
+          }),
+        }
+      : discovered;
+    local.unlocked = local.items.filter((item) => item.achieved).length;
     return this.registerLocalImages(
       game,
       catalogue ? mergeAchievementCatalogue(local, catalogue) : local,

@@ -1,3 +1,4 @@
+import { reconcilePlatformPlaytime } from "./groups.js";
 import {
   readTextIfExists,
   withFileLock,
@@ -58,7 +59,11 @@ export class LibraryStore {
       const { snapshot, revision } = await this.loadCached();
       const copy = {
         ...snapshot,
-        games: snapshot.games.map((game) => ({ ...game })),
+        games: snapshot.games.map((game) => ({
+          ...game,
+          tags: game.tags ? [...game.tags] : undefined,
+          collections: game.collections ? [...game.collections] : undefined,
+        })),
         sessions: snapshot.sessions.map((session) => ({ ...session })),
         excludedGameKeys: [...(snapshot.excludedGameKeys ?? [])],
       };
@@ -74,7 +79,13 @@ export class LibraryStore {
   async getGame(gameId: string): Promise<LibraryGame | null> {
     return withFileLock(this.filePath, async () => {
       const game = (await this.loadCached()).byId.get(gameId);
-      return game ? { ...game } : null;
+      return game
+        ? {
+            ...game,
+            tags: game.tags ? [...game.tags] : undefined,
+            collections: game.collections ? [...game.collections] : undefined,
+          }
+        : null;
     });
   }
 
@@ -241,6 +252,7 @@ export class LibraryStore {
         (game.installed || game.installPath)
       ) {
         game.installed = false;
+        game.installationState = undefined;
         game.installPath = "";
         game.updatedAt = new Date().toISOString();
       }
@@ -256,30 +268,24 @@ export class LibraryStore {
 
       const key = `steam:${candidate.appId}`;
       const previous = games.get(key);
-      const previousPlatformMinutes =
-        previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+      const reconciled = reconcilePlatformPlaytime(previous, candidate.playtimeMinutes);
 
-      if (
-        previous &&
-        previousPlatformMinutes !== undefined &&
-        candidate.playtimeMinutes > previousPlatformMinutes
-      ) {
-        const durationSeconds =
-          (candidate.playtimeMinutes - previousPlatformMinutes) * 60;
+      if (previous && reconciled.externalSeconds > 0) {
         const endedAt = candidate.lastPlayedAt ?? new Date().toISOString();
         snapshot.sessions.push({
           id: randomUUID(),
           gameId: previous.id,
           startedAt: new Date(
-            new Date(endedAt).getTime() - durationSeconds * 1_000,
+            new Date(endedAt).getTime() - reconciled.externalSeconds * 1000,
           ).toISOString(),
           endedAt,
-          durationSeconds,
-          origin: "steam-sync",
+          durationSeconds: reconciled.externalSeconds,
+          origin: "provider-sync",
         });
       }
 
       const game: LibraryGame = {
+        ...previous,
         id: previous?.id ?? randomUUID(),
         source: "steam",
         sourceId: candidate.appId,
@@ -291,17 +297,14 @@ export class LibraryStore {
           retainedArtwork(previous?.coverUrl) ?? steamArtwork(candidate.appId).coverUrl,
         heroUrl:
           retainedArtwork(previous?.heroUrl) ?? steamArtwork(candidate.appId).heroUrl,
-        playtimeMinutes: Math.max(
-          previous?.playtimeMinutes ?? 0,
-          candidate.playtimeMinutes,
-        ),
-        playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
-        platformPlaytimeMinutes: Math.max(
-          previous?.platformPlaytimeMinutes ?? 0,
-          candidate.playtimeMinutes,
-        ),
+        playtimeMinutes: reconciled.playtimeMinutes,
+        playtimeSecondsRemainder: reconciled.playtimeSecondsRemainder,
+        platformPlaytimeMinutes: reconciled.platformPlaytimeMinutes,
+        platformCreditedSeconds: reconciled.platformCreditedSeconds,
+        playtimeOverlapUnknown: reconciled.playtimeOverlapUnknown,
         trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
-        installed: true,
+        installed: candidate.installationState !== "installing",
+        installationState: candidate.installationState ?? "installed",
         hiddenFromLibrary: previous?.hiddenFromLibrary ?? false,
         favorite: previous?.favorite ?? false,
         backlogStatus: previous?.backlogStatus ?? null,
@@ -341,28 +344,24 @@ export class LibraryStore {
 
       const key = `steam:${owned.appId}`;
       const previous = games.get(key);
-      const previousPlatformMinutes =
-        previous?.platformPlaytimeMinutes ?? previous?.playtimeMinutes;
+      const reconciled = reconcilePlatformPlaytime(previous, owned.playtimeMinutes);
 
-      if (
-        previous &&
-        previousPlatformMinutes !== undefined &&
-        owned.playtimeMinutes > previousPlatformMinutes
-      ) {
-        const durationSeconds = (owned.playtimeMinutes - previousPlatformMinutes) * 60;
+      if (previous && reconciled.externalSeconds > 0) {
         const endedAt = owned.lastPlayedAt ?? new Date().toISOString();
         snapshot.sessions.push({
           id: randomUUID(),
           gameId: previous.id,
           startedAt: new Date(
-            new Date(endedAt).getTime() - durationSeconds * 1_000,
+            new Date(endedAt).getTime() - reconciled.externalSeconds * 1000,
           ).toISOString(),
           endedAt,
-          durationSeconds,
-          origin: "steam-sync",
+          durationSeconds: reconciled.externalSeconds,
+          origin: "provider-sync",
         });
       }
+
       games.set(key, {
+        ...previous,
         id: previous?.id ?? randomUUID(),
         source: "steam",
         sourceId: owned.appId,
@@ -374,15 +373,11 @@ export class LibraryStore {
           retainedArtwork(previous?.coverUrl) ?? steamArtwork(owned.appId).coverUrl,
         heroUrl:
           retainedArtwork(previous?.heroUrl) ?? steamArtwork(owned.appId).heroUrl,
-        playtimeMinutes: Math.max(
-          previous?.playtimeMinutes ?? 0,
-          owned.playtimeMinutes,
-        ),
-        playtimeSecondsRemainder: previous?.playtimeSecondsRemainder ?? 0,
-        platformPlaytimeMinutes: Math.max(
-          previous?.platformPlaytimeMinutes ?? 0,
-          owned.playtimeMinutes,
-        ),
+        playtimeMinutes: reconciled.playtimeMinutes,
+        playtimeSecondsRemainder: reconciled.playtimeSecondsRemainder,
+        platformPlaytimeMinutes: reconciled.platformPlaytimeMinutes,
+        platformCreditedSeconds: reconciled.platformCreditedSeconds,
+        playtimeOverlapUnknown: reconciled.playtimeOverlapUnknown,
         trackedPlaytimeSeconds: previous?.trackedPlaytimeSeconds ?? 0,
         lastPlayedAt: owned.lastPlayedAt ?? previous?.lastPlayedAt ?? null,
         importedAt: previous?.importedAt ?? new Date().toISOString(),
@@ -400,6 +395,109 @@ export class LibraryStore {
       games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),
     };
     return next;
+  }
+
+  async importProviderGames(
+    provider: "epic" | "gog",
+    products: Array<{
+      id: string;
+      title: string;
+      installPath: string;
+      coverUrl: string | null;
+      playtimeMinutes?: number;
+    }>,
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      const excluded = new Set(snapshot.excludedGameKeys ?? []);
+
+      for (const product of products) {
+        if (excluded.has(`${provider}:${product.id}`)) {
+          continue;
+        }
+
+        const previous = snapshot.games.find(
+          (game) => game.source === provider && game.sourceId === product.id,
+        );
+        const now = new Date().toISOString();
+        const reconciled =
+          product.playtimeMinutes === undefined
+            ? null
+            : reconcilePlatformPlaytime(previous, product.playtimeMinutes);
+        const game: LibraryGame = {
+          id: previous?.id ?? randomUUID(),
+          source: provider,
+          sourceId: product.id,
+          title: product.title,
+          installPath: product.installPath,
+          installed: Boolean(product.installPath),
+          launchUri: null,
+          coverPath: null,
+          coverUrl: product.coverUrl,
+          heroUrl: product.coverUrl,
+          playtimeMinutes: 0,
+          playtimeSecondsRemainder: 0,
+          platformPlaytimeMinutes: null,
+          trackedPlaytimeSeconds: 0,
+          lastPlayedAt: null,
+          importedAt: now,
+          ...previous,
+          ...(reconciled
+            ? {
+                playtimeMinutes: reconciled.playtimeMinutes,
+                playtimeSecondsRemainder: reconciled.playtimeSecondsRemainder,
+                platformPlaytimeMinutes: reconciled.platformPlaytimeMinutes,
+                platformCreditedSeconds: reconciled.platformCreditedSeconds,
+                playtimeOverlapUnknown: reconciled.playtimeOverlapUnknown,
+              }
+            : {}),
+        };
+
+        if (previous && reconciled && reconciled.externalSeconds > 0) {
+          const endedAt = new Date().toISOString();
+          snapshot.sessions.push({
+            id: randomUUID(),
+            gameId: game.id,
+            startedAt: new Date(
+              Date.now() - reconciled.externalSeconds * 1000,
+            ).toISOString(),
+            endedAt,
+            durationSeconds: reconciled.externalSeconds,
+            origin: "provider-sync",
+          });
+        }
+        game.installPath = product.installPath;
+        game.installed = Boolean(product.installPath);
+        game.coverUrl ??= product.coverUrl;
+        if (previous) {
+          snapshot.games[snapshot.games.findIndex((item) => item.id === previous.id)] =
+            game;
+        } else {
+          snapshot.games.push(game);
+        }
+      }
+      snapshot.games.sort((a, b) => a.title.localeCompare(b.title));
+      await this.write(snapshot);
+      return snapshot;
+    });
+  }
+  async setProviderInstall(
+    gameId: string,
+    installPath: string,
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      const game = snapshot.games.find((item) => item.id === gameId);
+
+      if (!game || !["epic", "gog"].includes(game.source)) {
+        throw new Error("invalid-provider");
+      }
+      game.installPath = installPath;
+      game.installed = Boolean(installPath);
+      game.updatedAt = new Date().toISOString();
+      await this.write(snapshot);
+      return snapshot;
+    });
   }
 
   async addLocal(input: LocalGameInput): Promise<LibrarySnapshot> {
@@ -566,6 +664,66 @@ export class LibraryStore {
     });
   }
 
+  async linkCopies(
+    gameIds: string[],
+    canonicalId: string | null,
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      const selected = new Set(gameIds);
+
+      if (
+        !selected.size ||
+        [...selected].some((id) => !snapshot.games.some((game) => game.id === id))
+      ) {
+        throw new Error("Selecciona copias existentes");
+      }
+
+      const groups = new Set(
+        snapshot.games
+          .filter((game) => selected.has(game.id))
+          .map((game) => game.canonicalId)
+          .filter(Boolean),
+      );
+
+      for (const game of snapshot.games) {
+        if (
+          selected.has(game.id) ||
+          (canonicalId && game.canonicalId && groups.has(game.canonicalId))
+        ) {
+          game.canonicalId = canonicalId;
+          game.updatedAt = new Date().toISOString();
+        }
+      }
+      await this.write(snapshot);
+      return snapshot;
+    });
+  }
+
+  async organizeGame(
+    gameId: string,
+    state: { tags?: string[]; collections?: string[] },
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+      const game = snapshot.games.find((item) => item.id === gameId);
+
+      if (!game) {
+        throw new Error("No se encontró el juego");
+      }
+      for (const field of ["tags", "collections"] as const) {
+        if (state[field]) {
+          game[field] = [
+            ...new Set(state[field]!.map((item) => item.trim()).filter(Boolean)),
+          ];
+        }
+      }
+      game.updatedAt = new Date().toISOString();
+      await this.write(snapshot);
+      return snapshot;
+    });
+  }
+
   async setCollectionState(
     gameId: string,
     state: {
@@ -580,13 +738,19 @@ export class LibraryStore {
       if (!game) {
         throw new Error("No se encontró el juego");
       }
-      if (state.favorite !== undefined) {
-        game.favorite = state.favorite;
+      for (const copy of snapshot.games.filter(
+        (copy) =>
+          copy.id === game.id ||
+          (game.canonicalId && copy.canonicalId === game.canonicalId),
+      )) {
+        if (state.favorite !== undefined) {
+          copy.favorite = state.favorite;
+        }
+        if (state.backlogStatus !== undefined) {
+          copy.backlogStatus = state.backlogStatus;
+        }
+        copy.updatedAt = new Date().toISOString();
       }
-      if (state.backlogStatus !== undefined) {
-        game.backlogStatus = state.backlogStatus;
-      }
-      game.updatedAt = new Date().toISOString();
       await this.write(snapshot);
       return snapshot;
     });
@@ -722,6 +886,9 @@ export class LibraryStore {
             existing?.playtimeSecondsRemainder ?? imported.playtimeSecondsRemainder,
           // Local preferences win on identity matches; importing another device must not
           // silently replace a user's collection state.
+          canonicalId: existing?.canonicalId ?? imported.canonicalId ?? null,
+          tags: existing?.tags ?? imported.tags,
+          collections: existing?.collections ?? imported.collections,
           favorite: existing?.favorite ?? imported.favorite ?? false,
           backlogStatus: existing?.backlogStatus ?? imported.backlogStatus ?? null,
           lastPlayedAt:

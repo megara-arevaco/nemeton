@@ -15,7 +15,8 @@ type Store = Pick<
   "importSteamSnapshot" | "importSteam" | "resolveSteamArtwork"
 >;
 
-type Settings = Pick<SettingsStore, "read" | "readApiKey">;
+type Settings = Pick<SettingsStore, "read" | "readApiKey"> &
+  Partial<Pick<SettingsStore, "update">>;
 
 export class SteamSyncService {
   private readonly artworkRetryAt = new Map<string, number>();
@@ -44,6 +45,7 @@ export class SteamSyncService {
     const snapshot = await this.resolveArtwork(
       await this.store.importSteamSnapshot(ownedGames, installedGames),
     );
+    await this.settings.update?.({ lastSteamSyncedAt: new Date().toISOString() });
     await this.broadcastLibrary(snapshot);
     return { snapshot, ownedCount: ownedGames.length };
   }
@@ -102,6 +104,32 @@ export class SteamSyncService {
       }),
     );
     return artwork.size ? this.store.resolveSteamArtwork(artwork) : snapshot;
+  }
+
+  watchInstallation(appId: string) {
+    let attempts = 0;
+    const check = async () => {
+      try {
+        const snapshot = await this.scanLocal();
+
+        if (
+          snapshot.games.some(
+            (game) =>
+              game.source === "steam" && game.sourceId === appId && game.installed,
+          )
+        ) {
+          return;
+        }
+      } catch {
+        /* Retry temporary manifest read failures while Steam installs. */
+      }
+      if (++attempts < 720) {
+        const timer = setTimeout(() => void check(), 5000);
+        timer.unref();
+      }
+    };
+    const timer = setTimeout(() => void check(), 2000);
+    timer.unref();
   }
 
   refreshAutomatically(): Promise<void> {

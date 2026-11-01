@@ -73,6 +73,7 @@ export interface DownloadJob {
   progress: number;
   cloudProgress: number;
   peers: number;
+  priority?: number;
   error: string | null;
   createdAt: string;
   torrentId?: string;
@@ -87,6 +88,8 @@ export interface DownloadsSnapshot {
   hasToken: boolean;
   persistentToken: boolean;
   maxConcurrent: number;
+  downloadLimitBytesPerSecond?: number;
+  bulkPausedIds?: string[];
 }
 
 export const startDownloadSchema = z

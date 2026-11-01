@@ -2,7 +2,7 @@ import { useVirtualCollection, CARD_HEIGHT } from "../../shared/virtualCollectio
 import { useTranslation } from "react-i18next";
 import { memo } from "react";
 import type { LibraryGame } from "@launcher/core";
-import type { SyntheticEvent } from "react";
+import type { ReactNode, SyntheticEvent } from "react";
 import { GameController } from "@phosphor-icons/react/GameController";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Play } from "@phosphor-icons/react/Play";
@@ -19,7 +19,9 @@ export const LibraryCollection = memo(function LibraryCollection({
   games,
   runningGameIds,
   onSelect,
+  intro,
 }: Readonly<{
+  intro?: ReactNode;
   games: LibraryGame[];
   runningGameIds: Set<string>;
   onSelect: (gameId: string) => void;
@@ -32,7 +34,7 @@ export const LibraryCollection = memo(function LibraryCollection({
     fallback: string | null,
   ) => {
     if (!fallback || event.currentTarget.src === fallback) {
-      event.currentTarget.remove();
+      event.currentTarget.style.visibility = "hidden";
       return;
     }
     event.currentTarget.src = fallback;
@@ -45,6 +47,7 @@ export const LibraryCollection = memo(function LibraryCollection({
         "library-collection-view [min-height:0] [overflow-y:auto] [padding:0_34px_34px]"
       }
     >
+      {intro}
       <section
         className={
           "installed-section [padding:24px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119]"

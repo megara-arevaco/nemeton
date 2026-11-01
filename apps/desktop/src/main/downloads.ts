@@ -19,6 +19,7 @@ import {
   downloadHttpFile,
   TransferSlots,
   type StoredDownloadFile,
+  DownloadRateLimiter,
 } from "./download-http.js";
 
 interface StoredJob extends Omit<DownloadJob, "files"> {
@@ -31,6 +32,9 @@ interface DownloadState {
   encryptedToken: string | null;
   account: DownloadsSnapshot["account"];
   sources?: unknown;
+  maxConcurrent?: number;
+  downloadLimitBytesPerSecond?: number;
+  bulkPausedIds?: string[];
 }
 
 interface ActiveTask {
@@ -39,7 +43,7 @@ interface ActiveTask {
 }
 
 const runningStatuses: DownloadStatus[] = ["queued", "preparing", "downloading"];
-const maxConcurrent = 3;
+const defaultMaxConcurrent = 3;
 
 function makeFile(id: string, name: string, total: number): StoredDownloadFile {
   return {
@@ -65,8 +69,13 @@ export class DownloadManager {
   private token: string | null = null;
   private active = new Map<string, ActiveTask>();
   private transfers = new Map<string, ActiveTask>();
-  private torrents = new Map<string, { torrent: Torrent; update: () => void }>();
+  private torrents = new Map<
+    string,
+    { torrent: Torrent; update: () => void; setLimit: (limit: number) => unknown }
+  >();
   private slots = new TransferSlots(3);
+  private bulkChanging = false;
+  private readonly rateLimiter = new DownloadRateLimiter(() => this.transferLimit());
   private stopping = false;
   private timer: ReturnType<typeof setInterval> | null = null;
   private readonly file: string;
@@ -87,6 +96,14 @@ export class DownloadManager {
       job.files ??= [];
       job.selectionConfirmed ??= job.files.length > 0;
       job.cloudProgress ??= 0;
+      if (job.status === "waiting-selection") {
+        job.selectionConfirmed = true;
+        job.status = "paused";
+        for (const file of job.files) {
+          file.selected = true;
+          file.status = "paused";
+        }
+      }
       if ([...runningStatuses, "interrupted"].includes(job.status)) {
         job.status = "paused";
       }
@@ -146,7 +163,9 @@ export class DownloadManager {
       account: this.token ? this.state.account : null,
       hasToken: Boolean(this.token),
       persistentToken: Boolean(this.state.encryptedToken && this.token),
-      maxConcurrent,
+      maxConcurrent: this.state.maxConcurrent ?? defaultMaxConcurrent,
+      downloadLimitBytesPerSecond: this.state.downloadLimitBytesPerSecond ?? 0,
+      bulkPausedIds: this.state.bulkPausedIds ?? [],
     };
   }
 
@@ -261,7 +280,7 @@ export class DownloadManager {
       error: null,
       createdAt: new Date().toISOString(),
       files: [],
-      selectionConfirmed: false,
+      selectionConfirmed: true,
     };
     this.state.jobs.unshift(job);
     await this.persist();
@@ -301,9 +320,93 @@ export class DownloadManager {
     });
   }
 
-  async control(id: string, action: DownloadAction) {
+  async controlAll(action: "pause" | "resume") {
+    return withFileLock(`${this.file}:bulk`, async () => {
+      this.bulkChanging = true;
+      try {
+        if (action === "pause") {
+          const ids = this.state.jobs
+            .filter((job) => runningStatuses.includes(job.status))
+            .map((job) => job.id);
+          this.state.bulkPausedIds = [
+            ...new Set([...(this.state.bulkPausedIds ?? []), ...ids]),
+          ];
+          for (const id of ids) {
+            await this.control(id, "pause", true);
+          }
+        } else {
+          for (const id of [...(this.state.bulkPausedIds ?? [])]) {
+            const job = this.state.jobs.find((item) => item.id === id);
+
+            if (job?.status === "paused") {
+              await this.control(id, "resume", true);
+            }
+            this.state.bulkPausedIds = (this.state.bulkPausedIds ?? []).filter(
+              (item) => item !== id,
+            );
+          }
+        }
+        await this.persist();
+      } finally {
+        this.bulkChanging = false;
+        this.pump();
+      }
+      return this.snapshot();
+    });
+  }
+
+  async configure(options: {
+    maxConcurrent: number;
+    downloadLimitBytesPerSecond: number;
+  }) {
+    this.state.maxConcurrent = Math.max(
+      1,
+      Math.min(6, Math.round(options.maxConcurrent)),
+    );
+    this.state.downloadLimitBytesPerSecond = Math.max(
+      0,
+      Math.round(options.downloadLimitBytesPerSecond),
+    );
+    this.applyTorrentLimits();
+    await this.persist();
+    this.pump();
+    return this.snapshot();
+  }
+  private transferLimit() {
+    const limit = this.state.downloadLimitBytesPerSecond ?? 0;
+    return limit > 0
+      ? Math.max(
+          1,
+          Math.floor(
+            limit / Math.max(1, this.torrents.size + (this.transfers.size ? 1 : 0)),
+          ),
+        )
+      : 0;
+  }
+  private applyTorrentLimits() {
+    const limit = this.transferLimit();
+
+    for (const value of this.torrents.values()) {
+      value.setLimit(limit || -1);
+    }
+  }
+  async setPriority(id: string, priority: number) {
+    const job = this.job(id);
+    job.priority = Math.max(-1, Math.min(1, priority));
+    await this.persist();
+    this.pump();
+    return this.snapshot();
+  }
+
+  async control(id: string, action: DownloadAction, bulk = false) {
     return withFileLock(`${this.file}:${id}`, async () => {
       const job = this.job(id);
+
+      if (!bulk) {
+        this.state.bulkPausedIds = (this.state.bulkPausedIds ?? []).filter(
+          (item) => item !== id,
+        );
+      }
 
       if (action === "pause" || action === "cancel") {
         if (job.status === "completed") {
@@ -465,11 +568,13 @@ export class DownloadManager {
   }
 
   private pump() {
-    if (this.stopping) {
+    if (this.stopping || this.bulkChanging) {
       return;
     }
-    for (const job of [...this.state.jobs].reverse()) {
-      if (this.active.size >= maxConcurrent) {
+    for (const job of [...this.state.jobs]
+      .reverse()
+      .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0))) {
+      if (this.active.size >= (this.state.maxConcurrent ?? defaultMaxConcurrent)) {
         break;
       }
       if (job.status !== "queued" || this.active.has(job.id)) {
@@ -544,11 +649,7 @@ export class DownloadManager {
           job.files = info.files.map((file) =>
             makeFile(String(file.id), file.path, file.bytes),
           );
-          job.selectionConfirmed = job.files.length === 1;
-        }
-        if (job.files.length && !job.selectionConfirmed) {
-          job.status = "waiting-selection";
-          return;
+          job.selectionConfirmed = true;
         }
         if (info.status === "waiting_files_selection" && job.selectionConfirmed) {
           await rd.select(
@@ -560,16 +661,36 @@ export class DownloadManager {
         if (info.status === "downloaded") {
           const selected = info.files.filter((file) => file.selected === 1);
 
-          if (selected.length !== info.links.length || !selected.length) {
+          if (!selected.length || !info.links.length) {
             throw new Error("invalid-file-links");
           }
-          for (const file of job.files.filter((file) => file.selected)) {
-            const index = selected.findIndex((remote) => String(remote.id) === file.id);
+          // A multi-file torrent can be returned as a single archive link.
+          if (
+            info.links.length === 1 &&
+            (selected.length > 1 || job.files.some((file) => file.id === "bundle"))
+          ) {
+            let bundle = job.files.find((file) => file.id === "bundle");
 
-            if (index < 0) {
+            if (!bundle) {
+              const resolved = await rd.unrestrict(info.links[0], signal);
+              bundle = makeFile("bundle", resolved.filename, resolved.filesize);
+            }
+            bundle.link = info.links[0];
+            job.files = [bundle];
+          } else {
+            if (selected.length !== info.links.length) {
               throw new Error("invalid-file-links");
             }
-            file.link = info.links[index];
+            for (const file of job.files.filter((file) => file.selected)) {
+              const index = selected.findIndex(
+                (remote) => String(remote.id) === file.id,
+              );
+
+              if (index < 0) {
+                throw new Error("invalid-file-links");
+              }
+              file.link = info.links[index];
+            }
           }
           break;
         }
@@ -614,6 +735,7 @@ export class DownloadManager {
     const key = `${job.id}:${file.id}`;
     const task: ActiveTask = { controller, done: Promise.resolve() };
     this.transfers.set(key, task);
+    this.applyTorrentLimits();
     task.done = this.slots
       .use(combined, async () => {
         await downloadHttpFile(
@@ -621,6 +743,7 @@ export class DownloadManager {
           job.directory,
           () => rd.unrestrict(file.link ?? job.uri, combined),
           combined,
+          this.rateLimiter,
         );
       })
       .catch((error: unknown) => {
@@ -636,6 +759,7 @@ export class DownloadManager {
       .finally(() => {
         file.speed = 0;
         this.transfers.delete(key);
+        this.applyTorrentLimits();
         this.aggregate(job);
       });
     await task.done;
@@ -674,6 +798,7 @@ export class DownloadManager {
           }
           signal.removeEventListener("abort", abort);
           this.torrents.delete(job.id);
+          this.applyTorrentLimits();
           torrent.destroy({ destroyStore: false }, () =>
             error ? reject(error) : resolve(),
           );
@@ -745,15 +870,15 @@ export class DownloadManager {
             job.files = torrent.files.map((file, index) =>
               makeFile(String(index + 1), file.path, file.length),
             );
-            job.selectionConfirmed = job.files.length === 1;
-          }
-          if (!job.selectionConfirmed) {
-            job.status = "waiting-selection";
-            finish();
-            return;
+            job.selectionConfirmed = true;
           }
           job.status = "downloading";
-          this.torrents.set(job.id, { torrent, update: select });
+          this.torrents.set(job.id, {
+            torrent,
+            update: select,
+            setLimit: (limit) => client.throttleDownload(limit),
+          });
+          this.applyTorrentLimits();
           select();
           if (!finished) {
             timer = setInterval(update, 200);

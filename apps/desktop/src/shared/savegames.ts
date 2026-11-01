@@ -29,6 +29,7 @@ export interface SavegamePolicy {
 }
 
 export interface SavegameState {
+  lastVerification?: { verifiedAt: string; versionId: string } | null;
   paths: string[];
   backupFailure: { failedAt: string; message: string } | null;
   suggestions: SavegameSuggestion[];
@@ -56,6 +57,7 @@ export interface SavegameLocalSummary {
 }
 
 export type SavegameVerification = Pick<SavegameState, "syncState" | "conflict"> & {
+  verifiedAt?: string;
   versionId: string | null;
   localSummary: SavegameLocalSummary | null;
 };

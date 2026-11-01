@@ -1,3 +1,4 @@
+import { savegameStorageKey } from "../shared/game-identity.js";
 import type { MainContext } from "./context.js";
 import { handle } from "./ipc/handle.js";
 import {
@@ -13,9 +14,18 @@ export function createSteamSessionWatcher({
   broadcastLibrary,
   broadcastGameRunning,
   scheduleSteamRefresh,
+  savegameManager,
+  settingsStore,
+  broadcastSavegameChanged,
 }: Pick<
   MainContext,
-  "store" | "broadcastLibrary" | "broadcastGameRunning" | "scheduleSteamRefresh"
+  | "store"
+  | "broadcastLibrary"
+  | "broadcastGameRunning"
+  | "scheduleSteamRefresh"
+  | "savegameManager"
+  | "settingsStore"
+  | "broadcastSavegameChanged"
 >) {
   const watchedSteamGames = new Set<string>();
   const watchSteamSession = async (gameId: string, installPath: string) => {
@@ -51,6 +61,19 @@ export function createSteamSessionWatcher({
       if (durationSeconds >= 10) {
         await broadcastLibrary(await store.addPlaytime(gameId, durationSeconds));
       }
+
+      const [game, policy, settings] = await Promise.all([
+        store.getGame(gameId),
+        savegameManager.getPolicy(gameId),
+        settingsStore.read(),
+      ]);
+
+      if (game && policy.autoBackup && settings.syncFolderPath) {
+        await savegameManager
+          .backupWithOutcome(gameId, savegameStorageKey(game), settings.syncFolderPath)
+          .catch(() => undefined);
+        broadcastSavegameChanged(gameId);
+      }
     } finally {
       if (reportedRunning) {
         broadcastGameRunning(gameId, false);
@@ -64,6 +87,8 @@ export function createSteamSessionWatcher({
 }
 
 export function registerLaunchHandlers({
+  steamSyncService,
+  providerService,
   store,
   settingsStore,
   savegameManager,
@@ -81,16 +106,6 @@ export function registerLaunchHandlers({
     if (!game) {
       throw new Error("Game not found");
     }
-    if (game.source === "steam" && game.launchUri) {
-      await openExternal(game.launchUri);
-      if (game.installed) {
-        runBackground(watchSteamSession(game.id, game.installPath), "[steam:session]");
-      }
-      return;
-    }
-    if (!game.installPath) {
-      throw new Error("Este juego todavía no tiene ejecutable");
-    }
 
     const savePolicy = await savegameManager.getPolicy(game.id);
     const launchSettings = await settingsStore.read();
@@ -99,12 +114,33 @@ export function registerLaunchHandlers({
       try {
         await savegameManager.backupWithOutcome(
           game.id,
-          game.sourceId,
+          savegameStorageKey(game),
           launchSettings.syncFolderPath,
         );
       } finally {
         broadcastSavegameChanged(game.id);
       }
+    }
+
+    if (game.source === "epic" || game.source === "gog") {
+      await providerService.launch(game);
+      runBackground(watchSteamSession(game.id, game.installPath), "[provider:session]");
+      return;
+    }
+    if (game.source === "steam" && game.launchUri) {
+      await openExternal(
+        game.installed ? game.launchUri : `steam://install/${game.sourceId}`,
+      );
+      if (!game.installed) {
+        steamSyncService.watchInstallation(game.sourceId);
+      }
+      if (game.installed) {
+        runBackground(watchSteamSession(game.id, game.installPath), "[steam:session]");
+      }
+      return;
+    }
+    if (!game.installPath) {
+      throw new Error("Este juego todavía no tiene ejecutable");
     }
 
     const stateBeforeLaunch = await achievementService.captureGoldbergState();
@@ -186,7 +222,11 @@ export function registerLaunchHandlers({
 
       if (savePolicy.autoBackup && syncSettings.syncFolderPath) {
         await savegameManager
-          .backupWithOutcome(game.id, game.sourceId, syncSettings.syncFolderPath)
+          .backupWithOutcome(
+            game.id,
+            savegameStorageKey(game),
+            syncSettings.syncFolderPath,
+          )
           .catch((error) => console.error("[savegames:auto]", error))
           .finally(() => broadcastSavegameChanged(game.id));
       }

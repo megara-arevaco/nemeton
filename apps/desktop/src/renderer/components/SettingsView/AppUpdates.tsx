@@ -98,7 +98,15 @@ export function AppUpdates() {
         >
           {t("updates.releases")}
         </Button>
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={() => void run(() => window.launcher.exportDiagnostics())}
+        >
+          {t("diagnostics.export")}
+        </Button>
       </div>
+      <p>{t("diagnostics.privacy")}</p>
     </section>
   );
 }

@@ -1,3 +1,4 @@
+import { savegameStorageKey } from "../shared/game-identity.js";
 import fs from "node:fs/promises";
 import type { MainContext } from "./context.js";
 import type { SavegameState } from "../shared/savegames.js";
@@ -52,10 +53,8 @@ export async function readSavegameState(
 ): Promise<SavegameState> {
   const game = await store.getGame(gameId);
 
-  if (!game || game.source !== "local") {
-    throw new Error(
-      "Las partidas sincronizadas solo están disponibles para juegos manuales",
-    );
+  if (!game) {
+    throw new Error("No se encontró el juego");
   }
 
   const settings = await settingsStore.read();
@@ -72,7 +71,7 @@ export async function readSavegameState(
         game.title,
         await getRoamingAppData(),
         game.installPath,
-        game.steamAppId,
+        game.source === "steam" ? game.sourceId : game.steamAppId,
         ludusavi,
         policy.includeConfig,
         false,
@@ -92,7 +91,10 @@ export async function readSavegameState(
   }
 
   const versions = settings.syncFolderPath
-    ? await savegameManager.listVersions(settings.syncFolderPath, game.sourceId)
+    ? await savegameManager.listVersions(
+        settings.syncFolderPath,
+        savegameStorageKey(game),
+      )
     : [];
   const backupFailure = await savegameManager.getBackupOutcome(gameId);
   const missingPaths = (
@@ -116,6 +118,7 @@ export async function readSavegameState(
     hasConflict: Boolean(conflict),
   });
   return {
+    lastVerification: await savegameManager.getLastVerification(gameId),
     paths,
     backupFailure,
     suggestions: suggestions.filter((item) => !paths.includes(item.path)),

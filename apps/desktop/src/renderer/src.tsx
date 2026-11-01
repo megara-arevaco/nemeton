@@ -1,3 +1,4 @@
+import { AppErrorBoundary } from "./components/AppErrorBoundary/AppErrorBoundary";
 import "./i18n";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -16,7 +17,9 @@ try {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <App />
+          <AppErrorBoundary>
+            <App />
+          </AppErrorBoundary>
         </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>,

@@ -70,12 +70,14 @@ export function StatisticsView({
             }
           >
             <button
+              aria-pressed={summaryPeriod === "week"}
               className={summaryPeriod === "week" ? "active" : ""}
               onClick={() => setSummaryPeriod("week")}
             >
               {t("statistics.week")}
             </button>
             <button
+              aria-pressed={summaryPeriod === "month"}
               className={summaryPeriod === "month" ? "active" : ""}
               onClick={() => setSummaryPeriod("month")}
             >
@@ -176,9 +178,7 @@ export function StatisticsView({
           >
             {statistics.played.slice(0, 3).map((game, index) => {
               const minutes =
-                game.source === "steam"
-                  ? (game.platformPlaytimeMinutes ?? 0)
-                  : game.trackedPlaytimeSeconds / 60;
+                game.playtimeMinutes + (game.playtimeSecondsRemainder ?? 0) / 60;
               const cover = gameLibraryCoverUrl(game);
               return (
                 <article
@@ -215,9 +215,7 @@ export function StatisticsView({
             >
               {statistics.played.slice(3).map((game, index) => {
                 const minutes =
-                  game.source === "steam"
-                    ? (game.platformPlaytimeMinutes ?? 0)
-                    : game.trackedPlaytimeSeconds / 60;
+                  game.playtimeMinutes + (game.playtimeSecondsRemainder ?? 0) / 60;
                 const cover = gameLibraryCoverUrl(game);
                 const percentage = Math.round(
                   (minutes / statistics.totalMinutes) * 100,

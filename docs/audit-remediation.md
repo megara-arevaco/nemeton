@@ -30,3 +30,28 @@ Fecha: 2026-09-05. Cambios en el código y compilación local; no se ha sustitui
 Los registros `performance.log` y `performance.log.previous`, en el directorio de datos de Electron, guardan fases de arranque, CPU, memoria y retraso del bucle de eventos. Se rotan al superar aproximadamente 1 MiB. No contienen claves ni rutas de partidas.
 
 La restauración necesita espacio temporal en el mismo volumen que las partidas. El registro permite recuperar interrupciones del proceso; no constituye una garantía frente a fallos físicos de almacenamiento. Queda por validar esta compilación instalada en Windows y con las carpetas de sincronización reales.
+
+## Revisión UI y UX del 1 de noviembre de 2026
+
+Se conserva la identidad oscura de Nemeton y sus cinco acentos. La revisión prioriza distinguir las acciones, leer las transferencias de un vistazo y recuperar errores sin bloquear tareas independientes.
+
+| Prioridad | Hallazgo                                                                  | Cambio                                                                                                                                         |
+| --------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Alta      | Botones de acciones con tamaños, pesos y estados propios en cada pantalla | Componente común para acciones de biblioteca, ajustes, partidas y modales; tres tamaños de 36, 44 y 48 px y variantes con significado estable. |
+| Alta      | Formulario de descarga por delante de la actividad existente              | Resumen, filtros y grupos de actividad e historial. El formulario se abre desde la cabecera y se muestra inicialmente con una cola vacía.      |
+| Alta      | Una operación bloqueaba los controles de todas las descargas              | Estado pendiente y error independientes por tarea; los errores del formulario y la configuración permanecen separados.                         |
+| Alta      | Seleccionar BitTorrent con enlaces HTTPS provocaba un fallo posterior     | Advertencia contextual y bloqueo del envío hasta cambiar el método o la fuente.                                                                |
+| Media     | Acciones de transferencias con peso visual equivalente                    | Pausa y reanudación visibles; abrir carpeta primero al completar; cancelar y quitar del historial como acciones discretas.                     |
+| Media     | Historial mezclado con actividad                                          | Filtros con contadores y limpieza de completadas que conserva archivos y datos parciales.                                                      |
+| Media     | Alta demasiado densa                                                      | Selector de archivo junto a la entrada de enlaces, nombre opcional desplegable y método recordado localmente.                                  |
+| Media     | Información de progreso poco estructurada                                 | Nombre, estado, datos transferidos, barra y porcentaje, con estimación de minutos restantes cuando hay velocidad y tamaño conocidos.           |
+| Media     | Cuenta de proveedor por delante del destino                               | Destino primero en configuración; ayuda sobre pausa y BitTorrent desplegable.                                                                  |
+| Media     | Efectos y foco inconsistentes                                             | Botones sin desplazamiento al pasar el ratón, foco común según el acento y respeto a movimiento reducido.                                      |
+| Media     | Texto auxiliar y títulos inconsistentes                                   | Tokens de texto más legibles, títulos de páginas coherentes y ajustes para ventanas compactas.                                                 |
+| Media     | Cierre de modal fijo en español y control sin nombre                      | Cierre traducido y nombre accesible para quitar la asociación con Ludusavi.                                                                    |
+
+Reglas de botones: primario para la acción principal; secundario para alternativas; ghost para utilidades; setup para acciones de configuración o reanudación; danger para la confirmación destructiva. Los controles de navegación, selección de carátulas y menús mantienen su estructura específica. Los iconos pertenecen a Phosphor y los estados no dependen únicamente del color.
+
+La validación incluye Electron real con datos temporales y red simulada, los cinco acentos oscuros, títulos largos a 980 × 640, teclado, movimiento reducido, filtros, conservación de archivos al limpiar el historial y fallos aislados por tarea. Las capturas se generan desde `e2e/downloads.spec.ts`. La compilación nativa, el arranque empaquetado y la instalación/desinstalación aislada de Windows también se han comprobado. Queda pendiente una evaluación con lector de pantalla; no se ha realizado una prueba de usabilidad con usuarios externos.
+
+La revisión se amplió, con autorización del usuario, a las integraciones de Steam, Epic y GOG, horas unificadas, colecciones, sesiones, protección de partidas y controles avanzados de descargas. El estado y los límites de validación se detallan en `implementation-review.md`.

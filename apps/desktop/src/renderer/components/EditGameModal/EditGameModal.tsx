@@ -76,7 +76,7 @@ export function EditGameModal({
           </span>
           <div
             className={
-              "file-field [display:grid] [grid-template-columns:minmax(0,_1fr)_auto_auto] [gap:8px] [&_button]:[display:flex] [&_button]:[align-items:center] [&_button]:[gap:7px] [&_button]:[border:1px_solid_#ffffff16] [&_button]:[border-radius:10px] [&_button]:[padding:0_13px] [&_button]:[background:#ffffff08] [&_button]:[cursor:pointer]"
+              "file-field [display:grid] [grid-template-columns:minmax(0,_1fr)_auto_auto] [gap:8px]"
             }
           >
             <input
@@ -84,16 +84,17 @@ export function EditGameModal({
               value={executablePath}
               placeholder={t("modal.noExecutable")}
             />
-            <button onClick={chooseExecutable}>
+            <Button variant="secondary" onClick={chooseExecutable}>
               <FolderOpen /> {t("modal.browse")}
-            </button>
+            </Button>
             {executablePath && (
-              <button
-                className={"clear-file [color:#e49096]"}
+              <Button
+                className="clear-file"
+                variant="ghost"
                 onClick={() => setExecutablePath("")}
               >
                 <X /> {t("modal.removeExecutable")}
-              </button>
+              </Button>
             )}
           </div>
         </label>

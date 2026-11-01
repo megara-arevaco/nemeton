@@ -1,3 +1,4 @@
+import { setTimeout as delay } from "node:timers/promises";
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
@@ -77,11 +78,32 @@ async function regularFileSize(file: string) {
   return info?.size ?? null;
 }
 
+export class DownloadRateLimiter {
+  private nextAt = 0;
+  constructor(private readonly limit: () => number) {}
+  async consume(bytes: number, signal: AbortSignal) {
+    const limit = this.limit();
+
+    if (limit <= 0) {
+      this.nextAt = 0;
+      return;
+    }
+
+    const now = performance.now();
+    const start = Math.max(now, this.nextAt);
+    this.nextAt = start + (bytes * 1000) / limit;
+    if (start > now) {
+      await delay(start - now, undefined, { signal });
+    }
+  }
+}
+
 export async function downloadHttpFile(
   file: StoredDownloadFile,
   directory: string,
   resolveLink: () => Promise<{ download: string; filesize: number }>,
   signal: AbortSignal,
+  rateLimiter?: DownloadRateLimiter,
 ) {
   const target = path.join(directory, `${file.id}-${safeFilename(file.name)}`);
   const partial = `${target}.partial`;
@@ -190,6 +212,7 @@ export async function downloadHttpFile(
 
       for await (const chunk of response.body) {
         signal.throwIfAborted();
+        await rateLimiter?.consume(chunk.length, signal);
         if (file.bytes + chunk.length > file.total) {
           throw new Error("file-too-large");
         }

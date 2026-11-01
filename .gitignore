@@ -11,3 +11,6 @@ release
 !.env.example
 playwright-report/
 test-results/
+
+# Generated native installer artwork
+apps/desktop/build/installer-assets/

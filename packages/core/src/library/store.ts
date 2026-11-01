@@ -12,6 +12,7 @@ import type {
   LibraryGame,
   LibrarySnapshot,
   LocalGameInput,
+  LocalGameAssets,
   SteamCandidate,
   SteamOwnedGame,
 } from "../shared/types.js";
@@ -501,47 +502,54 @@ export class LibraryStore {
   }
 
   async addLocal(input: LocalGameInput): Promise<LibrarySnapshot> {
+    return this.addLocalBatch([input]);
+  }
+
+  async addLocalBatch(inputs: LocalGameInput[]): Promise<LibrarySnapshot> {
     return withFileLock(this.filePath, async () => {
       const snapshot = await this.read();
-      const normalizedPath = input.executablePath
-        ? path.resolve(input.executablePath)
-        : "";
-      const previous = normalizedPath
-        ? snapshot.games.find(
-            (game) =>
-              game.source === "local" &&
-              game.installPath &&
-              path.resolve(game.installPath) === normalizedPath,
-          )
-        : undefined;
 
-      if (!previous) {
-        const now = new Date().toISOString();
-        snapshot.games.push({
-          id: randomUUID(),
-          source: "local",
-          sourceId: randomUUID(),
-          steamAppId: input.steamAppId ?? null,
-          achievementStateId: null,
-          ludusaviGameName: input.ludusaviGameName ?? null,
-          title: input.title.trim(),
-          installPath: normalizedPath,
-          launchUri: null,
-          coverPath: input.coverPath ?? null,
-          coverUrl: input.coverUrl ?? null,
-          heroUrl: input.heroUrl ?? null,
-          playtimeMinutes: 0,
-          playtimeSecondsRemainder: 0,
-          platformPlaytimeMinutes: null,
-          trackedPlaytimeSeconds: 0,
-          installed: Boolean(normalizedPath),
-          hiddenFromLibrary: false,
-          favorite: false,
-          backlogStatus: null,
-          lastPlayedAt: null,
-          importedAt: now,
-          updatedAt: now,
-        });
+      for (const input of inputs) {
+        const normalizedPath = input.executablePath
+          ? path.resolve(input.executablePath)
+          : "";
+        const previous = normalizedPath
+          ? snapshot.games.find(
+              (game) =>
+                game.source === "local" &&
+                game.installPath &&
+                path.resolve(game.installPath) === normalizedPath,
+            )
+          : undefined;
+
+        if (!previous) {
+          const now = new Date().toISOString();
+          snapshot.games.push({
+            id: randomUUID(),
+            source: "local",
+            sourceId: randomUUID(),
+            steamAppId: input.steamAppId ?? null,
+            achievementStateId: null,
+            ludusaviGameName: input.ludusaviGameName ?? null,
+            title: input.title.trim(),
+            installPath: normalizedPath,
+            launchUri: null,
+            coverPath: input.coverPath ?? null,
+            coverUrl: input.coverUrl ?? null,
+            heroUrl: input.heroUrl ?? null,
+            playtimeMinutes: 0,
+            playtimeSecondsRemainder: 0,
+            platformPlaytimeMinutes: null,
+            trackedPlaytimeSeconds: 0,
+            installed: Boolean(normalizedPath),
+            hiddenFromLibrary: false,
+            favorite: false,
+            backlogStatus: null,
+            lastPlayedAt: null,
+            importedAt: now,
+            updatedAt: now,
+          });
+        }
       }
       snapshot.games.sort((a, b) => a.title.localeCompare(b.title));
       await this.write(snapshot);
@@ -1095,6 +1103,33 @@ export class LibraryStore {
       sessions: snapshot.sessions.filter((session) => ids.has(session.gameId)),
       excludedGameKeys: snapshot.excludedGameKeys ?? [],
     };
+  }
+
+  async fillLocalGameAssets(
+    updates: Array<{ gameId: string; assets: LocalGameAssets }>,
+  ): Promise<LibrarySnapshot> {
+    return withFileLock(this.filePath, async () => {
+      const snapshot = await this.read();
+
+      for (const { gameId, assets } of updates) {
+        const game = snapshot.games.find((item) => item.id === gameId);
+
+        if (
+          !game ||
+          game.source !== "local" ||
+          game.coverPath ||
+          game.hiddenFromLibrary
+        ) {
+          continue;
+        }
+        game.coverUrl ||= assets.coverUrl ?? null;
+        game.heroUrl ||= assets.heroUrl ?? null;
+        game.steamAppId ??= assets.steamAppId ?? null;
+        game.ludusaviGameName ??= assets.ludusaviGameName ?? null;
+      }
+      await this.write(snapshot);
+      return snapshot;
+    });
   }
 
   async setRemoteArtwork(

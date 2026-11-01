@@ -18,6 +18,11 @@ interface SteamStoreAppDetails {
 const isUrl = (value: unknown): value is string =>
   typeof value === "string" && value.startsWith("https://");
 
+export const isSteamStoreBackground = (url: string | null | undefined): boolean =>
+  Boolean(
+    url && /^https:\/\/[^/]*steamstatic\.com\/images\/storepagebackground\//i.test(url),
+  );
+
 // These fixed paths may return 404s or grey placeholders for newer Steam assets.
 export const isUnresolvedSteamArtwork = (url: string | null | undefined): boolean =>
   !url ||
@@ -60,6 +65,10 @@ export const fetchSteamStoreArtwork = async (appId: string): Promise<SteamArtwor
 
   return {
     coverUrl: header,
-    heroUrl: isUrl(data?.background) ? data.background : (screenshot ?? header),
+    heroUrl:
+      screenshot ??
+      (isUrl(data?.background) && !isSteamStoreBackground(data.background)
+        ? data.background
+        : header),
   };
 };

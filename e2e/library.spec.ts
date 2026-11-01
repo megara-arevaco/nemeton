@@ -94,10 +94,6 @@ test("creates, edits and persists a local game across restart", async ({ desktop
   await add.getByLabel("Nombre del juego").fill("E2E Adventure");
   await add.getByRole("button", { name: "Añadir a la biblioteca" }).click();
   await expect(add).not.toBeVisible();
-  await page
-    .getByRole("group", { name: /^Lista de juegos/ })
-    .getByRole("button", { name: /^E2E Adventure,/ })
-    .click();
   await page.getByRole("button", { name: "Editar", exact: true }).click();
   const edit = page.getByRole("dialog", { name: "Editar ficha" });
   await edit.getByLabel("Nombre", { exact: true }).fill("E2E Renamed");
@@ -118,7 +114,7 @@ test("creates, edits and persists a local game across restart", async ({ desktop
   expect(games[0]).toMatchObject({ title: "E2E Renamed", playtimeMinutes: 150 });
   await expect(
     page
-      .getByRole("group", { name: /^Lista de juegos/ })
+      .getByRole("group", { name: /^Juegos de la biblioteca/ })
       .getByRole("button", { name: /^E2E Renamed,/ }),
   ).toBeVisible();
   const saved = JSON.parse(
@@ -127,29 +123,55 @@ test("creates, edits and persists a local game across restart", async ({ desktop
   expect(saved.games[0].title).toBe("E2E Renamed");
 });
 
-test("stores favorites and backlog status and filters them together", async ({
+test("game details omit organization controls while preserving saved metadata", async ({
   desktop,
 }) => {
-  const { page } = desktop;
+  let page = desktop.page;
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "Añadir juego", exact: true })
     .click();
   await page.getByLabel("Nombre del juego").fill("E2E Backlog");
-  await page.getByRole("button", { name: "Añadir a la biblioteca" }).click();
-  await page.getByRole("button", { name: "Añadir a favoritos", exact: true }).click();
-  await page.getByLabel("Estado del juego").selectOption("playing");
-  await page.getByRole("button", { name: "Biblioteca", exact: true }).click();
-  await page.getByRole("button", { name: "Favoritos", exact: true }).click();
-  await page.getByLabel("Filtrar por estado").selectOption("playing");
-  const collection = page.getByRole("group", { name: "Juegos de la biblioteca" });
-  await expect(collection.getByRole("button", { name: /^E2E Backlog,/ })).toBeVisible();
-  await page.getByLabel("Filtrar por estado").selectOption("finished");
+  await page
+    .getByRole("button", { name: "Añadir a la biblioteca", exact: true })
+    .click();
+  await page.evaluate(async () => {
+    const game = (await window.launcher.listGames()).games[0]!;
+    await window.launcher.setGameCollectionState(game.id, {
+      favorite: true,
+      backlogStatus: "playing",
+    });
+    await window.launcher.organizeGame(game.id, {
+      collections: ["Saved collection"],
+      tags: ["Saved tag"],
+    });
+  });
+  page = await desktop.restart();
+  await page
+    .getByRole("group", { name: "Juegos de la biblioteca" })
+    .getByRole("button", { name: /^E2E Backlog,/ })
+    .click();
   await expect(
-    page.getByText("No hay juegos con estos filtros", { exact: true }),
+    page.getByRole("heading", { name: "E2E Backlog", exact: true }),
   ).toBeVisible();
-  const snapshot = await page.evaluate(() => window.launcher.listGames());
-  expect(snapshot.games[0]).toMatchObject({ favorite: true, backlogStatus: "playing" });
+  await expect(page.getByLabel("Estado del juego")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^(Añadir a favoritos|Favorito)$/ }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Colecciones y etiquetas", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    page.getByRole("button", { name: "Guardar organización", exact: true }),
+  ).toHaveCount(0);
+  expect(
+    (await page.evaluate(() => window.launcher.listGames())).games[0],
+  ).toMatchObject({
+    favorite: true,
+    backlogStatus: "playing",
+    collections: ["Saved collection"],
+    tags: ["Saved tag"],
+  });
 });
 
 test("requires matching confirmation and persists permanent deletion", async ({
@@ -162,10 +184,6 @@ test("requires matching confirmation and persists permanent deletion", async ({
     .click();
   await page.getByLabel("Nombre del juego").fill("E2E Delete");
   await page.getByRole("button", { name: "Añadir a la biblioteca" }).click();
-  await page
-    .getByRole("group", { name: /^Lista de juegos/ })
-    .getByRole("button", { name: /^E2E Delete,/ })
-    .click();
   await page.getByRole("button", { name: "Más acciones", exact: true }).click();
   await page
     .getByRole("button", { name: "Eliminar para siempre", exact: true })
@@ -500,7 +518,13 @@ test.describe("large library", () => {
   test("virtualizes both collections and supports keyboard navigation and filtering", async ({
     desktop,
   }) => {
-    const page = desktop.page;
+    const filename = path.join(desktop.directory, "data/library.json");
+    const snapshot = JSON.parse(await fs.readFile(filename, "utf8"));
+    snapshot.games.forEach((game: { installed: boolean }) => {
+      game.installed = true;
+    });
+    await fs.writeFile(filename, JSON.stringify(snapshot));
+    const page = await desktop.restart();
     const grid = page.getByRole("group", { name: /^Juegos de la biblioteca/ });
     const sidebar = page.getByRole("group", { name: /^Lista de juegos/ });
     await expect(grid.getByRole("button").first()).toBeVisible();

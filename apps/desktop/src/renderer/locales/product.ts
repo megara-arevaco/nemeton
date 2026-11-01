@@ -1,5 +1,84 @@
 export const productTranslations = {
   es: {
+    "folderScan.artworkMissing_one":
+      "No se han encontrado carátulas para {{count}} juego. Puedes buscarlas desde su ficha.",
+    "folderScan.artworkMissing_other":
+      "No se han encontrado carátulas para {{count}} juegos. Puedes buscarlas desde sus fichas.",
+
+    "folderScan.confirmImport_one": "Confirmar y añadir {{count}} juego",
+    "folderScan.added_one": "Se ha añadido {{count}} juego a tu biblioteca",
+    "folderScan.confirmTitle_one": "Vas a añadir {{count}} juego",
+    "folderScan.detected_one": "{{count}} posible juego detectado",
+    "folderScan.validated_one": "{{count}} validado",
+    "folderScan.skipped_one":
+      "{{count}} juego ya estaba en la biblioteca y se ha omitido.",
+    "folderScan.unreadable_one": "No se ha podido leer {{count}} carpeta.",
+
+    "folderScan.entryTitle": "¿Tienes varios juegos en una carpeta?",
+    "folderScan.entryHelp":
+      "Detecta posibles juegos y valida cada uno antes de añadirlos.",
+    "folderScan.title": "Escanear carpeta",
+    "folderScan.subtitle": "IMPORTAR JUEGOS LOCALES",
+    "folderScan.doneTitle": "Importación completada",
+    "folderScan.viewLibrary": "Ver biblioteca",
+    "folderScan.backToReview": "Volver a validar",
+    "folderScan.back": "Añadir un solo juego",
+    "folderScan.importing": "Añadiendo juegos…",
+    "folderScan.confirmImport": "Confirmar y añadir {{count}} juegos",
+    "folderScan.reviewSelection": "Revisar selección ({{count}})",
+    "folderScan.stepFolder": "Carpeta",
+    "folderScan.stepValidate": "Validación",
+    "folderScan.stepConfirm": "Confirmación",
+    "folderScan.added": "Se han añadido {{count}} juegos a tu biblioteca",
+    "folderScan.skipped":
+      "{{count}} juegos ya estaban en la biblioteca y se han omitido.",
+    "folderScan.confirmTitle": "Vas a añadir {{count}} juegos",
+    "folderScan.confirmHelp":
+      "Comprueba los nombres y ejecutables. Al confirmar se crearán estas fichas en tu biblioteca.",
+    "folderScan.source": "Carpeta de juegos",
+    "folderScan.chooseHelp": "Elige una carpeta. También se revisarán sus subcarpetas.",
+    "folderScan.chooseFolder": "Elegir carpeta",
+    "folderScan.changeFolder": "Cambiar carpeta",
+    "folderScan.scanning": "Buscando posibles juegos…",
+    "folderScan.detected": "{{count}} posibles juegos detectados",
+    "folderScan.validated": "{{count}} validados",
+    "folderScan.validateHelp":
+      "Revisa el nombre y el ejecutable de cada juego y marca «Validar juego». Si cambias un dato, vuelve a validarlo.",
+    "folderScan.limited":
+      "Se ha alcanzado el límite del escaneo. Elige una subcarpeta para revisar los juegos restantes.",
+    "folderScan.unreadable": "No se han podido leer {{count}} carpetas.",
+    "folderScan.empty":
+      "No se han encontrado ejecutables de juegos. Prueba con otra carpeta o añade el juego individualmente.",
+    "folderScan.alreadyAdded": "Ya en biblioteca",
+    "folderScan.validateGame": "Validar {{title}}",
+    "folderScan.validatedGame": "Validado",
+    "folderScan.validate": "Validar juego",
+    "folderScan.scanError": "No se ha podido escanear la carpeta.",
+    "folderScan.importError": "No se han podido añadir los juegos.",
+
+    "library.collectionToggle": "Tu colección",
+    "library.recentEyebrow": "TUS ÚLTIMAS PARTIDAS",
+    "library.recentActivity": "Actividad reciente",
+    "library.recentOrder": "Más reciente primero",
+    "library.noRecentActivity":
+      "Aquí aparecerán los últimos cinco juegos que hayas jugado.",
+
+    "library.steamIncompleteTitle": "Tu biblioteca de Steam aún no está conectada",
+    "library.steamIncompleteHelp":
+      "La detección local solo encuentra instalaciones de este equipo. Conecta tu cuenta con una clave API para importar también tus juegos sin instalar.",
+    "library.connectSteamAccount": "Conectar cuenta de Steam",
+
+    "sidebar.quickAccess": "ACCESO RÁPIDO",
+    "sidebar.scope": "Juegos de la barra lateral",
+    "sidebar.installed": "Instalados",
+    "sidebar.all": "Todos",
+    "sidebar.installedHelp": "Listos para jugar en este equipo",
+    "sidebar.allHelp": "Incluye juegos sin instalar",
+    "sidebar.emptyInstalled":
+      "No hay juegos instalados. Tu biblioteca sigue disponible en Biblioteca.",
+    "sidebar.emptyAll": "Todavía no hay juegos en tu biblioteca.",
+    "sidebar.installedTime": "Instalado · {{time}}",
+
     "providers.transfers": "Transferencias de tiendas",
     "providers.transferProgress": "Progreso de {{store}}",
     "providers.error.operation-cancelled":
@@ -88,6 +167,84 @@ export const productTranslations = {
     "steam.installing": "Instalando en Steam…",
   },
   en: {
+    "folderScan.artworkMissing_one":
+      "Artwork could not be found for {{count}} game. You can search from its game page.",
+    "folderScan.artworkMissing_other":
+      "Artwork could not be found for {{count}} games. You can search from their game pages.",
+
+    "folderScan.confirmImport_one": "Confirm and add {{count}} game",
+    "folderScan.added_one": "Added {{count}} game to your library",
+    "folderScan.confirmTitle_one": "You are about to add {{count}} game",
+    "folderScan.detected_one": "{{count}} possible game found",
+    "folderScan.validated_one": "{{count}} validated",
+    "folderScan.skipped_one":
+      "{{count}} game was already in your library and was skipped.",
+    "folderScan.unreadable_one": "Could not read {{count}} folder.",
+
+    "folderScan.entryTitle": "Several games in one folder?",
+    "folderScan.entryHelp":
+      "Discover possible games and validate each one before adding them.",
+    "folderScan.title": "Scan folder",
+    "folderScan.subtitle": "IMPORT LOCAL GAMES",
+    "folderScan.doneTitle": "Import complete",
+    "folderScan.viewLibrary": "View library",
+    "folderScan.backToReview": "Back to validation",
+    "folderScan.back": "Add a single game",
+    "folderScan.importing": "Adding games…",
+    "folderScan.confirmImport": "Confirm and add {{count}} games",
+    "folderScan.reviewSelection": "Review selection ({{count}})",
+    "folderScan.stepFolder": "Folder",
+    "folderScan.stepValidate": "Validation",
+    "folderScan.stepConfirm": "Confirmation",
+    "folderScan.added": "Added {{count}} games to your library",
+    "folderScan.skipped":
+      "{{count}} games were already in your library and were skipped.",
+    "folderScan.confirmTitle": "You are about to add {{count}} games",
+    "folderScan.confirmHelp":
+      "Check the names and executables. Confirming creates these entries in your library.",
+    "folderScan.source": "Games folder",
+    "folderScan.chooseHelp": "Choose a folder. Its subfolders will also be scanned.",
+    "folderScan.chooseFolder": "Choose folder",
+    "folderScan.changeFolder": "Change folder",
+    "folderScan.scanning": "Looking for possible games…",
+    "folderScan.detected": "{{count}} possible games found",
+    "folderScan.validated": "{{count}} validated",
+    "folderScan.validateHelp":
+      "Review each game’s name and executable, then select “Validate game”. Validate it again after editing.",
+    "folderScan.limited":
+      "The scan limit was reached. Choose a subfolder to review the remaining games.",
+    "folderScan.unreadable": "Could not read {{count}} folders.",
+    "folderScan.empty":
+      "No game executables found. Try another folder or add a game individually.",
+    "folderScan.alreadyAdded": "Already in library",
+    "folderScan.validateGame": "Validate {{title}}",
+    "folderScan.validatedGame": "Validated",
+    "folderScan.validate": "Validate game",
+    "folderScan.scanError": "Could not scan the folder.",
+    "folderScan.importError": "Could not add the games.",
+
+    "library.collectionToggle": "Your collection",
+    "library.recentEyebrow": "YOUR LATEST GAMES",
+    "library.recentActivity": "Recent activity",
+    "library.recentOrder": "Most recent first",
+    "library.noRecentActivity": "The last five games you played will appear here.",
+
+    "library.steamIncompleteTitle": "Your Steam library is not connected yet",
+    "library.steamIncompleteHelp":
+      "Local discovery only finds installations on this computer. Connect your account with an API key to also import games that are not installed.",
+    "library.connectSteamAccount": "Connect Steam account",
+
+    "sidebar.quickAccess": "QUICK ACCESS",
+    "sidebar.scope": "Sidebar games",
+    "sidebar.installed": "Installed",
+    "sidebar.all": "All",
+    "sidebar.installedHelp": "Ready to play on this computer",
+    "sidebar.allHelp": "Includes games that are not installed",
+    "sidebar.emptyInstalled":
+      "No games installed. You can still find your games in Library.",
+    "sidebar.emptyAll": "No games in your library yet.",
+    "sidebar.installedTime": "Installed · {{time}}",
+
     "providers.transfers": "Store transfers",
     "providers.transferProgress": "{{store}} progress",
     "providers.error.operation-cancelled":

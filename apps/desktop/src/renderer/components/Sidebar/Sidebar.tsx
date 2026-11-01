@@ -1,7 +1,7 @@
 import { DownloadIndicator } from "./DownloadIndicator";
 import { useVirtualCollection } from "../../shared/virtualCollection";
 import { useTranslation } from "react-i18next";
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import type { LibraryGame } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { GameController } from "@phosphor-icons/react/GameController";
@@ -13,8 +13,7 @@ import { formatPlaytime, gameCoverUrl } from "../../shared/presentation";
 import { NemetonMark } from "../NemetonMark";
 
 export const Sidebar = memo(function Sidebar({
-  games,
-  totalCount,
+  games: libraryGames,
   selectedId,
   runningGameIds,
   onOpenLibrary,
@@ -27,7 +26,6 @@ export const Sidebar = memo(function Sidebar({
   view,
 }: Readonly<{
   games: LibraryGame[];
-  totalCount: number;
   selectedId: string | null;
   runningGameIds: Set<string>;
   view: "library" | "statistics" | "settings" | "downloads";
@@ -40,6 +38,11 @@ export const Sidebar = memo(function Sidebar({
   onContextMenu: (game: LibraryGame, x: number, y: number) => void;
 }>) {
   const { t } = useTranslation();
+  const games = useMemo(
+    () => libraryGames.filter((game) => game.installed),
+    [libraryGames],
+  );
+
   const { scrollRef, gridRef, range, virtual, activeIndex, setActiveId, onKeyDown } =
     useVirtualCollection(games, {
       itemHeight: 50,
@@ -69,19 +72,22 @@ export const Sidebar = memo(function Sidebar({
       </div>
       <nav className={"primary-nav [display:grid] [gap:4px] [margin:20px_0_24px]"}>
         <button
-          className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "library" && !selectedId ? "active" : ""}`}
+          className={`nav-item [&_svg]:[width:19px] ${view === "library" ? "active" : ""}`}
+          aria-current={view === "library" ? "page" : undefined}
           onClick={onOpenLibrary}
         >
           <GameController /> {t("sidebar.library")}
         </button>
         <button
-          className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "statistics" ? "active" : ""}`}
+          className={`nav-item [&_svg]:[width:19px] ${view === "statistics" ? "active" : ""}`}
+          aria-current={view === "statistics" ? "page" : undefined}
           onClick={onOpenStatistics}
         >
           <ChartDonut /> {t("sidebar.statistics")}
         </button>
         <button
-          className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "downloads" ? "active" : ""}`}
+          className={`nav-item [&_svg]:[width:19px] ${view === "downloads" ? "active" : ""}`}
+          aria-current={view === "downloads" ? "page" : undefined}
           onClick={onOpenDownloads}
           aria-label={t("downloads.title")}
         >
@@ -89,7 +95,8 @@ export const Sidebar = memo(function Sidebar({
           <DownloadIndicator />
         </button>
         <button
-          className={`nav-item [&_svg]:[width:19px] [&.active]:[background:#ffffff0c] [&.active]:[color:white] ${view === "settings" ? "active" : ""}`}
+          className={`nav-item [&_svg]:[width:19px] ${view === "settings" ? "active" : ""}`}
+          aria-current={view === "settings" ? "page" : undefined}
           onClick={onOpenSettings}
         >
           <Gear /> {t("sidebar.settings")}
@@ -103,13 +110,11 @@ export const Sidebar = memo(function Sidebar({
           <Plus /> {t("sidebar.addGame")}
         </Button>
       </nav>
-      <div
-        className={
-          "library-heading [display:flex] [justify-content:space-between] [padding:0_11px_10px] [color:#666976] [font-size:10px] [font-weight:700] [letter-spacing:1.4px]"
-        }
-      >
-        <span>{t("sidebar.games")}</span>
-        <span>{totalCount}</span>
+      <div className="sidebar-library-heading">
+        <div className="sidebar-library-title">
+          <span>{t("sidebar.installed")}</span>
+          <span>{games.length}</span>
+        </div>
       </div>
       <div
         ref={scrollRef}
@@ -120,6 +125,9 @@ export const Sidebar = memo(function Sidebar({
           "game-list [min-height:0] [overflow-x:hidden] [overflow-y:auto] [display:block]"
         }
       >
+        {games.length === 0 && (
+          <p className="sidebar-library-empty">{t("sidebar.emptyInstalled")}</p>
+        )}
         <div
           ref={gridRef}
           style={{ paddingTop: range.top, paddingBottom: range.bottom }}
@@ -184,9 +192,9 @@ export const Sidebar = memo(function Sidebar({
                     {runningGameIds.has(game.id)
                       ? t("sidebar.playing")
                       : game.installed
-                        ? formatPlaytime(
-                            game.platformPlaytimeMinutes ?? game.playtimeMinutes,
-                          )
+                        ? t("sidebar.installedTime", {
+                            time: formatPlaytime(game.playtimeMinutes),
+                          })
                         : t("sidebar.notInstalled")}
                   </small>
                 </span>

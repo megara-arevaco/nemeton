@@ -13,7 +13,7 @@ const current = {
   coverUrl:
     "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2807960/hash/header.jpg",
   heroUrl:
-    "https://store.akamai.steamstatic.com/images/storepagebackground/app/2807960",
+    "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2807960/scene.jpg",
 };
 
 test("Steam artwork uses the current header rather than the tiny capsule", async () => {
@@ -26,7 +26,9 @@ test("Steam artwork uses the current header rather than the tiny capsule", async
           data: {
             header_image: current.coverUrl,
             capsule_image: "https://example.com/tiny.jpg",
-            background: current.heroUrl,
+            background:
+              "https://store.akamai.steamstatic.com/images/storepagebackground/app/2807960",
+            screenshots: [{ path_full: current.heroUrl }],
           },
         },
       }),
@@ -86,5 +88,27 @@ test("Steam synchronization repairs old artwork and preserves custom covers", as
     ).toContain("custom.png");
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Steam decorative store backgrounds are not used as game scenes", async () => {
+  const original = globalThis.fetch;
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        "10": {
+          success: true,
+          data: {
+            header_image: current.coverUrl,
+            background:
+              "https://store.akamai.steamstatic.com/images/storepagebackground/app/10",
+          },
+        },
+      }),
+    );
+  try {
+    expect((await fetchSteamStoreArtwork("10")).heroUrl).toBe(current.coverUrl);
+  } finally {
+    globalThis.fetch = original;
   }
 });

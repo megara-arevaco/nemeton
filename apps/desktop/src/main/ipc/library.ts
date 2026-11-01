@@ -1,3 +1,5 @@
+import { resolveLocalGameAssets } from "../local-game-assets.js";
+import { LocalFolderImportService } from "../local-folder-import.js";
 import { savegameStorageKey } from "../../shared/game-identity.js";
 import fs from "node:fs";
 import path from "node:path";
@@ -13,10 +15,31 @@ export function registerLibraryHandlers({
   publishLibrarySnapshot,
   achievementService,
   coversDirectory,
+  ludusaviCatalog,
   savegameManager,
   settingsStore,
   scheduleAutoSync,
 }: MainContext) {
+  const localFolderImport = new LocalFolderImportService(store, (input) =>
+    resolveLocalGameAssets(input.title, ludusaviCatalog, input.steamAppId),
+  );
+  handle("library:scan-local-folder", async () => {
+    const result = await dialog.showOpenDialog({
+      title: "Selecciona la carpeta de juegos",
+      properties: ["openDirectory"],
+    });
+
+    if (result.canceled || !result.filePaths[0]) {
+      return null;
+    }
+    return localFolderImport.scan(result.filePaths[0]);
+  });
+  handle("library:import-local-folder", async (_event, scanId, selections) => {
+    const result = await localFolderImport.import(scanId, selections);
+    await broadcastLibrary(result.snapshot);
+    scheduleAutoSync();
+    return result;
+  });
   handle("library:link-copies", async (_event, ids, canonicalId) => {
     const snapshot = await store.linkCopies(ids, canonicalId);
     await broadcastLibrary(snapshot);

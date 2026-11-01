@@ -32,10 +32,6 @@ test("backs up, verifies and restores saves while preserving the previous state"
   await page.getByRole("button", { name: "Añadir juego", exact: true }).click();
   await page.getByLabel("Nombre del juego").fill("E2E Saves");
   await page.getByRole("button", { name: "Añadir a la biblioteca" }).click();
-  await page
-    .getByRole("group", { name: /^Lista de juegos/ })
-    .getByRole("button", { name: /^E2E Saves,/ })
-    .click();
   await page.getByRole("button", { name: "Añadir carpeta local", exact: true }).click();
   await page
     .getByRole("button", { name: "Crear / comprobar copia", exact: true })

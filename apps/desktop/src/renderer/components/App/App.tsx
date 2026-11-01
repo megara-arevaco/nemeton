@@ -1,3 +1,4 @@
+import { GameHeroImage } from "../GameHeroImage/GameHeroImage";
 import { LibraryFilters } from "../LibraryFilters/LibraryFilters";
 import { GameSessions } from "../GameSessions/GameSessions";
 import { ProviderActions } from "../GameCopies/ProviderActions";
@@ -5,7 +6,6 @@ import { GameCopies } from "../GameCopies/GameCopies";
 import { LoadingState } from "../LoadingState";
 import { useTranslation } from "react-i18next";
 import { lazy, Suspense, useEffect, useState } from "react";
-import type { BacklogStatus } from "@launcher/core";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { DotsThree } from "@phosphor-icons/react/DotsThree";
 import { Gear } from "@phosphor-icons/react/Gear";
@@ -16,16 +16,11 @@ import { MagnifyingGlass } from "@phosphor-icons/react/MagnifyingGlass";
 import { Minus } from "@phosphor-icons/react/Minus";
 import { PencilSimple } from "@phosphor-icons/react/PencilSimple";
 import { Square } from "@phosphor-icons/react/Square";
-import { Star } from "@phosphor-icons/react/Star";
 import { SteamLogo } from "@phosphor-icons/react/SteamLogo";
 import { Trophy } from "@phosphor-icons/react/Trophy";
 import { Trash } from "@phosphor-icons/react/Trash";
 import { X } from "@phosphor-icons/react/X";
-import {
-  formatLastPlayed,
-  formatPlaytime,
-  gameHeroUrl,
-} from "../../shared/presentation";
+import { formatLastPlayed, formatPlaytime } from "../../shared/presentation";
 import { GameLaunchButton } from "../GameLaunchButton";
 import { Button } from "../Button";
 import { GameMetadata } from "../GameMetadata";
@@ -75,8 +70,6 @@ export function App() {
     selectedGroup,
     storeFilter,
     setStoreFilter,
-    collectionFilter,
-    setCollectionFilter,
     installedOnly,
     setInstalledOnly,
     libraryLoading,
@@ -93,10 +86,6 @@ export function App() {
     workspaceStatus,
     query,
     setQuery,
-    favoritesOnly,
-    setFavoritesOnly,
-    backlogFilter,
-    setBacklogFilter,
     achievements,
     metadata,
     view,
@@ -109,6 +98,7 @@ export function App() {
     accentTheme,
     setAccentTheme,
     libraryGames,
+    recentGames,
     visibleGames,
     selected,
     openLibrary,
@@ -120,7 +110,6 @@ export function App() {
     selectCopy,
     openGameMenu,
     updateQuery,
-    updateCollectionState,
     scanInstalledSteam,
     scanningSteam,
     clearLibraryFilters,
@@ -137,7 +126,6 @@ export function App() {
     closeGameMenu,
     closeGameMenuFromContext,
     stopPropagation,
-    hideBrokenImage,
     onLocalGameCreated,
     launchSelected,
     chooseCover,
@@ -147,16 +135,31 @@ export function App() {
     deletingGame,
     deleteGameError,
   } = useApp();
+  const [focusSteamSettings, setFocusSteamSettings] = useState(false);
+  const openSteamSettings = () => {
+    setFocusSteamSettings(true);
+    openSettings();
+  };
+  const steamLibraryNotice =
+    steamSettings &&
+    !steamSettings.hasApiKey &&
+    rawGames.some((game) => game.source === "steam") ? (
+      <section
+        className="steam-library-notice"
+        aria-label={t("library.steamIncompleteTitle")}
+      >
+        <SteamLogo aria-hidden="true" weight="fill" />
+        <div>
+          <strong>{t("library.steamIncompleteTitle")}</strong>
+          <p>{t("library.steamIncompleteHelp")}</p>
+        </div>
+        <Button size="small" variant="secondary" onClick={openSteamSettings}>
+          {t("library.connectSteamAccount")}
+        </Button>
+      </section>
+    ) : null;
   const libraryFilters = (
-    <LibraryFilters
-      games={rawGames}
-      store={storeFilter}
-      collection={collectionFilter}
-      installed={installedOnly}
-      onStore={setStoreFilter}
-      onCollection={setCollectionFilter}
-      onInstalled={setInstalledOnly}
-    />
+    <LibraryFilters store={storeFilter} onStore={setStoreFilter} />
   );
   const [allAchievementsVisible, setAllAchievementsVisible] = useState(false);
   const [achievementFilter, setAchievementFilter] = useState<
@@ -184,14 +187,16 @@ export function App() {
       }
     >
       <Sidebar
-        games={visibleGames}
-        totalCount={libraryGames.length}
+        games={libraryGames}
         selectedId={selectedId}
         runningGameIds={runningGameIds}
         view={view}
         onOpenLibrary={openLibrary}
         onOpenStatistics={openStatistics}
-        onOpenSettings={openSettings}
+        onOpenSettings={() => {
+          setFocusSteamSettings(false);
+          openSettings();
+        }}
         onOpenDownloads={openDownloads}
         onAddGame={addGame}
         onSelect={selectGame}
@@ -222,31 +227,6 @@ export function App() {
                   placeholder={t("app.search")}
                 />
               </label>
-              <Button
-                size="small"
-                variant={favoritesOnly ? "setup" : "secondary"}
-                type="button"
-                aria-label={t("library.favorites")}
-                aria-pressed={favoritesOnly}
-                title={t("library.favorites")}
-                onClick={() => setFavoritesOnly(!favoritesOnly)}
-              >
-                <Star weight={favoritesOnly ? "fill" : "regular"} />
-                <span>{t("library.favorites")}</span>
-              </Button>
-              <select
-                aria-label={t("library.backlogFilter")}
-                value={backlogFilter}
-                onChange={(event) =>
-                  setBacklogFilter(event.target.value as BacklogStatus | "all")
-                }
-                className="[max-width:165px] [min-width:140px] [height:38px] [border:1px_solid_#ffffff12] [border-radius:10px] [padding:0_9px] [background:#101119] [color:#a4a7b1] [font-size:12px]"
-              >
-                <option value="all">{t("library.allStatuses")}</option>
-                <option value="pending">{t("library.status.pending")}</option>
-                <option value="playing">{t("library.status.playing")}</option>
-                <option value="finished">{t("library.status.finished")}</option>
-              </select>
             </div>
           ) : (
             <span
@@ -303,6 +283,7 @@ export function App() {
         ) : view === "settings" ? (
           <Suspense fallback={<LoadingState />}>
             <SettingsView
+              focusSteam={focusSteamSettings}
               settings={steamSettings}
               syncSettings={syncSettings}
               accentTheme={accentTheme}
@@ -328,22 +309,15 @@ export function App() {
                   "ambient [position:absolute] [inset:0] [background:radial-gradient(circle_at_77%_32%,_#94ff7430,_transparent_27%),_radial-gradient(circle_at_90%_82%,_#596bff24,_transparent_35%)] [background-position:center] [background-size:cover]"
                 }
               />
-              {gameHeroUrl(selected) && (
-                <img
-                  className={
-                    "hero-art [position:absolute] [inset:0] [width:100%] [height:100%] [object-fit:cover] [object-position:center]"
-                  }
-                  key={gameHeroUrl(selected)}
-                  src={gameHeroUrl(selected)!}
-                  alt={t("app.gameArtwork", { title: selected.title })}
-                  onError={hideBrokenImage}
-                />
-              )}
-              <div
-                className={
-                  "hero-shade [position:absolute] [inset:0] [background:linear-gradient(90deg,_#10121b_3%,_#10121bf2_32%,_#10121b8f_58%,_#10121b17_100%),_linear-gradient(0deg,_#0d0f17a8,_transparent_45%)]"
-                }
+              <GameHeroImage
+                key={selected.id}
+                game={selected}
+                className="hero-art [position:absolute] [inset:0] [width:100%] [height:100%] [object-fit:cover] [object-position:center]"
+                alt={t("app.gameArtwork", { title: selected.title })}
+                fetchPriority="high"
+                decoding="async"
               />
+              <div className="hero-shade" aria-hidden="true" />
               <div
                 className={
                   "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [width:64%] [height:100%] [padding:clamp(24px,_4vw,_48px)] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
@@ -386,38 +360,6 @@ export function App() {
                     </b>{" "}
                     {t("app.lastPlayed")}
                   </span>
-                </div>
-                <div className="[display:flex] [align-items:center] [gap:8px] [margin-bottom:12px] [-webkit-app-region:no-drag]">
-                  <Button
-                    size="small"
-                    variant={selected.favorite ? "setup" : "secondary"}
-                    type="button"
-                    aria-pressed={selected.favorite === true}
-                    onClick={() =>
-                      void updateCollectionState(selected.id, {
-                        favorite: selected.favorite !== true,
-                      })
-                    }
-                  >
-                    <Star weight={selected.favorite ? "fill" : "regular"} />
-                    {selected.favorite ? t("app.favorite") : t("app.addFavorite")}
-                  </Button>
-                  <select
-                    aria-label={t("app.backlogStatus")}
-                    value={selected.backlogStatus ?? ""}
-                    onChange={(event) =>
-                      void updateCollectionState(selected.id, {
-                        backlogStatus: (event.target.value ||
-                          null) as BacklogStatus | null,
-                      })
-                    }
-                    className="[height:34px] [border:1px_solid_#ffffff18] [border-radius:9px] [padding:0_9px] [background:#11131c] [color:#c5c7cf] [font-size:11px]"
-                  >
-                    <option value="">{t("app.noBacklogStatus")}</option>
-                    <option value="pending">{t("library.status.pending")}</option>
-                    <option value="playing">{t("library.status.playing")}</option>
-                    <option value="finished">{t("library.status.finished")}</option>
-                  </select>
                 </div>
                 <div
                   className={"hero-actions [display:flex] [flex-wrap:wrap] [gap:8px]"}
@@ -672,66 +614,30 @@ export function App() {
               </Suspense>
             }
           </div>
-        ) : visibleGames.length > 0 ? (
+        ) : libraryGames.length > 0 ? (
           <LibraryCollection
             games={visibleGames}
+            recentGames={recentGames}
+            installedOnly={installedOnly}
+            onInstalledChange={setInstalledOnly}
+            emptyState={
+              <div className="library-empty-results">
+                <h3>{t("library.noResults")}</h3>
+                <p>{t("library.noResultsHelp")}</p>
+                <Button onClick={clearLibraryFilters} variant="secondary">
+                  {t("library.clearFilters")}
+                </Button>
+              </div>
+            }
             runningGameIds={runningGameIds}
             onSelect={selectGame}
             intro={
               <>
                 {libraryFilters}
-                {!query && !favoritesOnly && backlogFilter === "all" && (
-                  <div className="home-suggestions">
-                    {[
-                      {
-                        title: "home.continue",
-                        items: [...games]
-                          .filter((game) => game.lastPlayedAt && game.installed)
-                          .sort((a, b) =>
-                            (b.lastPlayedAt ?? "").localeCompare(a.lastPlayedAt ?? ""),
-                          )
-                          .slice(0, 3),
-                      },
-                      {
-                        title: "home.pending",
-                        items: games
-                          .filter((game) => game.backlogStatus === "pending")
-                          .slice(0, 3),
-                      },
-                    ]
-                      .filter((section) => section.items.length)
-                      .map((section) => (
-                        <section key={section.title}>
-                          <h2>{t(section.title)}</h2>
-                          <div>
-                            {section.items.map((game) => (
-                              <Button
-                                key={game.id}
-                                variant="secondary"
-                                onClick={() => selectGame(game.id)}
-                              >
-                                {game.title}
-                              </Button>
-                            ))}
-                          </div>
-                        </section>
-                      ))}
-                  </div>
-                )}
+                {steamLibraryNotice}
               </>
             }
           />
-        ) : libraryGames.length > 0 ? (
-          <section className="[display:grid] [place-content:center] [justify-items:center] [gap:14px] [margin:0_34px] [padding:32px] [border:1px_dashed_#ffffff17] [border-radius:20px] [background:#ffffff04] [text-align:center]">
-            {libraryFilters}
-            <h1 className="[margin:0] [font-size:24px]">{t("library.noResults")}</h1>
-            <p className="[max-width:440px] [margin:0] [color:#9699a4] [font-size:13px] [line-height:1.55]">
-              {t("library.noResultsHelp")}
-            </p>
-            <Button onClick={clearLibraryFilters} variant="secondary">
-              {t("library.clearFilters")}
-            </Button>
-          </section>
         ) : (
           <section
             className={
@@ -789,6 +695,10 @@ export function App() {
           <AddGameModal
             onClose={closeAddGame}
             onCreated={onLocalGameCreated}
+            onBatchCreated={(snapshot) => {
+              updateLibrary(snapshot);
+              openLibrary();
+            }}
             initialTitle={downloadedGame?.title}
             initialExecutablePath={downloadedGame?.executablePath}
           />

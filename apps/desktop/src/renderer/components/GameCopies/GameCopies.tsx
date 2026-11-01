@@ -23,10 +23,6 @@ export function GameCopies({
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [tags, setTags] = useState((selected.tags ?? []).join(", "));
-  const [collections, setCollections] = useState(
-    (selected.collections ?? []).join(", "),
-  );
   const run = async (action: () => Promise<LibrarySnapshot>) => {
     setBusy(true);
     setError("");
@@ -154,46 +150,6 @@ export function GameCopies({
             }
           >
             {t("copies.link")}
-          </Button>
-        </div>
-      </details>
-      <details>
-        <summary>{t("organize.title")}</summary>
-        <div className="copy-organization">
-          <label>
-            {t("organize.collections")}
-            <input
-              value={collections}
-              onChange={(event) => setCollections(event.target.value)}
-              placeholder={t("organize.separated")}
-            />
-          </label>
-          <label>
-            {t("organize.tags")}
-            <input
-              value={tags}
-              onChange={(event) => setTags(event.target.value)}
-              placeholder={t("organize.separated")}
-            />
-          </label>
-          <Button
-            loading={busy}
-            onClick={() =>
-              void run(() =>
-                window.launcher.organizeGame(selected.id, {
-                  tags: tags
-                    .split(",")
-                    .map((text) => text.trim())
-                    .filter(Boolean),
-                  collections: collections
-                    .split(",")
-                    .map((text) => text.trim())
-                    .filter(Boolean),
-                }),
-              )
-            }
-          >
-            {t("organize.save")}
           </Button>
         </div>
       </details>

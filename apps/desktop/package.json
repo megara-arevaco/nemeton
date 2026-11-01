@@ -7,9 +7,9 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "node scripts/render-icon.cjs && electron-vite build",
-    "dist:win": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win nsis portable",
-    "dist:win:installer": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win nsis",
-    "dist:win:portable": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --win portable",
+    "dist:win": "node scripts/render-icon.cjs && node scripts/render-installer.cjs && electron-vite build && electron-builder --publish never --win nsis portable",
+    "dist:win:installer": "node scripts/render-icon.cjs && node scripts/render-installer.cjs && electron-vite build && electron-builder --publish never --win nsis",
+    "dist:win:portable": "node scripts/render-icon.cjs && node scripts/render-installer.cjs && electron-vite build && electron-builder --publish never --win portable",
     "typecheck": "tsc --noEmit",
     "icons": "node scripts/render-icon.cjs",
     "dist:linux": "node scripts/render-icon.cjs && electron-vite build && electron-builder --publish never --linux deb AppImage --x64",
@@ -88,7 +88,14 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Nemeton",
       "uninstallDisplayName": "Nemeton",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "installerSidebar": "build/installer-assets/sidebar.bmp",
+      "uninstallerSidebar": "build/installer-assets/sidebar.bmp",
+      "installerLanguages": [
+        "es_ES"
+      ],
+      "language": "3082"
     },
     "portable": {
       "artifactName": "Nemeton-Portable-${version}.${ext}"

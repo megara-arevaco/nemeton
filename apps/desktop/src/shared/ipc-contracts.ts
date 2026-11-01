@@ -193,6 +193,22 @@ export const ipcContracts = {
   "savegames:backup": z.tuple([id]),
   "savegames:set-pinned": z.tuple([id, id, z.boolean()]),
   "savegames:restore": z.tuple([id, id]),
+  "library:scan-local-folder": z.tuple([]),
+  "library:import-local-folder": z.tuple([
+    z.string().uuid(),
+    z
+      .array(
+        z
+          .object({
+            candidateId: z.string().uuid(),
+            title,
+            executablePath: text.min(1),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(500),
+  ]),
   "dialog:select-executable": z.tuple([]),
   "dialog:select-artwork": z.tuple([]),
   "artwork:search": z.tuple([text.max(500)]),

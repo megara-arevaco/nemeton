@@ -1,3 +1,7 @@
+import {
+  completeMissingLocalAssets,
+  resolveLocalGameAssets,
+} from "./local-game-assets.js";
 import { registerDiagnosticHandlers } from "./ipc/diagnostics.js";
 import { SteamAccountAchievements } from "./steam-achievements.js";
 import { ProviderService } from "./providers.js";
@@ -395,6 +399,23 @@ app
     createWindow();
     setTimeout(scheduleAutoSync, 10_000);
     scheduleSteamRefresh(10_000);
+    if (!process.env.NEMETON_E2E_DATA) {
+      setTimeout(
+        () =>
+          runBackground(
+            startupReady.then(async () => {
+              const snapshot = await completeMissingLocalAssets(
+                store,
+                (title, steamAppId) =>
+                  resolveLocalGameAssets(title, ludusaviCatalog, steamAppId),
+              );
+              await broadcastLibrary(snapshot);
+            }),
+            "[local-artwork:repair]",
+          ),
+        12_000,
+      ).unref();
+    }
 
     setInterval(() => {
       scheduleAutoSync();

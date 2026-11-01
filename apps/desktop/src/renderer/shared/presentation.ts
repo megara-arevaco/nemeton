@@ -1,5 +1,8 @@
 import type { LibraryGame } from "@launcher/core";
-import { isUnresolvedSteamArtwork } from "@launcher/core/artwork/steam";
+import {
+  isUnresolvedSteamArtwork,
+  isSteamStoreBackground,
+} from "@launcher/core/artwork/steam";
 export type AccentTheme = "forest" | "aurora" | "ember" | "amethyst" | "glacier";
 
 export const accentThemes: Array<{
@@ -129,11 +132,23 @@ export const gameLibraryCoverUrl = (game: LibraryGame) => {
     : null;
 };
 
-export const gameHeroUrl = (game: LibraryGame) =>
-  game.coverPath
-    ? localCoverUrl(game.coverPath)
-    : (game.heroUrl ??
-      game.coverUrl ??
-      (associatedSteamAppId(game)
-        ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${associatedSteamAppId(game)}/library_hero.jpg`
-        : null));
+export const gameHeroSources = (game: LibraryGame): string[] => {
+  const appId = associatedSteamAppId(game);
+  return [
+    ...new Set(
+      [
+        game.coverPath ? localCoverUrl(game.coverPath) : null,
+        appId
+          ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_hero.jpg`
+          : null,
+        game.heroUrl && !isSteamStoreBackground(game.heroUrl) ? game.heroUrl : null,
+        game.coverUrl,
+        appId
+          ? `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`
+          : null,
+      ].filter((url): url is string => Boolean(url)),
+    ),
+  ];
+};
+
+export const gameHeroUrl = (game: LibraryGame) => gameHeroSources(game)[0] ?? null;

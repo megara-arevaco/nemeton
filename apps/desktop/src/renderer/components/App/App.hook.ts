@@ -8,12 +8,11 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ChangeEvent, MouseEvent, SyntheticEvent } from "react";
+import type { ChangeEvent, MouseEvent } from "react";
 import type { SetStateAction } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
 import type {
-  BacklogStatus,
   FolderSyncSettings,
   LibraryGame,
   LibrarySnapshot,
@@ -185,43 +184,25 @@ export function useApp() {
   const [query, setQuery] = useState(
     () => localStorage.getItem("nemeton.library.query") ?? "",
   );
-  const [favoritesOnly, setFavoritesOnly] = useState(
-    () => localStorage.getItem("nemeton.library.favorites") === "true",
-  );
-  const [backlogFilter, setBacklogFilter] = useState<BacklogStatus | "all">(() => {
-    const stored = localStorage.getItem("nemeton.library.backlog");
-    return stored === "pending" || stored === "playing" || stored === "finished"
-      ? stored
-      : "all";
-  });
   const [storeFilter, setStoreFilter] = useState(
     () => localStorage.getItem("nemeton.library.store") ?? "all",
-  );
-  const [collectionFilter, setCollectionFilter] = useState(
-    () => localStorage.getItem("nemeton.library.collection") ?? "",
   );
   const [installedOnly, setInstalledOnly] = useState(
     () => localStorage.getItem("nemeton.library.installed") === "true",
   );
   useEffect(() => {
+    for (const key of ["favorites", "backlog", "collection"]) {
+      localStorage.removeItem(`nemeton.library.${key}`);
+    }
+    localStorage.removeItem("nemeton.sidebar.all");
     for (const [key, value] of Object.entries({
       query,
-      favorites: favoritesOnly,
-      backlog: backlogFilter,
       store: storeFilter,
-      collection: collectionFilter,
       installed: installedOnly,
     })) {
       localStorage.setItem(`nemeton.library.${key}`, String(value));
     }
-  }, [
-    query,
-    favoritesOnly,
-    backlogFilter,
-    storeFilter,
-    collectionFilter,
-    installedOnly,
-  ]);
+  }, [query, storeFilter, installedOnly]);
   const scanSteamMutation = useScanSteamMutation();
   const launchGameMutation = useLaunchGameMutation();
   const removeGameMutation = useRemoveGameMutation();
@@ -285,6 +266,39 @@ export function useApp() {
     () => groupLibrarySessions(gameGroups, library.sessions),
     [gameGroups, library.sessions],
   );
+  const recentGames = useMemo(() => {
+    const latest = new Map<string, number>();
+
+    for (const session of groupedSessions) {
+      const timestamp = Date.parse(session.endedAt || session.startedAt);
+
+      if (Number.isFinite(timestamp) && timestamp > (latest.get(session.gameId) ?? 0)) {
+        latest.set(session.gameId, timestamp);
+      }
+    }
+    return libraryGames
+      .map((game) => {
+        const group = groupsByRepresentative.get(game.id);
+        const running = group?.copies.some((copy) =>
+          library.runningGameIds.has(copy.id),
+        );
+        const timestamp = Math.max(
+          latest.get(game.id) ?? 0,
+          Date.parse(game.lastPlayedAt ?? "") || 0,
+          running ? Date.now() : 0,
+        );
+        return { game, timestamp };
+      })
+      .filter(({ timestamp }) => timestamp > 0)
+      .sort(
+        (a, b) => b.timestamp - a.timestamp || a.game.title.localeCompare(b.game.title),
+      )
+      .slice(0, 5)
+      .map(({ game, timestamp }) => ({
+        ...game,
+        lastPlayedAt: new Date(timestamp).toISOString(),
+      }));
+  }, [libraryGames, groupedSessions, groupsByRepresentative, library.runningGameIds]);
   const visibleGames = useMemo(() => {
     const normalized = deferredQuery.trim().toLocaleLowerCase();
     return libraryGames.filter((game) => {
@@ -293,35 +307,13 @@ export function useApp() {
         [game.title, ...(game.tags ?? []), ...(game.collections ?? [])].some((text) =>
           text.toLocaleLowerCase().includes(normalized),
         );
-      const matchesFavorite = !favoritesOnly || game.favorite === true;
-      const matchesBacklog =
-        backlogFilter === "all" || game.backlogStatus === backlogFilter;
       const group = groupsByRepresentative.get(game.id);
       const matchesStore =
         storeFilter === "all" ||
         group?.copies.some((copy) => copy.source === storeFilter);
-      const matchesCollection =
-        !collectionFilter ||
-        group?.copies.some((copy) => copy.collections?.includes(collectionFilter));
-      return (
-        matchesQuery &&
-        matchesFavorite &&
-        matchesBacklog &&
-        matchesStore &&
-        matchesCollection &&
-        (!installedOnly || game.installed)
-      );
+      return matchesQuery && matchesStore && (!installedOnly || game.installed);
     });
-  }, [
-    libraryGames,
-    groupsByRepresentative,
-    deferredQuery,
-    favoritesOnly,
-    backlogFilter,
-    storeFilter,
-    collectionFilter,
-    installedOnly,
-  ]);
+  }, [libraryGames, groupsByRepresentative, deferredQuery, storeFilter, installedOnly]);
   const selectedGroup = gameGroups.find((group) =>
     group.copies.some((copy) => copy.id === navigation.selectedId),
   );
@@ -416,21 +408,6 @@ export function useApp() {
     setQuery(event.target.value);
   };
 
-  const updateCollectionState = async (
-    gameId: string,
-    state: { favorite?: boolean; backlogStatus?: BacklogStatus | null },
-  ) => {
-    try {
-      const snapshot = await window.launcher.setGameCollectionState(gameId, state);
-      queryClient.setQueryData(queryKeys.library, snapshot);
-      library.setMessage(t("status.collectionUpdated"));
-    } catch (error) {
-      library.setMessage(
-        error instanceof Error ? error.message : t("status.collectionError"),
-      );
-    }
-  };
-
   const scanInstalledSteam = async () => {
     try {
       library.setMessage(t("status.scanningSteam"));
@@ -449,10 +426,7 @@ export function useApp() {
   const clearLibraryFilters = () => {
     setQuery("");
     setStoreFilter("all");
-    setCollectionFilter("");
     setInstalledOnly(false);
-    setFavoritesOnly(false);
-    setBacklogFilter("all");
   };
 
   const minimizeWindow = () => {
@@ -504,10 +478,6 @@ export function useApp() {
 
   const stopPropagation = (event: MouseEvent) => {
     event.stopPropagation();
-  };
-
-  const hideBrokenImage = (event: SyntheticEvent<HTMLImageElement>) => {
-    event.currentTarget.style.visibility = "hidden";
   };
 
   const onLocalGameCreated = (snapshot: LibrarySnapshot) => {
@@ -652,17 +622,11 @@ export function useApp() {
     selectedGroup,
     storeFilter,
     setStoreFilter,
-    collectionFilter,
-    setCollectionFilter,
     installedOnly,
     setInstalledOnly,
     selectedId: selectedGroup?.game.id ?? navigation.selectedId,
     query,
     setQuery,
-    favoritesOnly,
-    setFavoritesOnly,
-    backlogFilter,
-    setBacklogFilter,
     achievements,
     metadata,
     view,
@@ -675,6 +639,7 @@ export function useApp() {
     accentTheme,
     setAccentTheme,
     libraryGames,
+    recentGames,
     visibleGames,
     selected,
     openLibrary,
@@ -686,7 +651,6 @@ export function useApp() {
     selectCopy,
     openGameMenu,
     updateQuery,
-    updateCollectionState,
     scanInstalledSteam,
     scanningSteam: scanSteamMutation.isPending,
     clearLibraryFilters,
@@ -703,7 +667,6 @@ export function useApp() {
     closeGameMenu: closeOverlay,
     closeGameMenuFromContext,
     stopPropagation,
-    hideBrokenImage,
     onLocalGameCreated,
     launchSelected,
     chooseCover,

@@ -131,10 +131,15 @@ else { process.exitCode = 1; }
       ),
     )
     .toBe(33 * 60);
-  await page.getByText("Colecciones y etiquetas", { exact: true }).click();
-  await page.getByLabel("Colecciones", { exact: true }).fill("Weekend, RPG");
-  await page.getByLabel("Etiquetas", { exact: true }).fill("Story, Controller");
-  await page.getByRole("button", { name: "Guardar organización", exact: true }).click();
+  await page.evaluate(async () => {
+    const game = (await window.launcher.listGames()).games.find(
+      (item) => item.source === "epic",
+    )!;
+    await window.launcher.organizeGame(game.id, {
+      collections: ["Weekend", "RPG"],
+      tags: ["Story", "Controller"],
+    });
+  });
   await expect
     .poll(
       async () =>
@@ -211,11 +216,12 @@ else { process.exitCode = 1; }
     ).toBeNull();
   }
   await page.getByRole("button", { name: "Biblioteca", exact: true }).click();
-  await page.getByLabel("Colección", { exact: true }).selectOption("Weekend");
+  await page.getByRole("combobox", { name: "Tienda", exact: true }).click();
+  await page.getByRole("option", { name: "GOG", exact: true }).click();
   const restarted = await desktop.restart();
-  await expect(restarted.getByLabel("Colección", { exact: true })).toHaveValue(
-    "Weekend",
-  );
+  await expect(
+    restarted.getByRole("combobox", { name: "Tienda", exact: true }),
+  ).toHaveText("GOG");
   await expect(
     restarted
       .getByRole("group", { name: /^Juegos de la biblioteca/ })

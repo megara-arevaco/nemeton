@@ -1,4 +1,9 @@
 import type {
+  LocalFolderScan,
+  LocalFolderSelection,
+  LocalFolderImportResult,
+} from "../shared/local-folder.js";
+import type {
   StoreProvider,
   ProviderState,
   ProviderOperation,
@@ -254,6 +259,13 @@ const api = {
   getAchievements: (gameId: string): Promise<GameAchievements> =>
     invoke("library:achievements", gameId),
   scanSteam: (): Promise<LibrarySnapshot> => invoke("library:scan-steam"),
+  scanLocalFolder: (): Promise<LocalFolderScan | null> =>
+    invoke("library:scan-local-folder"),
+  importLocalFolder: (
+    scanId: string,
+    selections: LocalFolderSelection[],
+  ): Promise<LocalFolderImportResult> =>
+    invoke("library:import-local-folder", scanId, selections),
   selectExecutable: (): Promise<{ path: string; suggestedTitle: string } | null> =>
     invoke("dialog:select-executable"),
   selectArtwork: (): Promise<{

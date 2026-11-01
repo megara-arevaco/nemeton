@@ -140,6 +140,15 @@ Choose **Add game**, select an executable, and optionally associate the title wi
 Ludusavi entry or Steam AppID. The association improves artwork, achievement, and
 save-location detection.
 
+To import several local games, choose **Add game → Scan folder** and select a
+folder. Nemeton checks its subfolders, groups possible executables by game folder,
+and marks installations already in your library. Review each suggested name and
+executable, then explicitly validate the game. Editing either field clears that
+validation. Review the selected games in the final summary and confirm the import;
+cancelling leaves the library unchanged. Common installers, uninstallers and helper
+folders are skipped. A notice identifies incomplete scans so you can choose a
+smaller folder. Detection is a suggestion: you decide which entries are games.
+
 ### Back up and restore saves
 
 Open a game's save panel to review protected folders, detection suggestions,
@@ -262,6 +271,13 @@ corepack pnpm dist:win:installer
 # Portable executable
 corepack pnpm dist:win:portable
 ```
+
+The Windows installer has a branded Spanish welcome page with a native animated
+logo and matching finish artwork. The animation respects the Windows animation
+preference and can be paused from the welcome page. Windows distribution commands
+generate the bitmap frames from the official SVG using
+`apps/desktop/scripts/render-installer.cjs`; the NSIS customization lives in
+`apps/desktop/build/installer.nsh`. Generated artwork is ignored by Git.
 
 The installer is per-user, lets the user select an installation directory, creates
 Desktop and Start menu shortcuts, and preserves Nemeton data after uninstalling.

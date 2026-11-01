@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { LocalFolderImport } from "../LocalFolderImport/LocalFolderImport";
 import { Modal } from "../Modal";
 import { useTranslation } from "react-i18next";
 import type { LibrarySnapshot } from "@launcher/core";
@@ -12,6 +14,7 @@ import { useAddGameModal } from "./AddGameModal.hook";
 export function AddGameModal({
   onClose,
   onCreated,
+  onBatchCreated,
   initialTitle,
   initialExecutablePath,
 }: Readonly<{
@@ -19,8 +22,10 @@ export function AddGameModal({
   initialExecutablePath?: string;
   onClose: () => void;
   onCreated: (snapshot: LibrarySnapshot) => void;
+  onBatchCreated?: (snapshot: LibrarySnapshot) => void;
 }>) {
   const { t } = useTranslation();
+  const [folderMode, setFolderMode] = useState(false);
   const {
     title,
     executablePath,
@@ -37,6 +42,15 @@ export function AddGameModal({
     createGame,
   } = useAddGameModal({ onClose, onCreated, initialTitle, initialExecutablePath });
 
+  if (folderMode) {
+    return (
+      <LocalFolderImport
+        onClose={onClose}
+        onBack={() => setFolderMode(false)}
+        onImported={onBatchCreated ?? onCreated}
+      />
+    );
+  }
   return (
     <Modal
       title={t("modal.addTitle")}
@@ -62,6 +76,20 @@ export function AddGameModal({
       }
     >
       <div className={"add-game-body [padding:26px_24px]"}>
+        <div className="folder-import-entry">
+          <div>
+            <strong>{t("folderScan.entryTitle")}</strong>
+            <p>{t("folderScan.entryHelp")}</p>
+          </div>
+          <Button
+            variant="secondary"
+            disabled={saving}
+            onClick={() => setFolderMode(true)}
+          >
+            <FolderOpen />
+            {t("folderScan.title")}
+          </Button>
+        </div>
         <div
           className={
             "game-fields [display:flex] [flex-direction:column] [gap:18px] [padding-top:8px] [&_label_>_span]:[display:block] [&_label_>_span]:[margin:0_0_8px_2px] [&_label_>_span]:[color:#989ba5] [&_label_>_span]:[font-size:11px] [&_label_>_span]:[font-weight:600] [&_label_em]:[margin-left:5px] [&_label_em]:[color:#626571] [&_label_em]:[font-size:9px] [&_label_em]:[font-style:normal] [&_label_em]:[font-weight:500] [&_label_em]:[text-transform:uppercase] [&_input]:[width:100%] [&_input]:[height:44px] [&_input]:[border:1px_solid_#ffffff14] [&_input]:[border-radius:10px] [&_input]:[outline:none] [&_input]:[padding:0_12px] [&_input]:[background:#090a0fa3] [&_input]:[color:white] [&_input:focus]:[border-color:#a9fb766b] [&_input:focus]:[box-shadow:0_0_0_3px_#a9fb760d] [&_input:focus]:[border-color:color-mix(in_srgb,_var(--accent-a)_42%,_transparent)] [&_input:focus]:[box-shadow:0_0_0_3px_color-mix(in_srgb,_var(--accent-a)_5%,_transparent)]"

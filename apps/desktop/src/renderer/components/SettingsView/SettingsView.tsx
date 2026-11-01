@@ -1,6 +1,7 @@
 import { SteamAccountTools } from "./SteamAccountTools";
 import { StoreConnections } from "./StoreConnections";
 import { AppUpdates } from "./AppUpdates";
+import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import type {
   FolderSyncSettings,
@@ -16,6 +17,7 @@ import { useSettingsView } from "./SettingsView.hook";
 import { useTranslation } from "react-i18next";
 
 export function SettingsView({
+  focusSteam = false,
   settings,
   syncSettings,
   accentTheme,
@@ -24,6 +26,7 @@ export function SettingsView({
   onSynced,
   onLibraryUpdated,
 }: Readonly<{
+  focusSteam?: boolean;
   settings: SteamAccountSettings | null;
   syncSettings: FolderSyncSettings | null;
   accentTheme: AccentTheme;
@@ -33,6 +36,14 @@ export function SettingsView({
   onLibraryUpdated: (snapshot: LibrarySnapshot) => void;
 }>) {
   const { t, i18n } = useTranslation();
+  const steamSection = useRef<HTMLElement>(null);
+  const apiKeyInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (focusSteam) {
+      steamSection.current?.scrollIntoView({ block: "start" });
+      apiKeyInput.current?.focus({ preventScroll: true });
+    }
+  }, [focusSteam]);
   const {
     steamId,
     setSteamId,
@@ -169,6 +180,7 @@ export function SettingsView({
         </div>
       </section>
       <section
+        ref={steamSection}
         className={
           "settings-card [max-width:850px] [margin-top:30px] [border:1px_solid]"
         }
@@ -210,6 +222,7 @@ export function SettingsView({
           <label>
             <span>Steam Web API key</span>
             <input
+              ref={apiKeyInput}
               type="password"
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
@@ -356,6 +369,7 @@ export function SettingsView({
           </div>
         )}
         <Button
+          className="[margin-top:16px]"
           variant="secondary"
           type="button"
           disabled={syncing}

@@ -97,6 +97,11 @@ export interface LocalGameInput {
   ludusaviGameName?: string | null;
 }
 
+export type LocalGameAssets = Pick<
+  LocalGameInput,
+  "steamAppId" | "ludusaviGameName" | "coverUrl" | "heroUrl"
+>;
+
 export interface ArtworkSuggestion {
   provider: "steam" | "wikipedia";
   providerId: string;

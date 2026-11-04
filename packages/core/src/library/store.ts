@@ -513,7 +513,7 @@ export class LibraryStore {
         const normalizedPath = input.executablePath
           ? path.resolve(input.executablePath)
           : "";
-        const previous = normalizedPath
+        let previous = normalizedPath
           ? snapshot.games.find(
               (game) =>
                 game.source === "local" &&
@@ -521,6 +521,31 @@ export class LibraryStore {
                 path.resolve(game.installPath) === normalizedPath,
             )
           : undefined;
+
+        // A synchronized game has no executable on this machine. Reuse its
+        // identity so its history and save backups follow the new installation.
+        if (!previous && normalizedPath) {
+          const matches = snapshot.games.filter(
+            (game) =>
+              game.source === "local" &&
+              !game.installPath &&
+              game.title.trim().toLowerCase() === input.title.trim().toLowerCase() &&
+              !(
+                game.steamAppId &&
+                input.steamAppId &&
+                game.steamAppId !== input.steamAppId
+              ),
+          );
+
+          if (matches.length === 1) {
+            previous = matches[0]!;
+            previous.installPath = normalizedPath;
+            previous.installed = true;
+            previous.updatedAt = new Date().toISOString();
+            previous.steamAppId ??= input.steamAppId ?? null;
+            previous.ludusaviGameName ??= input.ludusaviGameName ?? null;
+          }
+        }
 
         if (!previous) {
           const now = new Date().toISOString();
@@ -1009,7 +1034,10 @@ export class LibraryStore {
     });
   }
 
-  async mergeRemoteManual(remote: LibrarySnapshot): Promise<LibrarySnapshot> {
+  async mergeRemoteManual(
+    remote: LibrarySnapshot,
+    beforeRelink?: (previousSourceId: string, sourceId: string) => Promise<void>,
+  ): Promise<LibrarySnapshot> {
     return withFileLock(this.filePath, async () => {
       const snapshot = await this.read();
       const excludedGameKeys = new Set([
@@ -1020,15 +1048,50 @@ export class LibraryStore {
         snapshot.games.map((game) => [`${game.source}:${game.sourceId}`, game]),
       );
 
+      const remoteIds = new Map<string, string>();
+      const sameGame = (a: LibraryGame, b: LibraryGame) =>
+        a.source === "local" &&
+        b.source === "local" &&
+        a.title.trim().toLowerCase() === b.title.trim().toLowerCase() &&
+        !(a.steamAppId && b.steamAppId && a.steamAppId !== b.steamAppId);
+
       for (const remoteGame of remote.games.filter((game) => game.source === "local")) {
-        const key = `local:${remoteGame.sourceId}`;
+        let key = `local:${remoteGame.sourceId}`;
 
         if (excludedGameKeys.has(key)) {
           games.delete(key);
           continue;
         }
 
-        const localGame = games.get(key);
+        let localGame = games.get(key);
+        let sourceId = remoteGame.sourceId;
+
+        if (!localGame && beforeRelink) {
+          const matches = [...games.values()].filter((game) =>
+            sameGame(game, remoteGame),
+          );
+          const remoteMatches = remote.games.filter((game) =>
+            sameGame(game, remoteGame),
+          );
+
+          if (
+            matches.length === 1 &&
+            remoteMatches.length === 1 &&
+            !excludedGameKeys.has(`local:${matches[0]!.sourceId}`)
+          ) {
+            localGame = matches[0]!;
+            sourceId = [localGame.sourceId, remoteGame.sourceId].sort()[0]!;
+            const previousSourceId =
+              sourceId === localGame.sourceId
+                ? remoteGame.sourceId
+                : localGame.sourceId;
+            // Copy backups before publishing the unified identity. Keep the originals.
+            await beforeRelink(previousSourceId, sourceId);
+            games.delete(`local:${localGame.sourceId}`);
+            key = `local:${sourceId}`;
+          }
+        }
+        remoteIds.set(remoteGame.id, localGame?.id ?? remoteGame.id);
         const localUpdatedAt = localGame?.updatedAt ?? localGame?.importedAt ?? "";
         const remoteUpdatedAt = remoteGame.updatedAt ?? remoteGame.importedAt;
         const metadata =
@@ -1036,6 +1099,7 @@ export class LibraryStore {
         games.set(key, {
           ...metadata,
           id: localGame?.id ?? remoteGame.id,
+          sourceId,
           installPath: localGame?.installPath ?? "",
           launchUri: null,
           coverPath: localGame?.coverPath ?? null,
@@ -1043,6 +1107,15 @@ export class LibraryStore {
             localGame?.playtimeMinutes ?? 0,
             remoteGame.playtimeMinutes,
           ),
+          playtimeSecondsRemainder:
+            (localGame?.playtimeMinutes ?? 0) > remoteGame.playtimeMinutes
+              ? (localGame?.playtimeSecondsRemainder ?? 0)
+              : (localGame?.playtimeMinutes ?? 0) === remoteGame.playtimeMinutes
+                ? Math.max(
+                    localGame?.playtimeSecondsRemainder ?? 0,
+                    remoteGame.playtimeSecondsRemainder,
+                  )
+                : remoteGame.playtimeSecondsRemainder,
           trackedPlaytimeSeconds: Math.max(
             localGame?.trackedPlaytimeSeconds ?? 0,
             remoteGame.trackedPlaytimeSeconds,
@@ -1068,10 +1141,67 @@ export class LibraryStore {
           .map((session) => [session.id, session]),
       );
       remote.sessions.forEach((session) => {
-        if (retainedGameIds.has(session.gameId) && !sessions.has(session.id)) {
-          sessions.set(session.id, session);
+        const gameId = remoteIds.get(session.gameId);
+
+        if (gameId && retainedGameIds.has(gameId) && !sessions.has(session.id)) {
+          sessions.set(session.id, { ...session, gameId });
         }
       });
+      // Session IDs identify the same play on every device. Add independent
+      // sessions once, retaining the largest historical baseline without sessions.
+      const durationByGame = (entries: LibrarySnapshot["sessions"]) => {
+        const totals = new Map<string, number>();
+
+        for (const session of entries) {
+          totals.set(
+            session.gameId,
+            (totals.get(session.gameId) ?? 0) + session.durationSeconds,
+          );
+        }
+        return totals;
+      };
+      const localDurations = durationByGame(snapshot.sessions);
+      const remoteDurations = durationByGame(remote.sessions);
+      const mergedDurations = durationByGame([...sessions.values()]);
+      const localById = new Map(snapshot.games.map((game) => [game.id, game]));
+      const remoteByLocalId = new Map(
+        remote.games.map((game) => [remoteIds.get(game.id), game]),
+      );
+
+      for (const game of games.values()) {
+        if (game.source !== "local") {
+          continue;
+        }
+
+        const local = localById.get(game.id);
+        const incoming = remoteByLocalId.get(game.id);
+
+        if (!incoming) {
+          continue;
+        }
+
+        const localSeconds = localDurations.get(game.id) ?? 0;
+        const remoteSeconds = remoteDurations.get(incoming.id) ?? 0;
+        const mergedSeconds = mergedDurations.get(game.id) ?? 0;
+        const total =
+          Math.max(
+            0,
+            (local ? local.playtimeMinutes * 60 + local.playtimeSecondsRemainder : 0) -
+              localSeconds,
+            incoming.playtimeMinutes * 60 +
+              incoming.playtimeSecondsRemainder -
+              remoteSeconds,
+          ) + mergedSeconds;
+        game.playtimeMinutes = Math.floor(total / 60);
+        game.playtimeSecondsRemainder = total % 60;
+        game.trackedPlaytimeSeconds =
+          Math.max(
+            0,
+            (local?.trackedPlaytimeSeconds ?? 0) - localSeconds,
+            incoming.trackedPlaytimeSeconds - remoteSeconds,
+          ) + mergedSeconds;
+      }
+
       const next = {
         version: 1 as const,
         games: [...games.values()].sort((a, b) => a.title.localeCompare(b.title)),

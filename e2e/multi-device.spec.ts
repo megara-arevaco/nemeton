@@ -42,6 +42,27 @@ test("two isolated Electron devices merge without losing saves and resolve a rea
   await fs.writeFile(saveFileA, "shared baseline fixture");
   await fs.writeFile(saveFileB, "shared baseline fixture");
   const primaryGame = await createGame(pageA, "Shared fictional game");
+  const independentGame = await createGame(pageB, "Shared fictional game");
+  expect(independentGame.sourceId).not.toBe(primaryGame.sourceId);
+  await pageA.evaluate(async (game) => {
+    await window.launcher.updateLocalGame(game.id, {
+      title: game.title,
+      executablePath: "",
+      playtimeMinutes: 125,
+    });
+  }, primaryGame);
+  // Seed a session with the sender's machine-specific game ID.
+  const libraryPath = path.join(deviceA.directory, "data", "library.json");
+  const seeded = JSON.parse(await fs.readFile(libraryPath, "utf8"));
+  seeded.sessions.push({
+    id: "shared-session",
+    gameId: primaryGame.id,
+    startedAt: "2026-01-01T12:00:00.000Z",
+    endedAt: "2026-01-01T12:05:00.000Z",
+    durationSeconds: 300,
+    origin: "launcher",
+  });
+  await fs.writeFile(libraryPath, JSON.stringify(seeded));
   await pageA.evaluate(
     (gameId) => window.launcher.getSavegames(gameId),
     primaryGame.id,
@@ -65,7 +86,27 @@ test("two isolated Electron devices merge without losing saves and resolve a rea
         (game) => game.title === "Shared fictional game",
       )!,
   );
-  expect(importedGame.sourceId).toBe(primaryGame.sourceId);
+  expect(importedGame.sourceId).toBe(
+    [primaryGame.sourceId, independentGame.sourceId].sort()[0],
+  );
+  expect(importedGame.id).toBe(independentGame.id);
+  expect(importedGame.playtimeMinutes).toBe(125);
+  const mergedLibrary = await pageB.evaluate(() => window.launcher.listGames());
+  expect(
+    mergedLibrary.games.filter((game) => game.title === importedGame.title),
+  ).toHaveLength(1);
+  const mergedData = JSON.parse(
+    await fs.readFile(path.join(deviceB.dataDirectory, "library.json"), "utf8"),
+  );
+  expect(
+    mergedData.sessions.find(
+      (session: { id: string }) => session.id === "shared-session",
+    )?.gameId,
+  ).toBe(importedGame.id);
+  expect(
+    (await pageB.evaluate((id) => window.launcher.getSavegames(id), importedGame.id))
+      .versions[0]?.id,
+  ).toBe(baseline.id);
   await pageB.evaluate(
     (gameId) => window.launcher.getSavegames(gameId),
     importedGame.id,
@@ -74,6 +115,7 @@ test("two isolated Electron devices merge without losing saves and resolve a rea
     await window.launcher.addSavegameFolder(gameId);
   }, importedGame.id);
 
+  await pageA.evaluate(() => window.launcher.syncNow());
   await fs.writeFile(saveFileA, "remote device A progress");
   await pageA.evaluate(
     (gameId) => window.launcher.backupSavegames(gameId),

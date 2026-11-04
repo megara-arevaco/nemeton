@@ -5,9 +5,9 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { readTextIfExists, writeJsonAtomically, LibraryStore } from "@launcher/core";
 import type { LibrarySnapshot } from "@launcher/core";
-import { AchievementService, type AchievementHistoryEntry } from "./achievements.js";
-import { toLinuxPath } from "./platform.js";
-import { SettingsStore } from "./settings.js";
+import type { AchievementService, AchievementHistoryEntry } from "./achievements.js";
+import { toLinuxPath } from "../shared/system-paths.js";
+import type { SettingsStore } from "./settings.js";
 export interface FolderSyncResult {
   snapshot: LibrarySnapshot;
   settings: {
@@ -84,13 +84,56 @@ export class FolderSyncService {
     const remoteHistory = await readTextIfExists(historyPath);
 
     if (remoteHistory && this.remoteContents.get(historyPath) !== remoteHistory) {
+      let parsed: LibrarySnapshot;
+
       try {
-        await this.store.mergeRemoteManual(
-          remoteLibrarySchema.parse(JSON.parse(remoteHistory)),
-        );
+        parsed = remoteLibrarySchema.parse(JSON.parse(remoteHistory));
       } catch {
         throw new Error("El historial remoto no tiene un formato válido");
       }
+      await this.store.mergeRemoteManual(parsed, async (previousSourceId, sourceId) => {
+        const segment = (value: string) => value.replace(/[^a-z0-9_-]/gi, "_");
+        const root = path.join(resolved, "launcher-next-saves");
+        const previous = path.join(root, segment(previousSourceId));
+        const destination = path.join(root, segment(sourceId));
+        const info = await fs.promises
+          .lstat(previous)
+          .catch((error: NodeJS.ErrnoException) => {
+            if (error.code === "ENOENT") {
+              return null;
+            }
+            throw error;
+          });
+
+        if (!info) {
+          return;
+        }
+        if (!info.isDirectory() || info.isSymbolicLink()) {
+          throw new Error("La carpeta de partidas no es un directorio seguro");
+        }
+        await fs.promises.cp(previous, destination, {
+          recursive: true,
+          force: false,
+          filter: async (source, target) => {
+            const sourceInfo = await fs.promises.lstat(source);
+            const targetInfo = await fs.promises
+              .lstat(target)
+              .catch((error: NodeJS.ErrnoException) => {
+                if (error.code === "ENOENT") {
+                  return null;
+                }
+                throw error;
+              });
+
+            if (sourceInfo.isSymbolicLink() || targetInfo?.isSymbolicLink()) {
+              throw new Error(
+                "No se pueden vincular partidas mediante enlaces simbólicos",
+              );
+            }
+            return true;
+          },
+        });
+      });
     }
 
     const exported = await this.store.exportManualHistory();

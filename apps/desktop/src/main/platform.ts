@@ -1,3 +1,5 @@
+import { defaultSteamRoots } from "@launcher/core";
+import { canonicalizeContext, findSteamUserdata } from "./savegames/destinations.js";
 import { toWindowsPath, toLocalPath } from "../shared/system-paths.js";
 import { execFile, spawn } from "node:child_process";
 import path from "node:path";
@@ -117,4 +119,93 @@ function encodePowerShellCommand(command: string) {
 
 function quotePowerShell(value: string) {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+/** Resolve known folders locally, including the game's own Proton prefix. */
+export async function getSavegamePathContext(game: {
+  installPath: string;
+  source: string;
+  sourceId: string;
+  steamAppId?: string | null;
+}): Promise<import("./savegames/destinations.js").PathContext> {
+  const fs = await import("node:fs/promises");
+  const gameDirectory = game.installPath
+    ? (await fs.stat(game.installPath).catch(() => null))?.isDirectory()
+      ? game.installPath
+      : path.dirname(game.installPath)
+    : undefined;
+  const steamAppId = game.source === "steam" ? game.sourceId : game.steamAppId;
+
+  const steamUserdata = await findSteamUserdata(steamAppId, defaultSteamRoots());
+
+  if (
+    process.platform === "linux" &&
+    gameDirectory &&
+    steamAppId &&
+    /^\d+$/.test(steamAppId)
+  ) {
+    let ancestor = path.resolve(gameDirectory);
+
+    while (path.dirname(ancestor) !== ancestor) {
+      if (path.basename(ancestor) === "steamapps") {
+        const users = path.join(
+          ancestor,
+          "compatdata",
+          steamAppId,
+          "pfx",
+          "drive_c",
+          "users",
+        );
+        const profiles = (
+          await fs.readdir(users, { withFileTypes: true }).catch(() => [])
+        ).filter(
+          (entry) =>
+            entry.isDirectory() &&
+            !/^(public|all users|default|default user)$/i.test(entry.name),
+        );
+
+        if (profiles.length === 1) {
+          const profile = path.join(users, profiles[0]!.name);
+          return canonicalizeContext({
+            platform: "windows",
+            anchors: {
+              documents: path.join(profile, "Documents"),
+              "saved-games": path.join(profile, "Saved Games"),
+              roaming: path.join(profile, "AppData", "Roaming"),
+              local: path.join(profile, "AppData", "Local"),
+              "local-low": path.join(profile, "AppData", "LocalLow"),
+              game: gameDirectory,
+              ...(steamUserdata ? { "steam-userdata": steamUserdata } : {}),
+            },
+          });
+        }
+        break;
+      }
+      ancestor = path.dirname(ancestor);
+    }
+  }
+
+  const windows = process.platform === "win32" || Boolean(process.env.WSL_DISTRO_NAME);
+  const roaming = await getRoamingAppData();
+  const profile = process.env.WSL_DISTRO_NAME
+    ? path.dirname(path.dirname(roaming))
+    : app.getPath("home");
+  return canonicalizeContext({
+    platform: windows ? "windows" : process.platform === "darwin" ? "darwin" : "linux",
+    anchors: {
+      documents: process.env.WSL_DISTRO_NAME
+        ? path.join(profile, "Documents")
+        : app.getPath("documents"),
+      "saved-games": path.join(profile, "Saved Games"),
+      roaming,
+      local: windows
+        ? process.platform === "win32" && process.env.LOCALAPPDATA
+          ? process.env.LOCALAPPDATA
+          : path.join(path.dirname(roaming), "Local")
+        : process.env.XDG_DATA_HOME || path.join(profile, ".local", "share"),
+      ...(windows ? { "local-low": path.join(path.dirname(roaming), "LocalLow") } : {}),
+      ...(gameDirectory ? { game: gameDirectory } : {}),
+      ...(steamUserdata ? { "steam-userdata": steamUserdata } : {}),
+    },
+  });
 }

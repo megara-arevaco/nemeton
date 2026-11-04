@@ -2,6 +2,30 @@ import path from "node:path";
 import { z } from "zod";
 import { MAX_BACKUP_BYTES, MAX_FILES } from "./archive.js";
 
+export const portableRootSchema = z.object({
+  id: z
+    .string()
+    .min(1)
+    .max(240)
+    .regex(/^(portable|custom|legacy)-[a-zA-Z0-9_-]+$/),
+  label: z.string().min(1).max(4096),
+  portable: z
+    .object({
+      platform: z.enum(["windows", "linux", "darwin"]),
+      anchor: z.enum([
+        "documents",
+        "saved-games",
+        "roaming",
+        "local",
+        "local-low",
+        "game",
+        "steam-userdata",
+      ]),
+      relative: z.string().min(1).max(4096),
+    })
+    .optional(),
+});
+
 export const versionIdSchema = z
   .string()
   .min(1)
@@ -17,6 +41,7 @@ export const manifestSchema = z
     sizeBytes: z.number().int().min(0).max(MAX_BACKUP_BYTES),
     fileCount: z.number().int().min(0).max(MAX_FILES),
     pinned: z.boolean().optional(),
+    roots: z.array(portableRootSchema).min(1).max(1000).optional(),
     files: z
       .array(
         z.object({
@@ -31,6 +56,19 @@ export const manifestSchema = z
       .max(MAX_FILES),
   })
   .superRefine((manifest, context) => {
+    if (manifest.roots) {
+      const ids = manifest.roots.map((root) => root.id);
+
+      if (
+        new Set(ids).size !== ids.length ||
+        manifest.files.some((file) => file.rootIndex >= ids.length)
+      ) {
+        context.addIssue({
+          code: "custom",
+          message: "Las carpetas de la copia no son válidas",
+        });
+      }
+    }
     if (
       manifest.fileCount !== manifest.files.length ||
       manifest.sizeBytes !==
@@ -62,7 +100,14 @@ export function restoreTarget(root: string, relative: string) {
 
   const target = path.resolve(root, ...segments);
 
-  if (!target.startsWith(`${path.resolve(root)}${path.sep}`)) {
+  const within = path.relative(path.resolve(root), target);
+
+  if (
+    !within ||
+    within === ".." ||
+    within.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(within)
+  ) {
     throw new Error("La copia contiene una ruta no válida");
   }
   return target;

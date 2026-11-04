@@ -371,7 +371,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
                     <Button
                       variant="setup"
                       size="small"
-                      disabled={busy || !data.syncConfigured || data.paths.length === 0}
+                      disabled={busy || !data.syncConfigured}
                       onClick={() =>
                         run(
                           () => restoreVersion(version.id),

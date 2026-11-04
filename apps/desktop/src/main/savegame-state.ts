@@ -57,6 +57,8 @@ export async function readSavegameState(
     throw new Error("No se encontró el juego");
   }
 
+  const { getSavegamePathContext } = await import("./platform.js");
+  savegameManager.setPathContext(gameId, await getSavegamePathContext(game));
   const settings = await settingsStore.read();
   let paths = discover
     ? await savegameManager.removeInstallRoot(gameId, game.installPath)

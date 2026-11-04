@@ -1,3 +1,13 @@
+import {
+  describeRoot,
+  resolvePortable,
+  pathKey,
+  validateDestination,
+  validateDistinctDestinations,
+  type BackupRoot,
+  type PathContext,
+  type RestoreDestination,
+} from "./savegames/destinations.js";
 import { savegamePolicySchema } from "../shared/ipc-contracts.js";
 import { pruneVersions } from "./savegames/retention.js";
 import { SavegameDiscovery } from "./savegames/discovery.js";
@@ -38,6 +48,7 @@ interface SavegameConfig {
   deviceId: string;
   deviceName: string;
   games: Record<string, string[]>;
+  bindings?: Record<string, Record<string, string>>;
   policies?: Record<string, SavegamePolicy>;
   learned?: Record<string, string[]>;
   backupFailures?: Record<string, { failedAt: string; message: string }>;
@@ -55,6 +66,7 @@ interface SnapshotFile {
 
 interface SnapshotManifest extends SavegameVersion {
   files: SnapshotFile[];
+  roots?: BackupRoot[];
 }
 
 const emptyConfig = (): SavegameConfig => ({
@@ -100,6 +112,11 @@ const rootKey = (root: string) => {
 export class SavegameManager {
   private readonly verifications = new Map<string, Promise<SavegameVerification>>();
   private readonly discovery: SavegameDiscovery;
+  private readonly pathContexts = new Map<string, PathContext>();
+
+  setPathContext(gameId: string, context: PathContext) {
+    this.pathContexts.set(gameId, context);
+  }
 
   constructor(private readonly configPath: string) {
     this.discovery = new SavegameDiscovery(() => this.readConfig());
@@ -120,6 +137,7 @@ export class SavegameManager {
           deviceId: parsed.deviceId || randomUUID(),
           deviceName: parsed.deviceName || os.hostname(),
           games: parsed.games ?? {},
+          bindings: parsed.bindings ?? {},
           policies: parsed.policies ?? {},
           learned: parsed.learned ?? {},
           backupFailures: parsed.backupFailures ?? {},
@@ -290,6 +308,11 @@ export class SavegameManager {
       config.games[gameId] = (config.games[gameId] ?? []).filter(
         (item) => item !== folderPath,
       );
+      for (const [id, target] of Object.entries(config.bindings?.[gameId] ?? {})) {
+        if (pathKey(target) === pathKey(folderPath)) {
+          delete config.bindings![gameId]![id];
+        }
+      }
       await this.writeConfig(config);
       return config.games[gameId];
     });
@@ -324,6 +347,7 @@ export class SavegameManager {
     return withFileLock(this.configPath, async () => {
       const config = await this.readConfig();
       delete config.games[gameId];
+      delete config.bindings?.[gameId];
       delete config.policies?.[gameId];
       delete config.learned?.[gameTitle];
       await this.writeConfig(config);
@@ -473,6 +497,7 @@ export class SavegameManager {
         ...config.policies?.[gameId],
       }),
       deviceId: config.deviceId,
+      bindings: config.bindings?.[gameId] ?? {},
     };
   }
 
@@ -549,7 +574,7 @@ export class SavegameManager {
             );
             files.push({
               rootIndex,
-              relativePath: path.relative(root, absolute),
+              relativePath: path.relative(root, absolute).split(path.sep).join("/"),
               hash,
             });
           }
@@ -617,7 +642,13 @@ export class SavegameManager {
       }
 
       // Hash without holding the shared configuration lock.
-      const synchronized = await this.currentMatchesLatest(gameId, latest, inputs);
+      const synchronized = await this.currentMatchesLatest(
+        gameId,
+        latest,
+        inputs,
+        syncFolder,
+        sourceId,
+      );
       const currentInputs = await this.verificationInputs(gameId);
       const currentLatest = (await this.listVersions(syncFolder, sourceId))[0];
 
@@ -658,9 +689,38 @@ export class SavegameManager {
     gameId: string,
     latestVersion?: SavegameVersion,
     inputs?: { paths: string[]; policy: SavegamePolicy },
+    syncFolder?: string,
+    sourceId?: string,
   ) {
     if (!latestVersion) {
       return false;
+    }
+
+    if (syncFolder && sourceId) {
+      const plan = await this.getRestorePlan(
+        gameId,
+        sourceId,
+        syncFolder,
+        latestVersion.id,
+      );
+      const currentPaths = inputs?.paths ?? (await this.getPaths(gameId));
+
+      if (
+        plan.some((entry) => !entry.destination) ||
+        plan.length !== currentPaths.length
+      ) {
+        return false;
+      }
+
+      const orderedPaths = plan.map((entry) => entry.destination!);
+
+      if (orderedPaths.some((folder) => !currentPaths.includes(folder))) {
+        return false;
+      }
+      inputs = {
+        paths: orderedPaths,
+        policy: inputs?.policy ?? (await this.getPolicy(gameId)),
+      };
     }
 
     const signature = inputs
@@ -688,7 +748,14 @@ export class SavegameManager {
     }
 
     const matchesLatest =
-      currentMatchesLatest ?? (await this.currentMatchesLatest(gameId, latest));
+      currentMatchesLatest ??
+      (await this.currentMatchesLatest(
+        gameId,
+        latest,
+        undefined,
+        syncFolder,
+        sourceId,
+      ));
     return matchesLatest ? null : { remoteVersion: latest };
   }
 
@@ -712,13 +779,50 @@ export class SavegameManager {
 
       const latest = (await this.listVersions(syncFolder, sourceId))[0];
 
-      if (latest && (await this.currentMatchesLatest(gameId, latest))) {
-        return latest;
+      if (
+        latest &&
+        (await this.currentMatchesLatest(
+          gameId,
+          latest,
+          undefined,
+          syncFolder,
+          sourceId,
+        ))
+      ) {
+        const manifest = await this.readManifest(
+          this.gameRoot(syncFolder, sourceId),
+          latest.id,
+        );
+
+        if (manifest.roots) {
+          return latest;
+        }
       }
 
+      validateDistinctDestinations(roots);
       const gameRoot = this.gameRoot(syncFolder, sourceId);
       const archiveRoot = path.join(gameRoot, "versions");
       await fs.promises.mkdir(archiveRoot, { recursive: true });
+      config.bindings ??= {};
+      const bindings = (config.bindings[gameId] ??= {});
+      const backupRoots = roots.map((root): BackupRoot => {
+        const known = describeRoot(root, this.pathContexts.get(gameId));
+        const existingId = Object.entries(bindings)
+          .reverse()
+          .find(([, target]) => pathKey(target) === pathKey(root))?.[0];
+        const descriptor = known ?? {
+          id: existingId ?? `custom-${randomUUID()}`,
+          label: path.basename(root),
+        };
+
+        // Preserve an explicit association received from the other device.
+        if (existingId) {
+          descriptor.id = existingId;
+        }
+        bindings[descriptor.id] = root;
+        return descriptor;
+      });
+      await this.writeConfig(config);
       const files: SnapshotFile[] = [];
       const archiveFiles: Array<{ source: string; name: string }> = [];
       const staging = await fs.promises.mkdtemp(path.join(gameRoot, ".backup-"));
@@ -755,7 +859,10 @@ export class SavegameManager {
                   source,
                   policy.maxSizeMb * 1024 * 1024 - totalSize,
                 );
-                const relativePath = path.relative(root, absolute);
+                const relativePath = path
+                  .relative(root, absolute)
+                  .split(path.sep)
+                  .join("/");
                 const archivePath = `files/${files.length}`;
                 archiveFiles.push({ source, name: archivePath });
                 totalSize += size;
@@ -799,7 +906,11 @@ export class SavegameManager {
         const versions = await this.listVersions(syncFolder, sourceId);
 
         if (versions[0]?.id.endsWith(signature.slice(0, 12))) {
-          return versions[0];
+          const previous = await this.readManifest(gameRoot, versions[0].id);
+
+          if (previous.roots) {
+            return versions[0];
+          }
         }
 
         const createdAt = new Date().toISOString();
@@ -811,6 +922,7 @@ export class SavegameManager {
           deviceName: config.deviceName,
           sizeBytes: totalSize,
           fileCount: files.length,
+          roots: backupRoots,
           files,
         };
         const target = path.join(archiveRoot, `${id}.zip`);
@@ -1144,10 +1256,136 @@ export class SavegameManager {
           async (archive) => manifestSchema.parse(await archive.manifest()),
         );
 
+    for (const file of manifest.files) {
+      restoreTarget(path.dirname(this.configPath), file.relativePath);
+    }
+    for (const root of manifest.roots ?? []) {
+      if (root.portable) {
+        restoreTarget(path.dirname(this.configPath), root.portable.relative);
+      }
+    }
     if (manifest.id !== versionId) {
       throw new Error("La versión no coincide con su manifiesto");
     }
     return manifest;
+  }
+
+  private validateProtectedDestinations(destinations: string[], syncFolder: string) {
+    const protectedRoots = [path.dirname(this.configPath), syncFolder].map(pathKey);
+
+    if (
+      destinations.some((destination) =>
+        protectedRoots.some((protectedRoot) => {
+          const root = pathKey(destination);
+          return (
+            root === protectedRoot ||
+            root.startsWith(`${protectedRoot}${path.sep}`) ||
+            protectedRoot.startsWith(`${root}${path.sep}`)
+          );
+        }),
+      )
+    ) {
+      throw new Error(
+        "El destino no puede contener la configuración de Nemeton ni la carpeta de sincronización",
+      );
+    }
+  }
+
+  private legacyRootId(manifest: SnapshotManifest, file: SnapshotFile) {
+    return `legacy-${createHash("sha256")
+      .update(JSON.stringify([manifest.deviceId, file.rootIndex, file.rootKey ?? null]))
+      .digest("hex")}`;
+  }
+
+  async getRestorePlan(
+    gameId: string,
+    sourceId: string,
+    syncFolder: string,
+    versionId: string,
+  ): Promise<RestoreDestination[]> {
+    const manifest = await this.readManifest(
+      this.gameRoot(syncFolder, sourceId),
+      versionId,
+    );
+    const config = await this.readConfig();
+    const paths = config.games[gameId] ?? [];
+    const bindings = config.bindings?.[gameId] ?? {};
+    const roots = manifest.roots ?? [
+      ...new Map(
+        manifest.files.map((file) => [
+          this.legacyRootId(manifest, file),
+          {
+            id: this.legacyRootId(manifest, file),
+            label: file.rootKey ?? `Carpeta ${file.rootIndex + 1}`,
+          },
+        ]),
+      ).values(),
+    ];
+    const plan = roots.map((root) => {
+      const binding = bindings[root.id];
+      const matches = manifest.roots
+        ? []
+        : paths.filter((folder) => root.label === rootKey(folder));
+      // Old keys lose punctuation and account information: review them once, too.
+      const destination = binding && paths.includes(binding) ? binding : null;
+      const candidates = paths.filter((folder) => path.basename(folder) === root.label);
+      const suggestion =
+        resolvePortable(root, this.pathContexts.get(gameId)) ??
+        (matches.length === 1
+          ? matches[0]!
+          : candidates.length === 1
+            ? candidates[0]!
+            : null);
+      return { id: root.id, label: root.label, destination, suggestion };
+    });
+    return plan;
+  }
+
+  /** Called after the user has reviewed the complete source-to-destination mapping. */
+  async bindRestoreDestinations(
+    gameId: string,
+    sourceId: string,
+    syncFolder: string,
+    versionId: string,
+    selections: Record<string, string>,
+  ) {
+    return withFileLock(this.configPath, async () => {
+      const plan = await this.getRestorePlan(gameId, sourceId, syncFolder, versionId);
+      const targets = plan.map((entry) => selections[entry.id] ?? entry.destination);
+
+      if (targets.some((target) => !target)) {
+        throw new Error("Falta asociar una carpeta de la copia");
+      }
+
+      const destinations = targets as string[];
+      validateDistinctDestinations(destinations);
+      this.validateProtectedDestinations(destinations, syncFolder);
+      for (const destination of destinations) {
+        await validateDestination(destination);
+      }
+
+      const config = await this.readConfig();
+      const configured = config.games[gameId] ?? [];
+      validateDistinctDestinations([...new Set([...configured, ...destinations])]);
+      // Verify the complete remote copy before creating any destination.
+      if ((await this.verifyVersion(syncFolder, sourceId, versionId)) !== "verified") {
+        throw new Error(
+          "La copia está incompleta o dañada; espera a que termine la sincronización",
+        );
+      }
+      for (const destination of destinations) {
+        await fs.promises.mkdir(destination, { recursive: true });
+        await validateDestination(destination);
+      }
+      config.bindings ??= {};
+      const bindings = (config.bindings[gameId] ??= {});
+      plan.forEach((entry, index) => {
+        bindings[entry.id] = destinations[index]!;
+      });
+      config.games[gameId] = [...new Set([...configured, ...destinations])];
+      await this.writeConfig(config);
+      return destinations;
+    });
   }
 
   async recoverRestore(onReady?: () => void) {
@@ -1182,18 +1420,28 @@ export class SavegameManager {
         throw new Error("La copia supera el tamaño permitido");
       }
 
+      const plan = await this.getRestorePlan(gameId, sourceId, syncFolder, versionId);
+
+      if (plan.some((entry) => !entry.destination)) {
+        throw new Error(
+          "Asocia cada carpeta de la copia con su destino en este equipo antes de restaurar",
+        );
+      }
+
+      const restoreRoots = plan.map((entry) => entry.destination!);
+      validateDistinctDestinations(restoreRoots);
+      this.validateProtectedDestinations(restoreRoots, syncFolder);
       const targets = new Set<string>();
       const mapped = manifest.files.map((file) => {
-        const matched = file.rootKey
-          ? roots.findIndex((root) => rootKey(root) === file.rootKey)
-          : -1;
-        const index = matched >= 0 ? matched : file.rootIndex;
+        const index = manifest.roots
+          ? file.rootIndex
+          : plan.findIndex((entry) => entry.id === this.legacyRootId(manifest, file));
 
-        if (!roots[index]) {
-          throw new Error("Falta una carpeta local para restaurar la copia completa");
+        if (index < 0 || !restoreRoots[index]) {
+          throw new Error("Falta el destino de una carpeta de la copia");
         }
 
-        const target = restoreTarget(roots[index]!, file.relativePath).toLowerCase();
+        const target = pathKey(restoreTarget(restoreRoots[index]!, file.relativePath));
 
         if (targets.has(target)) {
           throw new Error("La copia contiene rutas duplicadas");
@@ -1202,7 +1450,7 @@ export class SavegameManager {
         return { file, index };
       });
       await restoreDirectories(
-        roots,
+        restoreRoots,
         policy.exactRestore,
         `${this.configPath}.restore.json`,
         async (stages) => {

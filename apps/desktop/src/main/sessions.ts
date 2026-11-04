@@ -1,7 +1,10 @@
+import { BrowserWindow, dialog } from "electron";
+import { restoreSavegameWithReview } from "./savegame-restore-flow.js";
 import { savegameStorageKey } from "../shared/game-identity.js";
 import type { MainContext } from "./context.js";
 import { handle } from "./ipc/handle.js";
 import {
+  getSavegamePathContext,
   delay,
   isInstalledGameRunning,
   openExternal,
@@ -87,6 +90,7 @@ export function createSteamSessionWatcher({
 }
 
 export function registerLaunchHandlers({
+  awaitStartupRecovery,
   steamSyncService,
   providerService,
   store,
@@ -100,16 +104,63 @@ export function registerLaunchHandlers({
   autoSync,
   watchSteamSession,
 }: MainContext) {
-  handle("library:launch", async (_event, gameId: string) => {
+  handle("library:launch", async (event, gameId: string) => {
     const game = await store.getGame(gameId);
 
     if (!game) {
       throw new Error("Game not found");
     }
 
+    await awaitStartupRecovery();
+    savegameManager.setPathContext(game.id, await getSavegamePathContext(game));
     const savePolicy = await savegameManager.getPolicy(game.id);
     const launchSettings = await settingsStore.read();
 
+    if (launchSettings.syncFolderPath && (game.source !== "steam" || game.installed)) {
+      const conflict = await savegameManager.detectExternalConflict(
+        game.id,
+        savegameStorageKey(game),
+        launchSettings.syncFolderPath,
+      );
+
+      if (conflict) {
+        const choice = await dialog.showMessageBox(
+          BrowserWindow.fromWebContents(event.sender)!,
+          {
+            type: "question",
+            title: "Partidas de otro equipo",
+            message: `Hay una copia de ${game.title} distinta a las partidas de este equipo.`,
+            detail: `Creada en ${conflict.remoteVersion.deviceName} el ${new Date(conflict.remoteVersion.createdAt).toLocaleString("es-ES")}. Restaúrala para continuar desde esa partida o conserva expresamente la partida local. Si Drive todavía está sincronizando, cancela y espera a que termine.`,
+            buttons: ["Cancelar", "Restaurar y jugar", "Jugar con la partida local"],
+            defaultId: 0,
+            cancelId: 0,
+          },
+        );
+
+        if (choice.response === 0) {
+          return;
+        }
+        if (choice.response === 1) {
+          const restored = await restoreSavegameWithReview(
+            {
+              awaitStartupRecovery,
+              store,
+              settingsStore,
+              savegameManager,
+              broadcastSavegameChanged,
+            },
+            event.sender,
+            game.id,
+            conflict.remoteVersion.id,
+            true,
+          );
+
+          if (!restored) {
+            return;
+          }
+        }
+      }
+    }
     if (savePolicy.backupBeforeLaunch && launchSettings.syncFolderPath) {
       try {
         await savegameManager.backupWithOutcome(

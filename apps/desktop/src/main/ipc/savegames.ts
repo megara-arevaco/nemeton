@@ -1,12 +1,11 @@
+import { restoreSavegameWithReview } from "../savegame-restore-flow.js";
 import { savegameStorageKey } from "../../shared/game-identity.js";
 import { readSavegameState } from "../savegame-state.js";
 import type { SavegameState } from "../../shared/savegames.js";
-import fs from "node:fs";
-import path from "node:path";
-import { BrowserWindow, dialog } from "electron";
+import { dialog } from "electron";
 import type { MainContext } from "../context.js";
 import { handle } from "./handle.js";
-import { getRoamingAppData, toLinuxPath } from "../platform.js";
+import { getRoamingAppData, getSavegamePathContext, toLinuxPath } from "../platform.js";
 import { SavegameManager } from "../savegames.js";
 export function registerSavegameHandlers({
   awaitStartupRecovery,
@@ -118,6 +117,7 @@ export function registerSavegameHandlers({
         if (!settings.syncFolderPath) {
           throw new Error("Selecciona primero la carpeta de sincronización en Ajustes");
         }
+        savegameManager.setPathContext(gameId, await getSavegamePathContext(game));
         await savegameManager.backupWithOutcome(
           game.id,
           savegameStorageKey(game),
@@ -149,61 +149,18 @@ export function registerSavegameHandlers({
       );
     },
   );
-  handle("savegames:restore", async (event, gameId: string, versionId: string) => {
-    await awaitStartupRecovery();
-    const game = await store.getGame(gameId);
-    const settings = await settingsStore.read();
-
-    if (!game || !settings.syncFolderPath) {
-      throw new Error("No se puede restaurar esta copia");
-    }
-
-    const version = (
-      await savegameManager.listVersions(
-        settings.syncFolderPath,
-        savegameStorageKey(game),
-      )
-    ).find((item) => item.id === versionId);
-
-    if (!version) {
-      throw new Error("No se encontró la copia seleccionada");
-    }
-
-    const policy = await savegameManager.getPolicy(gameId);
-    const details = version
-      ? `${version.fileCount} archivos · ${Math.round(version.sizeBytes / 1024)} KB · creada ${new Date(version.createdAt).toLocaleString("es-ES")}.`
-      : "";
-    const response = await dialog.showMessageBox(
-      BrowserWindow.fromWebContents(event.sender)!,
+  handle("savegames:restore", (event, gameId: string, versionId: string) =>
+    restoreSavegameWithReview(
       {
-        type: "warning",
-        buttons: ["Cancelar", "Restaurar"],
-        defaultId: 0,
-        cancelId: 0,
-        title: "Restaurar partidas",
-        message: `¿Restaurar esta versión de ${game.title}?`,
-        detail: `${details}\nAntes se copiará el estado presente.${policy.exactRestore ? " La restauración exacta también eliminará archivos que no estén en esta versión." : " Los archivos adicionales se conservarán."}`,
+        awaitStartupRecovery,
+        store,
+        settingsStore,
+        savegameManager,
+        broadcastSavegameChanged,
       },
-    );
-
-    if (response.response !== 1) {
-      return null;
-    }
-    try {
-      await savegameManager.backupWithOutcome(
-        game.id,
-        savegameStorageKey(game),
-        settings.syncFolderPath,
-        versionId,
-      );
-      return await savegameManager.restore(
-        game.id,
-        savegameStorageKey(game),
-        settings.syncFolderPath,
-        versionId,
-      );
-    } finally {
-      broadcastSavegameChanged(gameId);
-    }
-  });
+      event.sender,
+      gameId,
+      versionId,
+    ),
+  );
 }

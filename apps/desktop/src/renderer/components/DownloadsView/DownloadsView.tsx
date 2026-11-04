@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { DownloadSimple } from "@phosphor-icons/react/DownloadSimple";
 import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
+import { ClipboardText } from "@phosphor-icons/react/ClipboardText";
 import { Pause } from "@phosphor-icons/react/Pause";
 import { Play } from "@phosphor-icons/react/Play";
 import { X } from "@phosphor-icons/react/X";
@@ -238,6 +239,7 @@ export function DownloadsView() {
                 void run(() => window.launcher.controlAllDownloads("pause"))
               }
             >
+              <Pause aria-hidden="true" />
               {t("downloads.pauseAll")}
             </Button>
             <Button
@@ -249,6 +251,7 @@ export function DownloadsView() {
                 void run(() => window.launcher.controlAllDownloads("resume"))
               }
             >
+              <Play aria-hidden="true" />
               {t("downloads.resumeAll")}
             </Button>
             <span>{t("downloads.parallel", { count: snapshot.maxConcurrent })}</span>
@@ -440,6 +443,26 @@ function AddDownload({
           </p>
         )}
         <div className="downloads-source-actions">
+          <Button
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const pasted = (await window.launcher.pasteDownloadLink()).trim();
+
+                if (!pasted) {
+                  return;
+                }
+                setTorrent(null);
+                setLinks((current) =>
+                  [current.trim(), pasted].filter(Boolean).join("\n").slice(0, 409600),
+                );
+                setInvalid(false);
+              })
+            }
+          >
+            <ClipboardText aria-hidden="true" />
+            {t("downloads.pasteLink")}
+          </Button>
           <Button
             disabled={busy}
             onClick={() =>
@@ -661,7 +684,7 @@ function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }
         )}
         {active && (
           <Button size="small" disabled={busy} onClick={() => control("pause")}>
-            <Pause />
+            <Pause aria-hidden="true" />
             {t("downloads.pause")}
           </Button>
         )}
@@ -672,7 +695,7 @@ function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }
             disabled={blocked}
             onClick={() => control("resume")}
           >
-            <Play />
+            <Play aria-hidden="true" />
             {t("downloads.resume")}
           </Button>
         )}

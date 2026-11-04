@@ -45,7 +45,7 @@ export const accentThemes: Array<{
 
 export const formatPlaytime = (minutes: number) => {
   if (minutes < 60) {
-    return `${minutes} min`;
+    return `${Math.round(minutes)} min`;
   }
   return `${Math.round((minutes / 60) * 10) / 10} h`;
 };

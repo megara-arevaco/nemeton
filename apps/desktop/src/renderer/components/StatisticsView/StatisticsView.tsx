@@ -51,11 +51,7 @@ export function StatisticsView({
         </span>
         <h1>{t("statistics.title")}</h1>
       </div>
-      <section
-        className={
-          "automatic-summary [border-color:color-mix(in_srgb,_var(--accent-a)_9%,_transparent)] [background:linear-gradient(135deg,_color-mix(in_srgb,_var(--accent-a)_4%,_transparent),_#101119_48%)]"
-        }
-      >
+      <section className="automatic-summary">
         <div
           className={
             "card-heading [display:flex] [justify-content:space-between] [align-items:end] [&_small]:[color:#727581] [&_small]:[font-size:9px] [&_small]:[font-weight:700] [&_small]:[letter-spacing:1.3px] [&_h2]:[margin:5px_0_0] [&_h2]:[font-size:20px] [&_>_span]:[color:#5f626e] [&_>_span]:[font-size:11px]"

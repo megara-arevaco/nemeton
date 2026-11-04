@@ -59,6 +59,8 @@ export const ipcContracts = {
   "providers:operate": z.tuple([id, z.enum(["install", "update", "verify"])]),
   "providers:import-installed": z.tuple([id]),
   "downloads:status": z.tuple([]),
+  "downloads:disk-space": z.tuple([]),
+  "downloads:paste-link": z.tuple([]),
   "downloads:control-all": z.tuple([z.enum(["pause", "resume"])]),
   "downloads:configure": z.tuple([
     z

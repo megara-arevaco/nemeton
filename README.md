@@ -134,6 +134,12 @@ speed limit in KiB/s; zero means unlimited. Cleaning completed history preserves
 After completion, **Add to library** lets you choose an executable and opens a prefilled
 local-game form without running it.
 
+Pausing preserves partial files, including across application restarts. Resume
+continues from the saved position; when a host supplies no file validators, Nemeton
+checks overlapping saved bytes before appending. If the host ignores resume
+requests or the remote content changes, the task stops with an error and preserves
+the partial file instead of silently restarting it.
+
 ### Add a local game
 
 Choose **Add game**, select an executable, and optionally associate the title with a
@@ -255,9 +261,9 @@ corepack pnpm dist:win
 The current package version produces:
 
 ```text
-apps/desktop/release/Nemeton-Setup-0.1.8.exe
-apps/desktop/release/Nemeton-Portable-0.1.8.exe
-apps/desktop/release/Nemeton-Setup-0.1.8.exe.blockmap
+apps/desktop/release/Nemeton-Setup-0.1.9.exe
+apps/desktop/release/Nemeton-Portable-0.1.9.exe
+apps/desktop/release/Nemeton-Setup-0.1.9.exe.blockmap
 apps/desktop/release/latest.yml
 apps/desktop/release/win-unpacked/
 ```
@@ -330,8 +336,8 @@ Before producing a release, update the version in both `package.json` and
 commit the result. Then create and push a matching tag:
 
 ```bash
-git tag -a v0.1.8 -m "Nemeton 0.1.8"
-git push origin v0.1.8
+git tag -a v0.1.9 -m "Nemeton 0.1.9"
+git push origin v0.1.9
 ```
 
 The release workflow validates the tag against `package.json`, runs every quality
@@ -341,7 +347,7 @@ the installer's `.exe.blockmap` to GitHub Releases with generated release notes.
 Do not rename the installer after building: `latest.yml` references its exact name.
 Local distribution commands disable automatic publishing; the workflow publishes
 all assets together. Published executables use portable asset names such as
-`Nemeton-Setup-0.1.8.exe` and `Nemeton-Portable-0.1.8.exe`.
+`Nemeton-Setup-0.1.9.exe` and `Nemeton-Portable-0.1.9.exe`.
 
 The `apps/desktop/release/` directory is intentionally ignored; executables belong
 in GitHub Releases, not in source control.

@@ -20,6 +20,7 @@ import type { AppUpdateState } from "../shared/app-updates.js";
 import type { IpcArgs, IpcChannel } from "../shared/ipc-contracts.js";
 import type {
   DownloadsSnapshot,
+  DiskSpace,
   StartDownloadInput,
   DownloadAction,
   DownloadFileAction,
@@ -82,6 +83,8 @@ const api = {
   importProviderInstallation: (gameId: string): Promise<LibrarySnapshot | null> =>
     invoke("providers:import-installed", gameId),
   getDownloads: (): Promise<DownloadsSnapshot> => invoke("downloads:status"),
+  getDiskSpace: (): Promise<DiskSpace> => invoke("downloads:disk-space"),
+  pasteDownloadLink: (): Promise<string> => invoke("downloads:paste-link"),
   controlAllDownloads: (action: "pause" | "resume"): Promise<DownloadsSnapshot> =>
     invoke("downloads:control-all", action),
   configureDownloads: (options: {

@@ -1,11 +1,41 @@
-import { app, BrowserWindow, dialog, shell } from "electron";
+import { app, BrowserWindow, clipboard, dialog, shell } from "electron";
 import { DownloadManager } from "../downloads.js";
 import { handle } from "./handle.js";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { DiskSpace } from "../../shared/downloads.js";
 
 export async function registerDownloadHandlers() {
   const manager = new DownloadManager(app.getPath("userData"));
   await manager.initialize();
   handle("downloads:status", () => manager.snapshot());
+  handle("downloads:disk-space", async (): Promise<DiskSpace> => {
+    let directory = manager.snapshot().directory ?? app.getPath("downloads");
+
+    while (true) {
+      try {
+        const stats = await fs.statfs(directory);
+        return {
+          path: directory,
+          free: stats.bavail * stats.bsize,
+          total: stats.blocks * stats.bsize,
+        };
+      } catch (error) {
+        const parent = path.dirname(directory);
+
+        if (
+          (error as NodeJS.ErrnoException).code !== "ENOENT" ||
+          parent === directory
+        ) {
+          throw error;
+        }
+        directory = parent;
+      }
+    }
+  });
+  handle("downloads:paste-link", async () =>
+    (await clipboard.readText()).slice(0, 409600),
+  );
   handle("downloads:control-all", (_event, action) => manager.controlAll(action));
   handle("downloads:configure", (_event, options) => manager.configure(options));
   handle("downloads:priority", (_event, id, priority) =>

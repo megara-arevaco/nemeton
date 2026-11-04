@@ -1,5 +1,6 @@
 export const downloadTranslations = {
   es: {
+    "downloads.pasteLink": "Pegar enlace",
     "downloads.bulkScope":
       "Controla la cola de Real-Debrid y BitTorrent. Las transferencias de tiendas tienen sus propios controles.",
     "downloads.addToLibrary": "Añadir a biblioteca",
@@ -128,8 +129,14 @@ export const downloadTranslations = {
       "Real-Debrid ha limitado las solicitudes. Espera un poco antes de reanudar.",
     "downloads.failure.already-queued":
       "Este enlace ya está añadido. Usa los controles de su tarea.",
+    "downloads.failure.invalid-selection":
+      "No se pudo iniciar la selección de archivos. Actualiza la lista de descargas y vuelve a intentarlo.",
     "downloads.failure.invalid-torrent":
       "El archivo .torrent no es válido o supera 8 MB.",
+    "downloads.failure.resume-not-supported":
+      "El servidor no permite reanudar este archivo. Se ha conservado todo lo descargado; no se reiniciará automáticamente.",
+    "downloads.failure.partial-file-changed":
+      "El archivo parcial ha cambiado en disco. Se ha detenido la descarga para conservarlo.",
     "downloads.failure.invalid-range":
       "El servidor devolvió un tramo incorrecto. Se han conservado los datos parciales.",
     "downloads.failure.file-changed":
@@ -147,6 +154,7 @@ export const downloadTranslations = {
     "downloads.loadFailed": "No se pudieron cargar las descargas.",
   },
   en: {
+    "downloads.pasteLink": "Paste link",
     "downloads.bulkScope":
       "Controls the Real-Debrid and BitTorrent queue. Store transfers have their own controls.",
     "downloads.addToLibrary": "Add to library",
@@ -272,8 +280,14 @@ export const downloadTranslations = {
       "Real-Debrid is limiting requests. Wait a moment before resuming.",
     "downloads.failure.already-queued":
       "This link is already added. Use its task controls.",
+    "downloads.failure.invalid-selection":
+      "Could not start the file selection. Refresh the download list and try again.",
     "downloads.failure.invalid-torrent":
       "The .torrent file is invalid or larger than 8 MB.",
+    "downloads.failure.resume-not-supported":
+      "The server cannot resume this file. All downloaded data is preserved; it will not restart automatically.",
+    "downloads.failure.partial-file-changed":
+      "The partial file changed on disk. The download stopped to preserve it.",
     "downloads.failure.invalid-range":
       "The server returned an incorrect range. Partial data has been preserved.",
     "downloads.failure.file-changed":

@@ -31,6 +31,12 @@ export const downloadUriSchema = z
 
 export type DownloadMethod = "real-debrid" | "torrent";
 
+export interface DiskSpace {
+  path: string;
+  free: number;
+  total: number;
+}
+
 export type DownloadStatus =
   | "queued"
   | "preparing"

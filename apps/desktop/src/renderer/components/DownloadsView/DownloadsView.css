@@ -614,6 +614,7 @@
 }
 .downloads-source-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 .downloads-queue-tools {

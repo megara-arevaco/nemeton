@@ -1,5 +1,10 @@
 export const productTranslations = {
   es: {
+    "sidebar.storage": "Almacenamiento",
+    "sidebar.storageCompact": "{{free}} libres / {{total}}",
+    "sidebar.storageFree": "{{free}} libres",
+    "sidebar.storageTotal": "de {{total}} en total",
+    "sidebar.storageUnavailable": "Espacio no disponible",
     "folderScan.artworkMissing_one":
       "No se han encontrado carátulas para {{count}} juego. Puedes buscarlas desde su ficha.",
     "folderScan.artworkMissing_other":
@@ -167,6 +172,11 @@ export const productTranslations = {
     "steam.installing": "Instalando en Steam…",
   },
   en: {
+    "sidebar.storage": "Storage",
+    "sidebar.storageCompact": "{{free}} free / {{total}}",
+    "sidebar.storageFree": "{{free}} free",
+    "sidebar.storageTotal": "of {{total}} total",
+    "sidebar.storageUnavailable": "Storage unavailable",
     "folderScan.artworkMissing_one":
       "Artwork could not be found for {{count}} game. You can search from its game page.",
     "folderScan.artworkMissing_other":

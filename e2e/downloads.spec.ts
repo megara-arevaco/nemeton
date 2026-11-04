@@ -1,25 +1,33 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { createHash } from "node:crypto";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { test, expect } from "./fixtures";
+import { test, expect, launchIsolatedDesktop } from "./fixtures";
 
 async function setupRealDebrid(
   app: ElectronApplication,
   folder: string,
-  options: { size?: number; delay?: number; rangeMode?: string; bundle?: boolean } = {},
+  options: {
+    size?: number;
+    delay?: number;
+    rangeMode?: string;
+    bundle?: boolean;
+    validators?: boolean;
+  } = {},
 ) {
   await fs.mkdir(folder, { recursive: true });
   await app.evaluate(
-    ({ dialog }, { folder, options }) => {
+    ({ dialog, net }, { folder, options }) => {
       dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [folder] });
       const state = {
         size: options.size ?? 5,
         delay: options.delay ?? 0,
         rangeMode: options.rangeMode ?? "normal",
         bundle: options.bundle ?? false,
+        validators: options.validators ?? true,
         selected: [] as string[],
         uploaded: false,
         active: 0,
@@ -32,7 +40,7 @@ async function setupRealDebrid(
         generation: 0,
       };
       Reflect.set(globalThis, "downloadFixture", state);
-      globalThis.fetch = async (input, init) => {
+      const fixtureFetch: typeof globalThis.fetch = async (input, init) => {
         const url = new URL(String(input));
         const json = (data: unknown) => new Response(JSON.stringify(data));
 
@@ -140,7 +148,8 @@ async function setupRealDebrid(
 
               const bytes = Buffer.alloc(
                 Math.min(16384, state.size - cursor),
-                url.pathname.charCodeAt(1) || 65,
+                (url.pathname.charCodeAt(1) || 65) +
+                  (range && state.rangeMode === "corrupt" ? 1 : 0),
               );
               cursor += bytes.length;
               controller.enqueue(bytes);
@@ -151,21 +160,25 @@ async function setupRealDebrid(
           });
           const responseHeaders: Record<string, string> = {
             "Content-Length": String(state.size - offset),
-            ETag: state.rangeMode === "changed" ? '"changed"' : '"fixture-v1"',
+            ...(state.validators
+              ? { ETag: state.rangeMode === "changed" ? '"changed"' : '"fixture-v1"' }
+              : {}),
             "Accept-Ranges": "bytes",
           };
 
-          if (requested && state.rangeMode !== "ignore") {
+          if (range && state.rangeMode !== "ignore") {
             responseHeaders["Content-Range"] =
               `bytes ${offset + (state.rangeMode === "bad" ? 1 : 0)}-${state.size - 1}/${state.size}`;
           }
           return new Response(body, {
-            status: requested && state.rangeMode !== "ignore" ? 206 : 200,
+            status: range && state.rangeMode !== "ignore" ? 206 : 200,
             headers: responseHeaders,
           });
         }
         throw new Error(`Unexpected request: ${url.hostname}${url.pathname}`);
       };
+      globalThis.fetch = fixtureFetch;
+      net.fetch = fixtureFetch;
     },
     { folder, options },
   );
@@ -228,6 +241,7 @@ test("link-only UI saves configuration, downloads and shows one progress bar per
   const snapshot = await state(page);
   expect(snapshot.jobs).toHaveLength(2);
   for (const job of snapshot.jobs) {
+    expect(path.basename(job.directory)).toBe(job.title);
     expect(await fs.readFile(path.join(job.directory, `1-${job.title}.bin`))).toEqual(
       Buffer.alloc(5, job.title.charCodeAt(0)),
     );
@@ -350,7 +364,7 @@ test("task pause survives restart, resumes partial data and cancellation preserv
   ).toBe(digest(Buffer.alloc(size, 112)));
 });
 
-test("incorrect ranges are rejected and servers ignoring Range restart without appending", async ({
+test("invalid ranges and servers ignoring Range preserve the partial file without restarting", async ({
   desktop,
 }) => {
   const size = 1024 * 1024;
@@ -405,8 +419,22 @@ test("incorrect ranges are rejected and servers ignoring Range restart without a
   );
   await expect
     .poll(async () => (await state(desktop.page)).jobs[0].status)
+    .toBe("error");
+  expect((await state(desktop.page)).jobs[0].files[0].error).toBe(
+    "resume-not-supported",
+  );
+  expect(await fs.readFile(partial)).toEqual(original);
+  await desktop.app.evaluate(() => {
+    Reflect.get(globalThis, "downloadFixture").rangeMode = "normal";
+  });
+  await desktop.page.evaluate(
+    (id) => window.launcher.controlDownload(id, "resume"),
+    id,
+  );
+  await expect
+    .poll(async () => (await state(desktop.page)).jobs[0].status)
     .toBe("completed");
-  expect((await state(desktop.page)).jobs[0].files[0].restarted).toBe(true);
+  expect((await state(desktop.page)).jobs[0].files[0].restarted).not.toBe(true);
   expect(
     digest(await fs.readFile(path.join(added.jobs[0].directory, "1-range.bin"))),
   ).toBe(digest(Buffer.alloc(size, 114)));
@@ -522,6 +550,13 @@ for (const source of ["magnet", "file"] as const) {
   }) => {
     const { page, directory } = desktop;
     const folder = path.join(directory, "torrent-downloads");
+    await desktop.app.evaluate(() => {
+      const errors: string[] = [];
+      Reflect.set(globalThis, "torrentUncaughtErrors", errors);
+      process.on("uncaughtExceptionMonitor", (error) =>
+        errors.push(error.stack ?? error.message),
+      );
+    });
     const seedFolder = path.join(directory, "seed");
     await fs.mkdir(folder);
     await fs.mkdir(seedFolder);
@@ -618,6 +653,11 @@ for (const source of ["magnet", "file"] as const) {
         .toBe("completed");
       const completed = (await state(page)).jobs[0];
       expect(
+        await desktop.app.evaluate(() =>
+          Reflect.get(globalThis, "torrentUncaughtErrors"),
+        ),
+      ).toEqual([]);
+      expect(
         completed.files.every(
           (file) => file.status === "completed" && file.progress === 100,
         ),
@@ -630,6 +670,94 @@ for (const source of ["magnet", "file"] as const) {
     } finally {
       await new Promise<void>((resolve) => seeder.destroy(() => resolve()));
       await new Promise<void>((resolve) => tracker.close(() => resolve()));
+    }
+  });
+}
+
+for (const legacyStatus of ["waiting-selection", "paused"] as const) {
+  test(`legacy ${legacyStatus} selection resumes and completes without losing selected files`, async () => {
+    const directory = await fs.mkdtemp(path.join(os.tmpdir(), "nemeton-selection-"));
+    const folder = path.join(directory, "downloads");
+    const data = path.join(directory, "data");
+    await fs.mkdir(data, { recursive: true });
+    await fs.writeFile(
+      path.join(data, "downloads.json"),
+      JSON.stringify({
+        directory: folder,
+        encryptedToken: null,
+        account: null,
+        jobs: [
+          {
+            id: "legacy-selection",
+            title: "Legacy selection",
+            uri: `magnet:?xt=urn:btih:${"a".repeat(40)}`,
+            method: "real-debrid",
+            status: legacyStatus,
+            selectionConfirmed: false,
+            directory: path.join(folder, "legacy"),
+            bytes: 0,
+            total: 10,
+            speed: 0,
+            progress: 0,
+            peers: 0,
+            cloudProgress: 0,
+            error: null,
+            createdAt: new Date().toISOString(),
+            files: ["alpha", "beta"].map((name, index) => ({
+              id: String(index + 1),
+              name: `folder/${name}.bin`,
+              total: 5,
+              bytes: 0,
+              progress: 0,
+              speed: 0,
+              error: null,
+              selected: legacyStatus === "waiting-selection" || index === 0,
+              status: "paused",
+            })),
+          },
+        ],
+      }),
+    );
+    let app: ElectronApplication | undefined;
+
+    try {
+      ({ app } = await launchIsolatedDesktop(directory));
+      const page = await app.firstWindow();
+      await expect(
+        page
+          .getByRole("navigation")
+          .getByRole("button", { name: /^(Añadir juego|Add game)$/ }),
+      ).toBeVisible();
+      await setupRealDebrid(app, folder);
+      const migrated = (await state(page)).jobs[0];
+      expect(migrated.status).toBe("paused");
+      expect(migrated.selectionConfirmed).toBe(true);
+      expect(migrated.files.map((file) => file.selected)).toEqual([
+        true,
+        legacyStatus === "waiting-selection",
+      ]);
+      await page.evaluate(() => window.launcher.connectRealDebrid("fixture_token"));
+      await page.evaluate(() =>
+        window.launcher.controlDownload("legacy-selection", "resume"),
+      );
+      await expect
+        .poll(async () => (await state(page)).jobs[0].status)
+        .toBe("completed");
+      expect(
+        await app.evaluate(() => Reflect.get(globalThis, "downloadFixture").selected),
+      ).toEqual(legacyStatus === "waiting-selection" ? ["1", "2"] : ["1"]);
+      const completed = (await state(page)).jobs[0];
+
+      for (const file of completed.files.filter((file) => file.selected)) {
+        expect(
+          await fs.readFile(
+            path.join(completed.directory, `${file.id}-${path.basename(file.name)}`),
+          ),
+        ).toEqual(Buffer.alloc(5, file.id === "1" ? 97 : 98));
+      }
+    } finally {
+      await app?.close();
+      await fs.rm(directory, { recursive: true, force: true });
     }
   });
 }
@@ -751,6 +879,10 @@ test("download hierarchy filters history, preserves files and isolates task fail
     page.getByRole("button", { name: "Añadir a la cola", exact: true }),
   ).toBeEnabled();
   await input.focus();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("button", { name: "Pegar enlace", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(
     page.getByRole("button", { name: "Abrir .torrent", exact: true }),
@@ -879,4 +1011,120 @@ test("completed downloads open a prefilled local-game flow without executing the
     ),
   ).toBe(true);
   expect(library.sessions).toHaveLength(0);
+});
+
+test("Real-Debrid bundle resumes without ETag or Last-Modified after an application restart", async ({
+  desktop,
+}) => {
+  const size = 2 * 1024 * 1024;
+  const folder = path.join(desktop.directory, "downloads");
+  await setupRealDebrid(desktop.app, folder, {
+    size,
+    delay: 15,
+    bundle: true,
+    validators: false,
+  });
+  await connect(desktop.page);
+  const added = await desktop.page.evaluate(() =>
+    window.launcher.startDownload({
+      title: "headerless bundle",
+      uri: "magnet:?xt=urn:btih:0123456789012345678901234567890123456789",
+      method: "real-debrid",
+    }),
+  );
+  const id = added.jobs[0].id;
+  await expect
+    .poll(async () => (await state(desktop.page)).jobs[0].bytes)
+    .toBeGreaterThan(128 * 1024);
+  await desktop.page.evaluate((id) => window.launcher.controlDownload(id, "pause"), id);
+  const partial = path.join(added.jobs[0].directory, "bundle-bundle.bin.partial");
+  const saved = await fs.readFile(partial);
+  const metadata = JSON.parse(
+    await fs.readFile(path.join(desktop.directory, "data/downloads.json"), "utf8"),
+  );
+  expect(metadata.jobs[0].files[0].etag).toBeUndefined();
+  expect(metadata.jobs[0].files[0].modified).toBeUndefined();
+  const page = await desktop.restart();
+  expect((await state(page)).jobs[0].bytes).toBe(saved.length);
+  await setupRealDebrid(desktop.app, folder, {
+    size,
+    delay: 10,
+    bundle: true,
+    validators: false,
+  });
+  await desktop.app.evaluate(() => {
+    Reflect.get(globalThis, "downloadFixture").selected = ["1", "2"];
+  });
+  await page.evaluate(() => window.launcher.connectRealDebrid("fixture_token"));
+  await page.evaluate((id) => window.launcher.controlDownload(id, "resume"), id);
+  await expect
+    .poll(async () => (await state(page)).jobs[0].status, { timeout: 15000 })
+    .toBe("completed");
+  const requests = await desktop.app.evaluate(
+    () =>
+      Reflect.get(globalThis, "downloadFixture").requests as {
+        range: string | null;
+        ifRange: string | null;
+      }[],
+  );
+  expect(requests[0]).toMatchObject({
+    range: `bytes=${saved.length - 65536}-`,
+    ifRange: null,
+  });
+  const completed = await fs.readFile(
+    path.join(added.jobs[0].directory, "bundle-bundle.bin"),
+  );
+  expect(completed.subarray(0, saved.length)).toEqual(saved);
+  expect(digest(completed)).toBe(digest(Buffer.alloc(size, 98)));
+  expect((await state(page)).jobs[0].files[0].restarted).not.toBe(true);
+});
+
+test("headerless resume rejects changed overlap bytes without overwriting the partial file", async ({
+  desktop,
+}) => {
+  const size = 1024 * 1024;
+  await setupRealDebrid(desktop.app, path.join(desktop.directory, "downloads"), {
+    size,
+    delay: 20,
+    validators: false,
+  });
+  await connect(desktop.page);
+  const added = await desktop.page.evaluate(() =>
+    window.launcher.startDownload({
+      title: "overlap",
+      uri: "https://host.example/overlap",
+      method: "real-debrid",
+    }),
+  );
+  const id = added.jobs[0].id;
+  await waitBytes(desktop.page, id);
+  await desktop.page.evaluate((id) => window.launcher.controlDownload(id, "pause"), id);
+  const partial = path.join(added.jobs[0].directory, "1-overlap.bin.partial");
+  const saved = await fs.readFile(partial);
+  await desktop.app.evaluate(() => {
+    Reflect.get(globalThis, "downloadFixture").rangeMode = "corrupt";
+  });
+  await desktop.page.evaluate(
+    (id) => window.launcher.controlDownload(id, "resume"),
+    id,
+  );
+  await expect
+    .poll(async () => (await state(desktop.page)).jobs[0].status)
+    .toBe("error");
+  expect((await state(desktop.page)).jobs[0].files[0].error).toBe("file-changed");
+  expect(await fs.readFile(partial)).toEqual(saved);
+  await desktop.app.evaluate(() => {
+    Reflect.get(globalThis, "downloadFixture").rangeMode = "normal";
+    Reflect.get(globalThis, "downloadFixture").delay = 0;
+  });
+  await desktop.page.evaluate(
+    (id) => window.launcher.controlDownload(id, "resume"),
+    id,
+  );
+  await expect
+    .poll(async () => (await state(desktop.page)).jobs[0].status)
+    .toBe("completed");
+  expect(
+    digest(await fs.readFile(path.join(added.jobs[0].directory, "1-overlap.bin"))),
+  ).toBe(digest(Buffer.alloc(size, 111)));
 });

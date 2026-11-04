@@ -61,21 +61,29 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
           className={`save-sync-indicator [width:10px] [height:10px] [border-radius:50%] [background:#777b86] [&.ok]:[background:var(--accent-a)] [&.warning]:[background:#e9bd70] [&.error]:[background:#ff727d] ${copy.tone}`}
         />
       </div>
-      <p className="save-sync-detail [margin:12px_0_0] [color:#a5a8b2] [font-size:12px] [line-height:1.55]">
+      <p className="save-sync-detail [margin:16px_0_0] [max-width:65ch] [color:#c6c8d0] [font-size:13px] [line-height:1.65]">
         {copy.detail}
       </p>
-      <p className="[margin:7px_0_0] [color:#9295a0] [font-size:11px] [line-height:1.5]">
-        {t("savegames.providerNote")}
-      </p>
       {data?.lastVerification && (
-        <p className="save-sync-detail">
-          {t("savegames.lastVerified", {
-            date: new Date(data.lastVerification.verifiedAt).toLocaleString(
-              i18n.language,
-            ),
-          })}
-        </p>
+        <div className="[display:flex] [align-items:flex-start] [gap:10px] [margin-top:16px] [padding:12px_14px] [border:1px_solid_#ffffff0d] [border-radius:10px] [background:#ffffff04]">
+          <ShieldCheck
+            aria-hidden="true"
+            className="[flex-shrink:0] [margin-top:2px] [width:18px] [height:18px] [color:var(--accent-a)]"
+          />
+          <p className="save-sync-detail [margin:0] [color:#b4b7c2] [font-size:12px] [line-height:1.65]">
+            {t("savegames.lastVerified", {
+              date: new Date(data.lastVerification.verifiedAt).toLocaleString(
+                i18n.language,
+              ),
+            })}
+          </p>
+        </div>
       )}
+      <p className="[margin:20px_0_0] [padding-top:16px] [border-top:1px_solid_#ffffff0d] [color:#9295a0] [font-size:12px] [line-height:1.65]">
+        <span className="[display:block] [max-width:70ch]">
+          {t("savegames.providerNote")}
+        </span>
+      </p>
       {data?.backupFailure && (
         <p
           role="alert"

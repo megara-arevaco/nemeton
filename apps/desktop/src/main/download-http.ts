@@ -104,6 +104,7 @@ export async function downloadHttpFile(
   resolveLink: () => Promise<{ download: string; filesize: number }>,
   signal: AbortSignal,
   rateLimiter?: DownloadRateLimiter,
+  fetchResponse: typeof globalThis.fetch = globalThis.fetch,
 ) {
   const target = path.join(directory, `${file.id}-${safeFilename(file.name)}`);
   const partial = `${target}.partial`;
@@ -119,7 +120,7 @@ export async function downloadHttpFile(
     return;
   }
 
-  let offset = (await regularFileSize(partial)) ?? 0;
+  const offset = (await regularFileSize(partial)) ?? 0;
 
   if (file.total > 0 && offset === file.total) {
     await completePartial(partial, target);
@@ -135,27 +136,34 @@ export async function downloadHttpFile(
     throw new Error("file-changed");
   }
   file.total = resolved.filesize;
-  if (offset > file.total || (offset && !file.etag && !file.modified)) {
-    offset = 0;
-    file.restarted = true;
+  if (offset > file.total) {
+    throw new Error("file-changed");
   }
 
+  const strongEtag = file.etag && !file.etag.startsWith("W/") ? file.etag : undefined;
+  const validator = strongEtag ?? file.modified;
+  // Hosts without validators can still serve byte ranges. Verify the saved tail
+  // against the remote overlap before appending, instead of discarding the file.
+  const overlapLength = offset && !validator ? Math.min(offset, 64 * 1024) : 0;
+  const requestedOffset = offset - overlapLength;
   const headers = new Headers({ "Accept-Encoding": "identity" });
 
   if (offset) {
-    headers.set("Range", `bytes=${offset}-`);
-    headers.set("If-Range", file.etag ?? file.modified!);
+    headers.set("Range", `bytes=${requestedOffset}-`);
+    if (validator) {
+      headers.set("If-Range", validator);
+    }
   }
 
-  const response = await fetch(resolved.download, {
+  const response = await fetchResponse(resolved.download, {
     headers,
     signal: AbortSignal.any([signal, AbortSignal.timeout(24 * 60 * 60 * 1000)]),
   });
 
-  if (!response.ok || !response.body) {
-    throw new Error(`http-${response.status}`);
-  }
   try {
+    if (!response.ok || !response.body) {
+      throw new Error(`http-${response.status}`);
+    }
     if (response.status === 206) {
       const range = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(
         response.headers.get("content-range") ?? "",
@@ -163,8 +171,8 @@ export async function downloadHttpFile(
 
       if (
         !range ||
-        Number(range[1]) !== offset ||
-        Number(range[2]) < offset ||
+        Number(range[1]) !== requestedOffset ||
+        Number(range[2]) < requestedOffset ||
         Number(range[3]) !== file.total ||
         Number(range[2]) >= file.total
       ) {
@@ -175,44 +183,93 @@ export async function downloadHttpFile(
       const modified = response.headers.get("last-modified");
 
       if (
-        (file.etag && etag && file.etag !== etag) ||
-        (!file.etag && file.modified && modified && file.modified !== modified)
+        (strongEtag && etag && strongEtag !== etag) ||
+        (!strongEtag && file.modified && modified && file.modified !== modified)
       ) {
         throw new Error("file-changed");
       }
     } else if (response.status === 200) {
       if (offset) {
-        file.restarted = true;
-        offset = 0;
+        throw new Error("resume-not-supported");
       }
     } else {
       throw new Error("invalid-response");
     }
 
     const etag = response.headers.get("etag");
-    file.etag = etag && !etag.startsWith("W/") ? etag : undefined;
-    file.modified = response.headers.get("last-modified") ?? undefined;
+    const modified = response.headers.get("last-modified") ?? undefined;
+    const acceptResponse = () => {
+      file.etag = etag && !etag.startsWith("W/") ? etag : undefined;
+      file.modified = modified;
+      delete file.restarted;
+    };
     const exists = await regularFileSize(partial);
+
+    if ((offset && exists === null) || (exists !== null && exists !== offset)) {
+      throw new Error("partial-file-changed");
+    }
+
     const output = await fs.open(
       partial,
       (exists === null ? constants.O_CREAT | constants.O_EXCL : 0) |
-        constants.O_WRONLY |
+        constants.O_RDWR |
         (constants.O_NOFOLLOW ?? 0),
       0o600,
     );
 
     try {
-      if (!offset) {
-        await output.truncate(0);
+      const overlap = Buffer.alloc(overlapLength);
+      let read = 0;
+
+      while (read < overlapLength) {
+        const result = await output.read(
+          overlap,
+          read,
+          overlapLength - read,
+          requestedOffset + read,
+        );
+
+        if (!result.bytesRead) {
+          throw new Error("partial-file-changed");
+        }
+        read += result.bytesRead;
+      }
+
+      let verified = 0;
+
+      if (!overlapLength) {
+        acceptResponse();
       }
       file.bytes = offset;
+      file.progress = file.total ? (offset / file.total) * 100 : 0;
       file.status = "downloading";
       let previousTime = performance.now();
       let previousBytes = offset;
 
-      for await (const chunk of response.body) {
+      for await (const received of response.body) {
         signal.throwIfAborted();
-        await rateLimiter?.consume(chunk.length, signal);
+        await rateLimiter?.consume(received.length, signal);
+        let chunk = received;
+
+        if (verified < overlapLength) {
+          const length = Math.min(chunk.length, overlapLength - verified);
+
+          if (
+            !Buffer.from(chunk.subarray(0, length)).equals(
+              overlap.subarray(verified, verified + length),
+            )
+          ) {
+            throw new Error("file-changed");
+          }
+          verified += length;
+          chunk = chunk.subarray(length);
+          if (verified === overlapLength) {
+            acceptResponse();
+          }
+          if (!chunk.length) {
+            continue;
+          }
+        }
         if (file.bytes + chunk.length > file.total) {
           throw new Error("file-too-large");
         }
@@ -243,7 +300,7 @@ export async function downloadHttpFile(
         }
       }
       signal.throwIfAborted();
-      if (file.bytes !== file.total) {
+      if (verified !== overlapLength || file.bytes !== file.total) {
         throw new Error("incomplete-file");
       }
       await output.sync();
@@ -256,7 +313,7 @@ export async function downloadHttpFile(
     file.progress = 100;
   } finally {
     file.speed = 0;
-    await response.body.cancel().catch(() => undefined);
+    await response.body?.cancel().catch(() => undefined);
   }
 }
 

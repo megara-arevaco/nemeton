@@ -1,5 +1,5 @@
 import { readTextIfExists, withFileLock, writeJsonAtomically } from "@launcher/core";
-import { safeStorage } from "electron";
+import { net, safeStorage } from "electron";
 import fs from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
@@ -20,6 +20,7 @@ import {
   TransferSlots,
   type StoredDownloadFile,
   DownloadRateLimiter,
+  safeFilename,
 } from "./download-http.js";
 
 interface StoredJob extends Omit<DownloadJob, "files"> {
@@ -96,12 +97,13 @@ export class DownloadManager {
       job.files ??= [];
       job.selectionConfirmed ??= job.files.length > 0;
       job.cloudProgress ??= 0;
-      if (job.status === "waiting-selection") {
-        job.selectionConfirmed = true;
+      if (job.status === "waiting-selection" || !job.selectionConfirmed) {
+        this.confirmLegacySelection(job);
         job.status = "paused";
         for (const file of job.files) {
-          file.selected = true;
-          file.status = "paused";
+          if (file.selected && file.status !== "completed") {
+            file.status = "paused";
+          }
         }
       }
       if ([...runningStatuses, "interrupted"].includes(job.status)) {
@@ -270,7 +272,7 @@ export class DownloadManager {
       uri: parsed.uri ?? "",
       id,
       status: "queued",
-      directory: path.join(this.state.directory, `nemeton-${id}`),
+      directory: await this.createDownloadDirectory(parsed.title),
       bytes: 0,
       total: 0,
       speed: 0,
@@ -286,6 +288,30 @@ export class DownloadManager {
     await this.persist();
     this.pump();
     return this.snapshot();
+  }
+
+  private async createDownloadDirectory(title: string) {
+    const root = this.state.directory!;
+    let name = safeFilename(title.replace(/\.torrent$/i, ""));
+
+    // Windows reserves these names even when they have an extension.
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)) {
+      name = `_${name}`;
+    }
+    await fs.mkdir(root, { recursive: true });
+    for (let index = 1; ; index++) {
+      const directory = path.join(root, index === 1 ? name : `${name} (${index})`);
+
+      try {
+        // Reserve the folder atomically, including for simultaneous additions.
+        await fs.mkdir(directory);
+        return directory;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
+          throw error;
+        }
+      }
+    }
   }
 
   private job(id: string) {
@@ -433,16 +459,13 @@ export class DownloadManager {
         }
         this.state.jobs = this.state.jobs.filter((item) => item.id !== id);
       } else {
-        if (
-          this.active.has(id) ||
-          job.status === "waiting-selection" ||
-          job.status === "completed"
-        ) {
+        if (this.active.has(id) || job.status === "completed") {
           return this.snapshot();
         }
         if (job.method === "real-debrid" && !this.token) {
           throw new Error("connect-real-debrid");
         }
+        this.confirmLegacySelection(job);
         for (const file of job.files) {
           if (file.selected && file.status !== "completed") {
             file.status = "queued";
@@ -463,7 +486,7 @@ export class DownloadManager {
       const job = this.job(id);
       const file = job.files.find((item) => item.id === fileId);
 
-      if (!file || !file.selected || !job.selectionConfirmed) {
+      if (!file || !file.selected) {
         throw new Error("invalid-selection");
       }
       if (file.status === "completed") {
@@ -473,6 +496,7 @@ export class DownloadManager {
         if (job.method === "real-debrid" && !this.token) {
           throw new Error("connect-real-debrid");
         }
+        this.confirmLegacySelection(job);
         file.status = "queued";
         file.error = null;
         if (!this.active.has(id) || !runningStatuses.includes(job.status)) {
@@ -544,6 +568,20 @@ export class DownloadManager {
       : job.status === "completed"
         ? 100
         : 0;
+  }
+
+  // The current queue starts files automatically. Older versions could persist
+  // an unconfirmed selection, including after pausing the selection screen.
+  private confirmLegacySelection(job: StoredJob) {
+    if (job.selectionConfirmed && job.status !== "waiting-selection") {
+      return;
+    }
+    if (!job.files.some((file) => file.selected)) {
+      for (const file of job.files) {
+        file.selected = true;
+      }
+    }
+    job.selectionConfirmed = true;
   }
 
   private settle(job: StoredJob) {
@@ -744,6 +782,9 @@ export class DownloadManager {
           () => rd.unrestrict(file.link ?? job.uri, combined),
           combined,
           this.rateLimiter,
+          // Chromium avoids Undici's uncaught paused-parser assertion when a
+          // server closes the socket while disk writes or throttling pause us.
+          (input, init) => net.fetch(input instanceof URL ? input.href : input, init),
         );
       })
       .catch((error: unknown) => {
@@ -799,9 +840,17 @@ export class DownloadManager {
           signal.removeEventListener("abort", abort);
           this.torrents.delete(job.id);
           this.applyTorrentLimits();
-          torrent.destroy({ destroyStore: false }, () =>
-            error ? reject(error) : resolve(),
-          );
+          // WebTorrent continues using its store after emitting events such as
+          // "done". Let that stack finish before releasing its resources.
+          setImmediate(() => {
+            const complete = () => (error ? reject(error) : resolve());
+
+            if ((torrent as Torrent & { destroyed: boolean }).destroyed) {
+              complete();
+            } else {
+              torrent.destroy({ destroyStore: false }, complete);
+            }
+          });
         };
         fail = finish;
         const abort = () => finish(new Error("stopped"));

@@ -1,4 +1,5 @@
 import { DownloadIndicator } from "./DownloadIndicator";
+import { StorageIndicator } from "./StorageIndicator";
 import { useVirtualCollection } from "../../shared/virtualCollection";
 import { useTranslation } from "react-i18next";
 import { memo, useMemo } from "react";
@@ -53,7 +54,7 @@ export const Sidebar = memo(function Sidebar({
   return (
     <aside
       className={
-        "sidebar [min-height:0] [display:grid] [grid-template-rows:54px_auto_auto_minmax(0,_1fr)] [padding:26px_14px_14px] [background:rgba(10,_11,_17,_.9)] [border-right:1px_solid_#ffffff0d] [overflow:hidden] [-webkit-app-region:drag]"
+        "sidebar [min-height:0] [display:grid] [grid-template-rows:54px_auto_auto_minmax(0,_1fr)_auto] [padding:26px_14px_14px] [background:rgba(10,_11,_17,_.9)] [border-right:1px_solid_#ffffff0d] [overflow:hidden] [-webkit-app-region:drag]"
       }
     >
       <div
@@ -203,6 +204,7 @@ export const Sidebar = memo(function Sidebar({
           })}
         </div>
       </div>
+      <StorageIndicator />
     </aside>
   );
 });

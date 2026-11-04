@@ -1310,7 +1310,7 @@ export class SavegameManager {
     const config = await this.readConfig();
     const paths = config.games[gameId] ?? [];
     const bindings = config.bindings?.[gameId] ?? {};
-    const roots = manifest.roots ?? [
+    const roots: BackupRoot[] = manifest.roots ?? [
       ...new Map(
         manifest.files.map((file) => [
           this.legacyRootId(manifest, file),
@@ -1328,14 +1328,21 @@ export class SavegameManager {
         : paths.filter((folder) => root.label === rootKey(folder));
       // Old keys lose punctuation and account information: review them once, too.
       const destination = binding && paths.includes(binding) ? binding : null;
-      const candidates = paths.filter((folder) => path.basename(folder) === root.label);
+      const basename = path.basename(root.portable?.relative ?? root.label);
+      const candidates = paths.filter((folder) => path.basename(folder) === basename);
+      const portable = resolvePortable(root, this.pathContexts.get(gameId));
+      // A folder explicitly configured on this PC takes precedence over a proposed new path.
+      // Never choose the first of several matches with the same name.
       const suggestion =
-        resolvePortable(root, this.pathContexts.get(gameId)) ??
-        (matches.length === 1
-          ? matches[0]!
-          : candidates.length === 1
-            ? candidates[0]!
-            : null);
+        portable && paths.includes(portable)
+          ? portable
+          : matches.length === 1
+            ? matches[0]!
+            : candidates.length === 1
+              ? candidates[0]!
+              : candidates.length > 1
+                ? null
+                : portable;
       return { id: root.id, label: root.label, destination, suggestion };
     });
     return plan;

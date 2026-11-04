@@ -367,3 +367,53 @@ test("Proton and OS folder redirections resolve to a canonical base before creat
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test("a configured local save folder wins over a portable path inherited from another device's layout", async () => {
+  const directory = await fs.mkdtemp(
+    path.join(await fs.realpath(os.tmpdir()), "nemeton-configured-destination-"),
+  );
+
+  try {
+    const a = new SavegameManager(path.join(directory, "config-a", "saves.json"));
+    const b = new SavegameManager(path.join(directory, "config-b", "saves.json"));
+    // Both OS instances resolve AppData, but saves have explicitly configured layouts.
+    const context: PathContext = {
+      platform: "windows",
+      anchors: { local: path.join(directory, "AppData", "Local") },
+    };
+    a.setPathContext("game", context);
+    b.setPathContext("game", context);
+    const source = path.join(context.anchors.local!, "Temp", "pc-a", "saves");
+    const destination = path.join(context.anchors.local!, "Temp", "pc-b", "saves");
+    const ambiguous = path.join(context.anchors.local!, "Temp", "pc-c", "saves");
+
+    for (const folder of [source, destination, ambiguous]) {
+      await fs.mkdir(folder, { recursive: true });
+    }
+    await fs.writeFile(path.join(source, "slot.sav"), "remote progress");
+    await fs.writeFile(path.join(destination, "slot.sav"), "local progress");
+    await a.addPath("game", source);
+    await b.addPath("game", destination);
+    const sync = path.join(directory, "drive");
+    const version = (await a.backup("game", "source", sync))!;
+    const [entry] = await b.getRestorePlan("game", "source", sync, version.id);
+    expect(entry).toMatchObject({ destination: null, suggestion: destination });
+    await b.addPath("game", ambiguous);
+    expect(
+      (await b.getRestorePlan("game", "source", sync, version.id))[0]!.suggestion,
+    ).toBeNull();
+    await b.removePath("game", ambiguous);
+    await b.bindRestoreDestinations("game", "source", sync, version.id, {
+      [entry!.id]: destination,
+    });
+    await b.restore("game", "source", sync, version.id);
+    expect(await fs.readFile(path.join(destination, "slot.sav"), "utf8")).toBe(
+      "remote progress",
+    );
+    expect(await fs.readFile(path.join(source, "slot.sav"), "utf8")).toBe(
+      "remote progress",
+    );
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});

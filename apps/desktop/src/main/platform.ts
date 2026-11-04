@@ -190,12 +190,19 @@ export async function getSavegamePathContext(game: {
   const profile = process.env.WSL_DISTRO_NAME
     ? path.dirname(path.dirname(roaming))
     : app.getPath("home");
+  const documents = process.env.WSL_DISTRO_NAME
+    ? path.join(profile, "Documents")
+    : app.getPath("documents");
+  // Electron falls back to HOME on Linux when the XDG Documents directory is absent.
+  // HOME is not a portable Documents root: it can include other devices' fixture/install paths.
+  const documentsRoot =
+    path.resolve(documents) === path.resolve(profile)
+      ? path.join(profile, "Documents")
+      : documents;
   return canonicalizeContext({
     platform: windows ? "windows" : process.platform === "darwin" ? "darwin" : "linux",
     anchors: {
-      documents: process.env.WSL_DISTRO_NAME
-        ? path.join(profile, "Documents")
-        : app.getPath("documents"),
+      documents: documentsRoot,
       "saved-games": path.join(profile, "Saved Games"),
       roaming,
       local: windows

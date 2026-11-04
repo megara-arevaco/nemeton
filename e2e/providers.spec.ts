@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { test, expect } from "./fixtures";
+import { discoverStoreInstallations } from "../apps/desktop/src/main/provider-discovery";
 
 test("Epic and GOG adapters import, group 33 hours, install, persist and export diagnostics without secrets", async ({
   desktop,
@@ -236,9 +237,6 @@ else { process.exitCode = 1; }
 });
 
 test("store discovery reads installed manifests and ignores incomplete or malformed entries", async () => {
-  const { discoverStoreInstallations } = await import(
-    "../apps/desktop/src/main/provider-discovery"
-  );
   const os = await import("node:os");
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), "nemeton-store-discovery-"),

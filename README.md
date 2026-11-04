@@ -277,9 +277,9 @@ corepack pnpm dist:win
 The current package version produces:
 
 ```text
-apps/desktop/release/Nemeton-Setup-0.1.12.exe
-apps/desktop/release/Nemeton-Portable-0.1.12.exe
-apps/desktop/release/Nemeton-Setup-0.1.12.exe.blockmap
+apps/desktop/release/Nemeton-Setup-0.1.13.exe
+apps/desktop/release/Nemeton-Portable-0.1.13.exe
+apps/desktop/release/Nemeton-Setup-0.1.13.exe.blockmap
 apps/desktop/release/latest.yml
 apps/desktop/release/win-unpacked/
 ```
@@ -352,8 +352,8 @@ Before producing a release, update the version in both `package.json` and
 commit the result. Then create and push a matching tag:
 
 ```bash
-git tag -a v0.1.12 -m "Nemeton 0.1.12"
-git push origin v0.1.12
+git tag -a v0.1.13 -m "Nemeton 0.1.13"
+git push origin v0.1.13
 ```
 
 The release workflow validates the tag against `package.json`, runs every quality
@@ -363,7 +363,7 @@ the installer's `.exe.blockmap` to GitHub Releases with generated release notes.
 Do not rename the installer after building: `latest.yml` references its exact name.
 Local distribution commands disable automatic publishing; the workflow publishes
 all assets together. Published executables use portable asset names such as
-`Nemeton-Setup-0.1.12.exe` and `Nemeton-Portable-0.1.12.exe`.
+`Nemeton-Setup-0.1.13.exe` and `Nemeton-Portable-0.1.13.exe`.
 
 The `apps/desktop/release/` directory is intentionally ignored; executables belong
 in GitHub Releases, not in source control.

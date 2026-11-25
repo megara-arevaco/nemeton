@@ -71,22 +71,26 @@ test("Big Picture updates playtime and achievement status when the highlight mov
   desktop,
 }) => {
   const { page, directory } = desktop;
-  const executablePath = path.join(directory, "fixture.exe");
-  await fs.writeFile(executablePath, "fixture");
-  await page.evaluate(async (executablePath) => {
-    for (const [title, playtimeMinutes] of [
-      ["Alpha", 120],
-      ["Beta", 45],
-    ] as const) {
-      const snapshot = await window.launcher.addLocalGame({ title, executablePath });
-      const game = snapshot.games.find((entry) => entry.title === title)!;
-      await window.launcher.updateLocalGame(game.id, {
-        title,
-        executablePath,
-        playtimeMinutes,
-      });
-    }
-  }, executablePath);
+
+  for (const [title, playtimeMinutes] of [
+    ["Alpha", 120],
+    ["Beta", 45],
+  ] as const) {
+    const executablePath = path.join(directory, `${title}.exe`);
+    await fs.writeFile(executablePath, "fixture");
+    await page.evaluate(
+      async ({ title, executablePath, playtimeMinutes }) => {
+        const snapshot = await window.launcher.addLocalGame({ title, executablePath });
+        const game = snapshot.games.find((entry) => entry.title === title)!;
+        await window.launcher.updateLocalGame(game.id, {
+          title,
+          executablePath,
+          playtimeMinutes,
+        });
+      },
+      { title, executablePath, playtimeMinutes },
+    );
+  }
 
   await page.getByRole("button", { name: "Entrar en Big Picture" }).click();
   const mode = page.getByRole("main", { name: "Big Picture" });
@@ -94,7 +98,7 @@ test("Big Picture updates playtime and achievement status when the highlight mov
   await expect(mode.getByRole("heading", { name: "Alpha" })).toBeVisible();
   await expect(mode.getByText(/2 h/)).toBeVisible();
   await expect(mode.getByText("Logros sin datos")).toBeVisible();
-  await page.keyboard.press("ArrowRight");
+  await mode.getByRole("button", { name: "Beta", exact: true }).focus();
   await expect(mode.getByRole("heading", { name: "Beta" })).toBeVisible();
   await expect(mode.getByText(/45 min/)).toBeVisible();
 });

@@ -3,6 +3,10 @@ import type { ReactNode } from "react";
 import type { GameGroup, LibraryGame } from "@launcher/core";
 import { useTranslation } from "react-i18next";
 import { ArrowUUpLeft } from "@phosphor-icons/react/ArrowUUpLeft";
+import { Clock } from "@phosphor-icons/react/Clock";
+import { Trophy } from "@phosphor-icons/react/Trophy";
+import { formatPlaytime } from "../../shared/presentation";
+import { useAchievementsQuery, useDebouncedValue } from "../../queries/game.queries";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { SpeakerHigh } from "@phosphor-icons/react/SpeakerHigh";
 import { SpeakerSlash } from "@phosphor-icons/react/SpeakerSlash";
@@ -110,6 +114,11 @@ export function BigPicture({
   const [showStatistics, setShowStatistics] = useState(false);
   const { sound, toggleSound } = useAmbientSound();
   const libraryButton = useRef<HTMLButtonElement>(null);
+  const statisticsButton = useRef<HTMLButtonElement>(null);
+  const cycleSection = () => {
+    setShowStatistics(!showStatistics);
+    (showStatistics ? libraryButton : statisticsButton).current?.focus();
+  };
   const back = () => {
     if (showStatistics) {
       setShowStatistics(false);
@@ -118,9 +127,9 @@ export function BigPicture({
       onExit();
     }
   };
-  const backAction = useRef(back);
+  const actions = useRef({ back, cycleSection });
   useLayoutEffect(() => {
-    backAction.current = back;
+    actions.current = { back, cycleSection };
   });
   const [selectedId, setSelectedId] = useState<string>();
   const installed = groups.filter(({ game }) => game.installed);
@@ -128,6 +137,18 @@ export function BigPicture({
   const copy = selected?.copies.find(({ installed }) => installed);
   const running = Boolean(selected && runningGameIds.has(selected.game.id));
   const canLaunch = copy && !running && !launching;
+  const achievementGameId =
+    selected?.copies.find(({ source }) => source === "steam")?.id ?? copy?.id ?? null;
+  const settledAchievementGameId = useDebouncedValue(achievementGameId, 160);
+  const achievements = useAchievementsQuery(
+    settledAchievementGameId === achievementGameId ? achievementGameId : null,
+    running,
+  );
+  const progress = achievements.data;
+  const unlocked = progress?.items
+    .filter(({ achieved, imageUrl }) => achieved && imageUrl)
+    .slice(0, 3);
+  const progressKnown = progress && (progress.total > 0 || progress.unlocked > 0);
 
   useLayoutEffect(() => {
     if (!loading) {
@@ -147,6 +168,7 @@ export function BigPicture({
     let repeatAt = 0;
     let confirmHeld = true;
     let backHeld = true;
+    let bumperHeld = true;
 
     const poll = (time: number) => {
       const pad = navigator
@@ -165,8 +187,12 @@ export function BigPicture({
         const confirm = Boolean(pad.buttons[0]?.pressed);
         const back = Boolean(pad.buttons[1]?.pressed);
 
+        const bumper = Boolean(pad.buttons[4]?.pressed || pad.buttons[5]?.pressed);
+
         if (back && !backHeld) {
-          backAction.current();
+          actions.current.back();
+        } else if (bumper && !bumperHeld) {
+          actions.current.cycleSection();
         } else if (confirm && !confirmHeld) {
           const target = document.activeElement;
 
@@ -178,10 +204,12 @@ export function BigPicture({
         }
         confirmHeld = confirm;
         backHeld = back;
+        bumperHeld = bumper;
       } else {
         lastDirection = "";
         confirmHeld = true;
         backHeld = true;
+        bumperHeld = true;
       }
       frame = requestAnimationFrame(poll);
     };
@@ -199,12 +227,23 @@ export function BigPicture({
         if (event.key === "Escape") {
           event.preventDefault();
           back();
+        } else if (
+          event.key === "Tab" &&
+          !event.altKey &&
+          !event.ctrlKey &&
+          !event.metaKey
+        ) {
+          event.preventDefault();
+          if (!event.repeat) {
+            cycleSection();
+          }
         } else if (Object.hasOwn(directions, event.key)) {
           event.preventDefault();
           moveFocus(event.currentTarget, event.key);
         }
       }}
     >
+      <div className="big-picture-atmosphere" aria-hidden="true" />
       <header className="big-picture-header">
         <strong>
           <NemetonMark />
@@ -223,6 +262,7 @@ export function BigPicture({
           </button>
           <button
             type="button"
+            ref={statisticsButton}
             aria-pressed={showStatistics}
             aria-label={t("bigPicture.statistics")}
             title={t("bigPicture.statistics")}
@@ -259,6 +299,47 @@ export function BigPicture({
               <GameHeroImage key={selected.id} game={selected.game} alt="" />
               <div>
                 <h1>{selected.game.title}</h1>
+                <div className="big-picture-game-details">
+                  <span>
+                    <Clock aria-hidden />
+                    {t(
+                      selected.historyComplete
+                        ? "bigPicture.playtime"
+                        : "bigPicture.partialPlaytime",
+                      {
+                        time: formatPlaytime(selected.totalSeconds / 60),
+                      },
+                    )}
+                  </span>
+                  <span>
+                    <Trophy aria-hidden />
+                    {progressKnown
+                      ? progress.totalKnown === false
+                        ? t("app.unlockedPending", { count: progress.unlocked })
+                        : t("bigPicture.achievementProgress", {
+                            unlocked: progress.unlocked,
+                            total: progress.total,
+                          })
+                      : t(
+                          achievements.isFetching ||
+                            settledAchievementGameId !== achievementGameId
+                            ? "bigPicture.loadingAchievements"
+                            : "bigPicture.noAchievements",
+                        )}
+                  </span>
+                  {Boolean(unlocked?.length) && (
+                    <ul aria-label={t("bigPicture.unlockedAchievements")}>
+                      {unlocked?.map((achievement) => (
+                        <li key={achievement.id} title={achievement.name}>
+                          <img
+                            src={achievement.imageUrl ?? undefined}
+                            alt={achievement.name}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
                 <button
                   type="button"
                   aria-disabled={!canLaunch}
@@ -292,6 +373,7 @@ export function BigPicture({
                   data-game
                   aria-pressed={id === selected?.id}
                   onFocus={() => setSelectedId(id)}
+                  onPointerEnter={() => setSelectedId(id)}
                   onClick={() => {
                     setSelectedId(id);
                     const installedCopy = copies.find(

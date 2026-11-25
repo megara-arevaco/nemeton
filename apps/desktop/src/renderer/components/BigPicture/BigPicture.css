@@ -97,6 +97,7 @@
 .big-picture-feature::after {
   content: "";
   background:
+    linear-gradient(270deg, #080e13b8, transparent 38%),
     linear-gradient(90deg, #080e13a8, transparent 82%),
     linear-gradient(0deg, #080e13, #080e1399 48%, transparent 95%);
 }
@@ -132,22 +133,15 @@
 
 .big-picture-achievements {
   display: grid;
-  gap: var(--space-3);
-  padding: clamp(12px, 2vh, 24px);
-  border: 1px solid #cae8e63b;
-  border-radius: var(--radius-card);
-  background: #0d1923f2;
-  box-shadow: 0 10px 28px #040b1270;
-}
-
-.big-picture-achievements h2,
-.big-picture-achievements li {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
+  justify-items: start;
+  gap: var(--space-2);
+  min-width: 0;
 }
 
 .big-picture-achievements h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   font-size: clamp(1.2rem, 2vw, 1.8rem);
   line-height: 1.15;
 }
@@ -178,15 +172,36 @@
   border-radius: inherit;
 }
 
+.big-picture-achievements progress {
+  max-width: 224px;
+}
+
 .big-picture-achievements ul {
+  display: flex;
+  gap: var(--space-4);
+  min-width: 0;
+  width: 100%;
+  margin-top: var(--space-2);
+}
+
+.big-picture-achievements li {
   display: grid;
+  justify-items: start;
+  align-content: start;
   gap: var(--space-2);
+  min-width: 0;
+  width: min(45%, 120px);
 }
 
 .big-picture-achievements li > span:last-child {
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+  color: #e0efec;
+  font-size: clamp(0.875rem, 1.1vw, 1.05rem);
+  line-height: 1.25;
 }
 
 .big-picture-achievement-icon,
@@ -202,7 +217,7 @@
 }
 
 .big-picture-achievement-icon {
-  width: clamp(36px, 6vh, 56px);
+  width: clamp(44px, 7vh, 64px);
   aspect-ratio: 1;
 }
 

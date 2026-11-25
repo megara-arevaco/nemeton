@@ -8,6 +8,7 @@ import {
   delay,
   isInstalledGameRunning,
   openExternal,
+  resolveLocalGameLaunch,
   runBackground,
   spawnLocalGame,
 } from "./platform.js";
@@ -218,8 +219,13 @@ export function registerLaunchHandlers({
       return JSON.stringify(result);
     };
 
+    const launch = await resolveLocalGameLaunch(game.installPath);
     const startedAt = Date.now();
-    const child = spawnLocalGame(game.installPath);
+    const child = spawnLocalGame(
+      launch.executablePath,
+      launch.workingDirectory,
+      launch.env,
+    );
     let stopped = false;
     let pollDelay = 5_000;
     let lastState: string | null = null;

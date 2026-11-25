@@ -66,6 +66,8 @@ export class SavegameDiscovery {
     ludusavi?: { name: string; files: Array<{ path: string; tags: string[] }> } | null,
     includeConfig = false,
     scanHeuristics = true,
+    xdgData?: string,
+    gameDirectory?: string,
   ): Promise<SavegameSuggestion[]> {
     const cacheKey = JSON.stringify([
       gameTitle,
@@ -75,6 +77,8 @@ export class SavegameDiscovery {
       ludusavi?.name,
       includeConfig,
       scanHeuristics,
+      xdgData,
+      gameDirectory,
     ]);
     const cached = this.suggestionCache.get(cacheKey);
 
@@ -83,7 +87,8 @@ export class SavegameDiscovery {
     }
 
     const profile = path.dirname(path.dirname(roamingAppData));
-    const executableDirectory = executablePath ? path.dirname(executablePath) : "";
+    const executableDirectory =
+      gameDirectory ?? (executablePath ? path.dirname(executablePath) : "");
     const roots = [
       ...new Set(
         [
@@ -147,6 +152,7 @@ export class SavegameDiscovery {
     if (ludusavi) {
       const replacements: Record<string, string> = {
         "<home>": profile,
+        ...(xdgData ? { "<xdgData>": xdgData } : {}),
         "<winAppData>": roamingAppData,
         "<winLocalAppData>": path.join(path.dirname(roamingAppData), "Local"),
         "<winLocalAppDataLow>": path.join(path.dirname(roamingAppData), "LocalLow"),
@@ -188,7 +194,11 @@ export class SavegameDiscovery {
           continue;
         }
         resolved = path.resolve(resolved.replaceAll("/", path.sep));
-        const allowed = [...roots, profile].some(
+        const allowedRoots =
+          xdgData && manifestPath.startsWith("<xdgData>/")
+            ? [xdgData]
+            : [...roots, profile];
+        const allowed = allowedRoots.some(
           (root) =>
             resolved === path.resolve(root) ||
             resolved.startsWith(`${path.resolve(root)}${path.sep}`),

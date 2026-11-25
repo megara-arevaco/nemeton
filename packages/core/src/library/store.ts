@@ -616,47 +616,41 @@ export class LibraryStore {
     });
   }
 
-  async updateLocalGames(
+  async linkLocalGamesToLudusavi(
     updates: Array<{
       gameId: string;
-      input: {
-        title: string;
-        executablePath: string;
-        playtimeMinutes: number;
-        steamAppId?: string | null;
-        ludusaviGameName?: string | null;
-      };
+      installPath: string;
+      previousName?: string | null;
+      name: string;
+      steamAppId: string | null;
     }>,
-  ): Promise<LibrarySnapshot> {
+  ) {
     return withFileLock(this.filePath, async () => {
-      if (!updates.length) {
-        return this.read();
-      }
-
       const snapshot = await this.read();
       const byId = new Map(snapshot.games.map((game) => [game.id, game]));
+      let count = 0;
 
-      for (const { gameId, input } of updates) {
-        const game = byId.get(gameId);
+      for (const update of updates) {
+        const game = byId.get(update.gameId);
 
-        if (!game || game.source !== "local") {
+        if (
+          game?.source !== "local" ||
+          game.installPath !== update.installPath ||
+          game.ludusaviGameName !== update.previousName
+        ) {
           continue;
         }
-        game.title = input.title.trim();
-        game.installPath = input.executablePath
-          ? path.resolve(input.executablePath)
-          : "";
-        game.installed = Boolean(game.installPath);
-        game.playtimeMinutes = Math.max(0, Math.round(input.playtimeMinutes));
-        game.playtimeSecondsRemainder = 0;
-        game.trackedPlaytimeSeconds = game.playtimeMinutes * 60;
-        game.steamAppId = input.steamAppId?.trim() || null;
-        game.ludusaviGameName = input.ludusaviGameName?.trim() || null;
+
+        game.ludusaviGameName = update.name;
+        game.steamAppId ??= update.steamAppId;
         game.updatedAt = new Date().toISOString();
+        count += 1;
       }
-      snapshot.games.sort((a, b) => a.title.localeCompare(b.title));
-      await this.write(snapshot);
-      return snapshot;
+      if (count) {
+        await this.write(snapshot);
+      }
+
+      return { snapshot, count };
     });
   }
 

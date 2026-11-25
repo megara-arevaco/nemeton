@@ -1,5 +1,5 @@
 import { ProviderTransfers } from "./ProviderTransfers";
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { DownloadSimple } from "@phosphor-icons/react/DownloadSimple";
@@ -9,6 +9,7 @@ import { Pause } from "@phosphor-icons/react/Pause";
 import { Play } from "@phosphor-icons/react/Play";
 import { X } from "@phosphor-icons/react/X";
 import { Button } from "../Button";
+import { Modal } from "../Modal";
 import {
   downloadUriSchema,
   type DownloadMethod,
@@ -37,7 +38,7 @@ export function DownloadsView() {
   const client = useQueryClient();
   const [tab, setTab] = useState<"queue" | "configuration">("queue");
   const [filter, setFilter] = useState<"all" | "activity" | "history">("all");
-  const [adding, setAdding] = useState<boolean | null>(null);
+  const [adding, setAdding] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const providers = useQuery({
@@ -113,7 +114,6 @@ export function DownloadsView() {
     (sum, job) => sum + (job.status === "downloading" ? job.speed : 0),
     0,
   );
-  const composerOpen = adding ?? snapshot.jobs.length === 0;
   const groups =
     filter === "activity"
       ? [["activity", activity] as const]
@@ -123,17 +123,14 @@ export function DownloadsView() {
   return (
     <div className="downloads-view">
       <header className="downloads-heading">
-        <div>
-          <h1>{t("downloads.title")}</h1>
-          <p>{t("downloads.description")}</p>
-        </div>
+        <h1>{t("downloads.title")}</h1>
         <Button
           variant="primary"
-          aria-expanded={tab === "queue" && composerOpen}
-          aria-controls="download-composer"
+          aria-haspopup="dialog"
           onClick={() => {
-            setTab("queue");
-            setAdding(!composerOpen);
+            setError("");
+            setNotice("");
+            setAdding(true);
           }}
         >
           <DownloadSimple aria-hidden="true" />
@@ -156,7 +153,7 @@ export function DownloadsView() {
           </button>
         ))}
       </nav>
-      {error && (
+      {!adding && error && (
         <p className="downloads-error" role="alert">
           {error}
         </p>
@@ -169,42 +166,24 @@ export function DownloadsView() {
       {tab === "configuration" && (
         <DownloadConfiguration snapshot={snapshot} run={run} busy={busy} />
       )}
-      <div hidden={tab !== "queue"}>
-        <div className="downloads-overview" aria-label={t("downloads.overview")}>
-          <div>
-            <span>{t("downloads.activity")}</span>
-            <strong>{activity.length + externalTransfers}</strong>
-          </div>
-          <div>
-            <span>{t("downloads.speed")}</span>
-            <strong>
-              {formatDownloadBytes(speed)}
-              <small>/s</small>
-            </strong>
-          </div>
-          <div>
-            <span>{t("downloads.completedCount")}</span>
-            <strong>
-              {history.filter((job) => job.status === "completed").length}
-            </strong>
-          </div>
-        </div>
-        {!snapshot.directory && (
-          <div className="downloads-setup">
-            <p>{t("downloads.noFolder")}</p>
-            <Button size="small" onClick={() => setTab("configuration")}>
-              {t("downloads.chooseFolder")}
-            </Button>
-          </div>
-        )}
+      {adding && (
         <AddDownload
           snapshot={snapshot}
           run={run}
           busy={busy}
-          expanded={composerOpen}
-          setExpanded={setAdding}
-          configure={() => setTab("configuration")}
+          error={error}
+          onClose={() => {
+            setAdding(false);
+            setError("");
+          }}
+          onAdded={() => {
+            setAdding(false);
+            setTab("queue");
+            setFilter("all");
+          }}
         />
+      )}
+      <div hidden={tab !== "queue"}>
         <div className="downloads-queue-heading">
           <div className="downloads-filters" aria-label={t("downloads.filter")}>
             {(["all", "activity", "history"] as const).map((item) => (
@@ -227,34 +206,42 @@ export function DownloadsView() {
             ))}
           </div>
           <div className="downloads-queue-tools">
-            <Button
-              size="small"
-              variant="secondary"
-              title={t("downloads.bulkScope")}
-              disabled={
-                busy ||
-                !snapshot.jobs.some((job) => activeStatuses.includes(job.status))
-              }
-              onClick={() =>
-                void run(() => window.launcher.controlAllDownloads("pause"))
-              }
-            >
-              <Pause aria-hidden="true" />
-              {t("downloads.pauseAll")}
-            </Button>
-            <Button
-              size="small"
-              variant="secondary"
-              title={t("downloads.resumeAllHelp")}
-              disabled={busy || !snapshot.bulkPausedIds?.length}
-              onClick={() =>
-                void run(() => window.launcher.controlAllDownloads("resume"))
-              }
-            >
-              <Play aria-hidden="true" />
-              {t("downloads.resumeAll")}
-            </Button>
-            <span>{t("downloads.parallel", { count: snapshot.maxConcurrent })}</span>
+            {filter !== "history" && snapshot.jobs.length > 0 && (
+              <>
+                <Button
+                  size="small"
+                  variant="secondary"
+                  title={t("downloads.bulkScope")}
+                  disabled={
+                    busy ||
+                    !snapshot.jobs.some((job) => activeStatuses.includes(job.status))
+                  }
+                  onClick={() =>
+                    void run(() => window.launcher.controlAllDownloads("pause"))
+                  }
+                >
+                  <Pause aria-hidden="true" />
+                  {t("downloads.pauseAll")}
+                </Button>
+                <Button
+                  size="small"
+                  variant="secondary"
+                  title={t("downloads.resumeAllHelp")}
+                  disabled={busy || !snapshot.bulkPausedIds?.length}
+                  onClick={() =>
+                    void run(() => window.launcher.controlAllDownloads("resume"))
+                  }
+                >
+                  <Play aria-hidden="true" />
+                  {t("downloads.resumeAll")}
+                </Button>
+                {speed > 0 && (
+                  <span>
+                    {t("downloads.speed")} · {formatDownloadBytes(speed)}/s
+                  </span>
+                )}
+              </>
+            )}
             {filter !== "activity" &&
               history.some((job) => job.status === "completed") && (
                 <Button
@@ -291,10 +278,8 @@ export function DownloadsView() {
             key={name}
             aria-label={t(`downloads.${name}`)}
           >
-            {jobs.length > 0 && (
-              <h2 className="downloads-group-title">
-                {t(`downloads.${name}`)} <span>{jobs.length}</span>
-              </h2>
+            {filter === "all" && jobs.length > 0 && (
+              <h2 className="downloads-group-title">{t(`downloads.${name}`)}</h2>
             )}
             {jobs.map((job) => (
               <DownloadTask key={job.id} job={job} hasToken={snapshot.hasToken} />
@@ -316,13 +301,13 @@ function AddDownload({
   snapshot,
   run,
   busy,
-  configure,
-  expanded,
-  setExpanded,
+  error,
+  onClose,
+  onAdded,
 }: {
-  expanded: boolean;
-  setExpanded: (value: boolean) => void;
-  configure: () => void;
+  error: string;
+  onClose: () => void;
+  onAdded: () => void;
   snapshot: DownloadsSnapshot;
   run: Run;
   busy: boolean;
@@ -336,15 +321,14 @@ function AddDownload({
       : "real-debrid",
   );
   const [invalid, setInvalid] = useState(false);
-  const selectedMethod = method;
+  const formId = useId();
   const unsupportedLinks =
     method === "torrent" &&
     !torrent &&
     links.split(/\r?\n/).some((link) => link.trim().startsWith("https:"));
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const form = event.currentTarget;
-    const title = String(new FormData(form).get("title") ?? "").trim();
+    const title = String(new FormData(event.currentTarget).get("title") ?? "").trim();
     const uris = links
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -364,12 +348,13 @@ function AddDownload({
       return;
     }
     setInvalid(false);
+    let added = 0;
     const ok = await run(async () => {
       if (torrent) {
         return window.launcher.startDownload({
           title: title || torrent.name,
           torrentFileId: torrent.id,
-          method: selectedMethod,
+          method,
         });
       }
 
@@ -384,145 +369,32 @@ function AddDownload({
         result = await window.launcher.startDownload({
           title: title || suggested || t("downloads.newDownload"),
           uri,
-          method: selectedMethod,
+          method,
         });
+        added++;
       }
       return result;
     }, t("downloads.added"));
 
     if (ok) {
-      setLinks("");
-      setTorrent(null);
-      form.reset();
-      setExpanded(false);
+      onAdded();
+    } else if (added > 0) {
+      setLinks(uris.slice(added).join("\n"));
     }
   };
   return (
-    <details
-      hidden={!expanded}
-      id="download-composer"
-      className="downloads-add-panel"
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
-    >
-      <summary>
-        <h2>{t("downloads.addDownload")}</h2>
-      </summary>
-      <form className="downloads-add" onSubmit={(event) => void submit(event)}>
-        {torrent ? (
-          <div className="downloads-selected-torrent">
-            <span>{torrent.name}</span>
-            <Button size="small" disabled={busy} onClick={() => setTorrent(null)}>
-              {t("downloads.change")}
-            </Button>
-          </div>
-        ) : (
-          <label>
-            {t("downloads.links")}
-            <textarea
-              name="links"
-              value={links}
-              onChange={(event) => {
-                setLinks(event.target.value);
-                setInvalid(false);
-              }}
-              rows={2}
-              maxLength={409600}
-              placeholder={t("downloads.linkPlaceholder")}
-              aria-invalid={invalid || undefined}
-            />
-          </label>
-        )}
-        {(invalid || unsupportedLinks) && (
-          <p className="downloads-error" role="alert">
-            {t(
-              unsupportedLinks
-                ? "downloads.torrentLinksOnly"
-                : "downloads.invalidLinks",
-            )}
-          </p>
-        )}
-        <div className="downloads-source-actions">
-          <Button
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const pasted = (await window.launcher.pasteDownloadLink()).trim();
-
-                if (!pasted) {
-                  return;
-                }
-                setTorrent(null);
-                setLinks((current) =>
-                  [current.trim(), pasted].filter(Boolean).join("\n").slice(0, 409600),
-                );
-                setInvalid(false);
-              })
-            }
-          >
-            <ClipboardText aria-hidden="true" />
-            {t("downloads.pasteLink")}
+    <Modal
+      title={t("downloads.addDownload")}
+      icon={<DownloadSimple aria-hidden="true" />}
+      busy={busy}
+      onClose={onClose}
+      actions={
+        <>
+          <Button disabled={busy} onClick={onClose} variant="secondary">
+            {t("modal.cancel")}
           </Button>
           <Button
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const selected = await window.launcher.chooseDownloadTorrent();
-
-                if (selected) {
-                  setTorrent(selected);
-                  setLinks("");
-                  setInvalid(false);
-                }
-              })
-            }
-          >
-            <FolderOpen />
-            {t("downloads.openTorrent")}
-          </Button>
-        </div>
-        <details className="downloads-add-fields">
-          <summary>{t("downloads.customName")}</summary>
-          <label>
-            {t("downloads.name")}
-            <input name="title" maxLength={500} placeholder={t("downloads.optional")} />
-          </label>
-        </details>
-        <fieldset className="downloads-methods">
-          <legend>{t("downloads.method")}</legend>
-          {(["real-debrid", "torrent"] as const).map((option) => (
-            <label key={option} className="downloads-method">
-              <input
-                type="radio"
-                name="method"
-                value={option}
-                checked={method === option}
-                onChange={() => {
-                  setMethod(option);
-                  localStorage.setItem("nemeton.downloadMethod", option);
-                  setInvalid(false);
-                }}
-              />
-              <span>
-                <strong>
-                  {option === "real-debrid" ? "Real-Debrid" : t("downloads.torrent")}
-                </strong>
-                <small>
-                  {t(
-                    option === "real-debrid"
-                      ? "downloads.realDebridHelp"
-                      : "downloads.directTorrentHelp",
-                  )}
-                </small>
-              </span>
-            </label>
-          ))}
-        </fieldset>
-        <div className="downloads-actions">
-          {method === "real-debrid" && !snapshot.hasToken && (
-            <Button onClick={configure}>{t("downloads.connectRealDebrid")}</Button>
-          )}
-          <Button
+            form={formId}
             type="submit"
             variant="primary"
             disabled={
@@ -533,15 +405,152 @@ function AddDownload({
               (!torrent && !links.trim())
             }
           >
-            <DownloadSimple />
             {t("downloads.addQueue")}
           </Button>
-        </div>
-        {method === "real-debrid" && !snapshot.hasToken && (
-          <p className="downloads-job-meta">{t("downloads.connectHint")}</p>
+        </>
+      }
+    >
+      <div className="downloads-composer">
+        <form
+          id={formId}
+          className="downloads-add"
+          onSubmit={(event) => void submit(event)}
+        >
+          {torrent ? (
+            <div className="downloads-selected-torrent">
+              <span>{torrent.name}</span>
+              <Button size="small" disabled={busy} onClick={() => setTorrent(null)}>
+                {t("downloads.change")}
+              </Button>
+            </div>
+          ) : (
+            <label>
+              {t("downloads.links")}
+              <textarea
+                name="links"
+                value={links}
+                onChange={(event) => {
+                  setLinks(event.target.value);
+                  setInvalid(false);
+                }}
+                rows={2}
+                maxLength={409600}
+                placeholder={t("downloads.linkPlaceholder")}
+                aria-invalid={invalid || unsupportedLinks || undefined}
+              />
+            </label>
+          )}
+          {(invalid || unsupportedLinks) && (
+            <p className="downloads-error" role="alert">
+              {t(
+                unsupportedLinks
+                  ? "downloads.torrentLinksOnly"
+                  : "downloads.invalidLinks",
+              )}
+            </p>
+          )}
+          <div className="downloads-source-actions">
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const pasted = (await window.launcher.pasteDownloadLink()).trim();
+
+                  if (!pasted) {
+                    return;
+                  }
+                  setTorrent(null);
+                  setLinks((current) =>
+                    [current.trim(), pasted]
+                      .filter(Boolean)
+                      .join("\n")
+                      .slice(0, 409600),
+                  );
+                  setInvalid(false);
+                })
+              }
+            >
+              <ClipboardText aria-hidden="true" />
+              {t("downloads.pasteLink")}
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const selected = await window.launcher.chooseDownloadTorrent();
+
+                  if (selected) {
+                    setTorrent(selected);
+                    setLinks("");
+                    setInvalid(false);
+                  }
+                })
+              }
+            >
+              <FolderOpen aria-hidden="true" />
+              {t("downloads.openTorrent")}
+            </Button>
+          </div>
+          <label>
+            {t("downloads.name")}
+            <input name="title" maxLength={500} placeholder={t("downloads.optional")} />
+          </label>
+          <fieldset className="downloads-methods">
+            <legend>{t("downloads.method")}</legend>
+            {(["real-debrid", "torrent"] as const).map((option) => (
+              <label key={option} className="downloads-method">
+                <input
+                  type="radio"
+                  name="method"
+                  value={option}
+                  checked={method === option}
+                  onChange={() => {
+                    setMethod(option);
+                    localStorage.setItem("nemeton.downloadMethod", option);
+                    setInvalid(false);
+                  }}
+                />
+                <span>
+                  <strong>
+                    {option === "real-debrid" ? "Real-Debrid" : t("downloads.torrent")}
+                  </strong>
+                  <small>
+                    {t(
+                      option === "real-debrid"
+                        ? "downloads.realDebridHelp"
+                        : "downloads.directTorrentHelp",
+                    )}
+                  </small>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        </form>
+        {!snapshot.directory && (
+          <div className="downloads-setup">
+            <p>{t("downloads.noFolder")}</p>
+            <Button
+              disabled={busy}
+              onClick={() => void run(window.launcher.chooseDownloadDirectory)}
+            >
+              <FolderOpen aria-hidden="true" />
+              {t("downloads.chooseFolder")}
+            </Button>
+          </div>
         )}
-      </form>
-    </details>
+        {method === "real-debrid" && !snapshot.hasToken && (
+          <div className="downloads-account-setup">
+            <p>{t("downloads.tokenHelp")}</p>
+            <RealDebridConnect run={run} busy={busy} />
+          </div>
+        )}
+        {error && (
+          <p className="downloads-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -637,30 +646,6 @@ function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }
         </p>
       )}
       <div className="downloads-actions">
-        {job.status === "completed" && (
-          <Button
-            size="small"
-            variant="setup"
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const selected = await window.launcher.chooseDownloadedExecutable(
-                  job.id,
-                );
-
-                if (selected) {
-                  window.dispatchEvent(
-                    new CustomEvent("nemeton:add-downloaded-game", {
-                      detail: selected,
-                    }),
-                  );
-                }
-              })
-            }
-          >
-            {t("downloads.addToLibrary")}
-          </Button>
-        )}
         {job.status === "queued" && (
           <label className="download-priority">
             {t("downloads.priority")}
@@ -706,10 +691,19 @@ function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }
             disabled={busy}
             onClick={() => control("cancel")}
           >
-            <X />
+            <X aria-hidden="true" />
             {t("downloads.cancel")}
           </Button>
         )}
+        <Button
+          size="small"
+          variant={job.status === "completed" ? "secondary" : "ghost"}
+          disabled={busy || !job.directory || job.status === "queued"}
+          onClick={() => void run(() => window.launcher.openDownload(job.id))}
+        >
+          <FolderOpen aria-hidden="true" />
+          {t("downloads.open")}
+        </Button>
         {!active && job.status !== "waiting-selection" && (
           <Button
             size="small"
@@ -721,16 +715,6 @@ function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }
             {t("downloads.remove")}
           </Button>
         )}
-        <Button
-          size="small"
-          className="downloads-open"
-          variant={job.status === "completed" ? "secondary" : "ghost"}
-          disabled={busy || !job.directory || job.status === "queued"}
-          onClick={() => void run(() => window.launcher.openDownload(job.id))}
-        >
-          <FolderOpen />
-          {t("downloads.open")}
-        </Button>
       </div>
     </article>
   );
@@ -760,7 +744,7 @@ function DownloadConfiguration({
           disabled={busy}
           onClick={() => void run(() => window.launcher.chooseDownloadDirectory())}
         >
-          <FolderOpen />
+          <FolderOpen aria-hidden="true" />
           {t("downloads.chooseFolder")}
         </Button>
       </section>
@@ -834,34 +818,7 @@ function DownloadConfiguration({
             </Button>
           </>
         ) : (
-          <form
-            className="downloads-inline-form"
-            onSubmit={async (event) => {
-              event.preventDefault();
-              const form = event.currentTarget;
-              const token = String(new FormData(form).get("token")).trim();
-              form.reset();
-              await run(
-                () => window.launcher.connectRealDebrid(token),
-                t("downloads.saved"),
-              );
-            }}
-          >
-            <label>
-              {t("downloads.token")}
-              <input
-                name="token"
-                type="password"
-                autoComplete="off"
-                required
-                maxLength={4096}
-                spellCheck={false}
-              />
-            </label>
-            <Button type="submit" disabled={busy} variant="primary">
-              {busy ? t("downloads.busy") : t("downloads.connect")}
-            </Button>
-          </form>
+          <RealDebridConnect run={run} busy={busy} />
         )}
       </section>
       <details className="downloads-help">
@@ -873,5 +830,38 @@ function DownloadConfiguration({
         <p>{t("downloads.torrentHelp")}</p>
       </details>
     </div>
+  );
+}
+
+function RealDebridConnect({ run, busy }: { run: Run; busy: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <form
+      className="downloads-inline-form"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const token = String(new FormData(form).get("token")).trim();
+
+        if (await run(() => window.launcher.connectRealDebrid(token))) {
+          form.reset();
+        }
+      }}
+    >
+      <label>
+        {t("downloads.token")}
+        <input
+          name="token"
+          type="password"
+          autoComplete="off"
+          required
+          maxLength={4096}
+          spellCheck={false}
+        />
+      </label>
+      <Button type="submit" disabled={busy} variant="primary">
+        {busy ? t("downloads.busy") : t("downloads.connect")}
+      </Button>
+    </form>
   );
 }

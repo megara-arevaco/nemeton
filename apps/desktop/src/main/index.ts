@@ -96,7 +96,7 @@ const broadcastLibrary = async (
   snapshot?: Awaited<ReturnType<LibraryStore["read"]>>,
 ) => {
   const current = snapshot ?? (await store.read());
-  publisher.publish(current, store.getSnapshotRevision(current));
+  await publisher.snapshot(current, store.getSnapshotRevision(current));
 };
 
 const broadcastGameRunning = (gameId: string, running: boolean) => {
@@ -316,8 +316,6 @@ app
       broadcastGameRunning,
       broadcastSavegameChanged,
       broadcastLibrary,
-      publishLibrarySnapshot: (snapshot) =>
-        publisher.snapshot(snapshot, store.getSnapshotRevision(snapshot)),
       coversDirectory,
       folderSyncService,
       ludusaviCatalog,
@@ -338,7 +336,7 @@ app
         scheduleSteamRefresh,
       }),
     };
-    setSnapshotDecorator((value) => {
+    setSnapshotDecorator(async (value) => {
       if (!value || typeof value !== "object") {
         return value;
       }
@@ -365,7 +363,7 @@ app
       if (result.snapshot) {
         return {
           ...value,
-          snapshot: publisher.snapshot(
+          snapshot: await publisher.snapshot(
             result.snapshot,
             store.getSnapshotRevision(result.snapshot),
           ),
@@ -406,8 +404,13 @@ app
             startupReady.then(async () => {
               const snapshot = await completeMissingLocalAssets(
                 store,
-                (title, steamAppId) =>
-                  resolveLocalGameAssets(title, ludusaviCatalog, steamAppId),
+                (title, steamAppId, ludusaviGameName) =>
+                  resolveLocalGameAssets(
+                    title,
+                    ludusaviCatalog,
+                    steamAppId,
+                    ludusaviGameName,
+                  ),
               );
               await broadcastLibrary(snapshot);
             }),
@@ -416,6 +419,19 @@ app
         12_000,
       ).unref();
     }
+
+    const refreshLocalGames = () => {
+      runBackground(
+        startupReady.then(() => broadcastLibrary()),
+        "[library:refresh]",
+      );
+    };
+    app.on("browser-window-focus", refreshLocalGames);
+    setInterval(() => {
+      if (BrowserWindow.getFocusedWindow()) {
+        refreshLocalGames();
+      }
+    }, 30_000).unref();
 
     setInterval(() => {
       scheduleAutoSync();

@@ -41,7 +41,11 @@ if (typeof workerData === "string") {
   ) {
     throw new Error("Invalid catalog entries");
   }
-  parentPort?.postMessage({ updatedAt: cached.updatedAt, games });
+  parentPort?.postMessage({
+    version: cached.version,
+    updatedAt: cached.updatedAt,
+    games,
+  });
 } else {
   throw new Error("Invalid catalog operation");
 }

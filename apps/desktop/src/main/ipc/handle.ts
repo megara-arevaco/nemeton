@@ -47,7 +47,9 @@ export function handle<K extends IpcChannel, T>(
     let failed = false;
 
     try {
-      return decorateSnapshot(await listener(event, ...(parsed.data as IpcArgs<K>)));
+      return await decorateSnapshot(
+        await listener(event, ...(parsed.data as IpcArgs<K>)),
+      );
     } catch (error) {
       failed = true;
       throw error;

@@ -72,3 +72,39 @@ test("launch cancels for a remote save or restores it into a new destination bef
     (await page.evaluate((id) => window.launcher.getSavegames(id), game.id)).paths,
   ).toEqual([destination]);
 });
+
+test("counts the Hookshot game session when the selected executable is its launcher", async ({
+  desktop,
+}) => {
+  test.skip(process.platform !== "linux", "Uses a Linux Hookshot installation fixture");
+  const { page, directory } = desktop;
+  const installation = path.join(directory, "Hookshot game");
+  const launcher = path.join(installation, "hookshot");
+  await fs.mkdir(path.join(installation, "bin"), { recursive: true });
+  await fs.writeFile(launcher, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  await fs.writeFile(path.join(installation, "image.bin"), "");
+  await fs.writeFile(
+    path.join(installation, "bin", "hookshot"),
+    '#!/bin/sh\n[ -f image.bin ] && [ "$HOOKSHOT_NO_UPDATE_CHECK" = 1 ] || exit 1\nsleep 6\n',
+    { mode: 0o755 },
+  );
+  const game = await page.evaluate(async (executablePath) => {
+    const title = "The Legend of Zelda: Ocarina of Time";
+    await window.launcher.addLocalGame({ title, executablePath });
+    return (await window.launcher.listGames()).games.find(
+      (item) => item.title === title,
+    )!;
+  }, launcher);
+
+  await page.evaluate((id) => window.launcher.launchGame(id), game.id);
+  await expect
+    .poll(
+      () =>
+        page.evaluate(async (id) => {
+          const snapshot = await window.launcher.listGames();
+          return snapshot.games.find((item) => item.id === id)?.trackedPlaytimeSeconds;
+        }, game.id),
+      { timeout: 15_000 },
+    )
+    .toBeGreaterThanOrEqual(6);
+});

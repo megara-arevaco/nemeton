@@ -115,7 +115,7 @@ export function useLibraryController() {
 export type AppView = "library" | "statistics" | "settings" | "downloads";
 
 type AppOverlay =
-  | { type: "add-game"; title?: string; executablePath?: string }
+  | { type: "add-game" }
   | { type: "artwork"; game: LibraryGame }
   | { type: "delete-game"; game: LibraryGame }
   | { type: "edit-game"; game: LibraryGame }
@@ -208,25 +208,6 @@ export function useApp() {
   const removeGameMutation = useRemoveGameMutation();
   const deleteGameForeverMutation = useDeleteGameForeverMutation();
   const showAddGame = navigation.overlay?.type === "add-game";
-  const downloadedGame =
-    navigation.overlay?.type === "add-game" ? navigation.overlay : null;
-  useEffect(() => {
-    const addDownloaded = (event: Event) => {
-      const detail = (event as CustomEvent<{ title: string; executablePath: string }>)
-        .detail;
-      dispatchNavigation({
-        type: "open-overlay",
-        overlay: {
-          type: "add-game",
-          title: detail.title,
-          executablePath: detail.executablePath,
-        },
-      });
-    };
-    window.addEventListener("nemeton:add-downloaded-game", addDownloaded);
-    return () =>
-      window.removeEventListener("nemeton:add-downloaded-game", addDownloaded);
-  }, []);
   const artworkGame =
     navigation.overlay?.type === "artwork" ? navigation.overlay.game : null;
   const editGame =
@@ -489,7 +470,7 @@ export function useApp() {
     library.setMessage(t("status.localGameAdded"));
   };
 
-  const launchSelected = async () => {
+  const launchGame = async (selected: LibraryGame | null) => {
     if (!selected) {
       return;
     }
@@ -631,7 +612,6 @@ export function useApp() {
     metadata,
     view,
     showAddGame,
-    downloadedGame,
     artworkGame,
     editGame,
     deleteGame,
@@ -668,7 +648,8 @@ export function useApp() {
     closeGameMenuFromContext,
     stopPropagation,
     onLocalGameCreated,
-    launchSelected,
+    launchSelected: () => launchGame(selected),
+    launchGame,
     chooseCover,
     removeGame,
     requestDeleteGame,

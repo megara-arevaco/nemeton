@@ -20,7 +20,7 @@ export async function launchIsolatedDesktop(directory: string) {
   if (!(await fs.stat(catalogPath).catch(() => null))) {
     await fs.writeFile(
       catalogPath,
-      JSON.stringify({ updatedAt: new Date().toISOString(), games: [] }),
+      JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), games: [] }),
     );
   }
   if (!(await fs.stat(libraryPath).catch(() => null))) {
@@ -76,7 +76,7 @@ export const test = base.extend<{
     await fs.mkdir(roamingAppData);
     await fs.writeFile(
       path.join(data, "ludusavi-catalog.json"),
-      JSON.stringify({ updatedAt: new Date().toISOString(), games: [] }),
+      JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), games: [] }),
     );
     const games: LibraryGame[] = Array.from({ length: gameCount }, (_, index) => ({
       id: `local-${index}`,

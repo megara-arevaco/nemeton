@@ -4,6 +4,8 @@ import {
   searchSteamArtwork,
   type ArtworkSuggestion,
 } from "@launcher/core";
+import { hookshotGame, isOcarinaOfTimeAlias } from "../ludusavi.js";
+import { findHookshotInstallation } from "../platform.js";
 import type { MainContext } from "../context.js";
 
 export const registerArtworkHandlers = ({
@@ -18,25 +20,29 @@ export const registerArtworkHandlers = ({
     const updates = [];
 
     for (const game of snapshot.games.filter(
-      (item) => item.source === "local" && !item.ludusaviGameName,
+      (item) =>
+        item.source === "local" &&
+        (!item.ludusaviGameName || isOcarinaOfTimeAlias(item.ludusaviGameName)),
     )) {
-      const match = await ludusaviCatalog.match(game.title, game.steamAppId);
+      const isHookshot = await findHookshotInstallation(game.installPath);
+      const match = isHookshot
+        ? hookshotGame
+        : game.ludusaviGameName
+          ? null
+          : await ludusaviCatalog.match(game.title, game.steamAppId);
 
       if (!match) {
         continue;
       }
       updates.push({
         gameId: game.id,
-        input: {
-          title: game.title,
-          executablePath: game.installPath,
-          playtimeMinutes: game.trackedPlaytimeSeconds / 60,
-          steamAppId: game.steamAppId ?? match.steamAppId,
-          ludusaviGameName: match.name,
-        },
+        installPath: game.installPath,
+        previousName: game.ludusaviGameName,
+        name: match.name,
+        steamAppId: match.steamAppId,
       });
     }
-    return { snapshot: await store.updateLocalGames(updates), count: updates.length };
+    return store.linkLocalGamesToLudusavi(updates);
   });
   handle(
     "library:set-remote-artwork",

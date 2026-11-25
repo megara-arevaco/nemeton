@@ -5,6 +5,17 @@ export const resources = {
   es: {
     translation: {
       ...downloadTranslations.es,
+      "bp.enter": "Entrar en Big Picture",
+      "bp.exit": "Volver al escritorio",
+      "bp.library": "Tu biblioteca",
+      "bp.all": "Todos los juegos",
+      "bp.recent": "Recientes",
+      "bp.installed": "Instalados",
+      "bp.empty": "No hay juegos en esta vista",
+      "bp.details": "Ver detalles",
+      "bp.launching": "Iniciando…",
+      "bp.select": "Seleccionar",
+      "bp.navigation": "Cruceta / stick / flechas para navegar",
       ...productTranslations.es,
       "updates.title": "Actualizaciones de Nemeton",
       "updates.description":
@@ -526,6 +537,17 @@ export const resources = {
   en: {
     translation: {
       ...downloadTranslations.en,
+      "bp.enter": "Enter Big Picture",
+      "bp.exit": "Back to desktop",
+      "bp.library": "Your library",
+      "bp.all": "All games",
+      "bp.recent": "Recent",
+      "bp.installed": "Installed",
+      "bp.empty": "No games in this view",
+      "bp.details": "View details",
+      "bp.launching": "Starting…",
+      "bp.select": "Select",
+      "bp.navigation": "D-pad / stick / arrows to navigate",
       ...productTranslations.en,
       "updates.title": "Nemeton updates",
       "updates.description":

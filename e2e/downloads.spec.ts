@@ -228,7 +228,9 @@ test("link-only UI saves configuration, downloads and shows one progress bar per
   await page.getByRole("button", { name: "Conectar cuenta", exact: true }).click();
   await expect(page.getByText(/Conectado como fixture-user/)).toBeVisible();
   await page.getByRole("button", { name: "Cola de descargas", exact: true }).click();
+  await page.getByRole("button", { name: "Añadir descarga", exact: true }).click();
   await page
+    .getByRole("dialog", { name: "Añadir descarga" })
     .getByLabel("Enlaces magnet o HTTPS · uno por línea")
     .fill("https://host.example/first\nhttps://host.example/second");
   await page.getByRole("button", { name: "Añadir a la cola", exact: true }).click();
@@ -456,7 +458,11 @@ test("Real-Debrid downloads every torrent file automatically with one game progr
     dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [torrent] });
   }, torrent);
   await page.getByRole("button", { name: "Descargas", exact: true }).click();
-  await page.getByRole("button", { name: "Abrir .torrent", exact: true }).click();
+  await page.getByRole("button", { name: "Añadir descarga", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Abrir .torrent", exact: true })
+    .click();
   await page.getByRole("button", { name: "Añadir a la cola", exact: true }).click();
   const job = (await state(page)).jobs[0];
   await Promise.all([waitBytes(page, job.id, "1"), waitBytes(page, job.id, "2")]);
@@ -770,20 +776,22 @@ test("magnet uses Real-Debrid and automatically downloads a grouped archive", as
     bundle: true,
   });
   await page.getByRole("button", { name: "Descargas", exact: true }).click();
-  await page
-    .getByLabel("Enlaces magnet o HTTPS · uno por línea")
-    .fill(`magnet:?xt=urn:btih:${"b".repeat(40)}&dn=Fixture+Game`);
-  await expect(page.getByRole("radio", { name: /Real-Debrid Envía/ })).toBeChecked();
-  await page.getByRole("button", { name: "Conectar Real-Debrid", exact: true }).click();
-  await page.getByRole("button", { name: "Elegir carpeta", exact: true }).click();
-  await page.getByLabel("Clave API de Real-Debrid").fill("fixture_token");
-  await page.getByRole("button", { name: "Conectar cuenta", exact: true }).click();
-  await expect(page.getByText(/Conectado como fixture-user/)).toBeVisible();
-  await page.getByRole("button", { name: "Cola de descargas", exact: true }).click();
-  await expect(page.getByLabel("Enlaces magnet o HTTPS · uno por línea")).toHaveValue(
-    /magnet:/,
-  );
-  await page.getByRole("button", { name: "Añadir a la cola", exact: true }).click();
+  const add = page.getByRole("button", { name: "Añadir descarga", exact: true });
+  await add.click();
+  const modal = page.getByRole("dialog", { name: "Añadir descarga" });
+  const links = modal.getByLabel("Enlaces magnet o HTTPS · uno por línea");
+  await links.fill(`magnet:?xt=urn:btih:${"b".repeat(40)}&dn=Fixture+Game`);
+  await expect(modal.getByRole("radio", { name: /Real-Debrid Envía/ })).toBeChecked();
+  const submit = modal.getByRole("button", { name: "Añadir a la cola", exact: true });
+  await expect(submit).toBeDisabled();
+  await modal.getByRole("button", { name: "Elegir carpeta", exact: true }).click();
+  await modal.getByLabel("Clave API de Real-Debrid").fill("fixture_token");
+  await modal.getByRole("button", { name: "Conectar cuenta", exact: true }).click();
+  await expect(links).toHaveValue(/magnet:/);
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(modal).toHaveCount(0);
+  await expect(add).toBeFocused();
   await expect.poll(async () => (await state(page)).jobs[0].status).toBe("completed");
   const job = (await state(page)).jobs[0];
   expect(job.method).toBe("real-debrid");
@@ -863,8 +871,11 @@ test("download hierarchy filters history, preserves files and isolates task fail
       .toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`downloads-${theme}.png`) });
   }
-  await page.getByRole("button", { name: "Añadir descarga", exact: true }).click();
-  const input = page.getByLabel("Enlaces magnet o HTTPS · uno por línea");
+
+  const add = page.getByRole("button", { name: "Añadir descarga", exact: true });
+  await add.click();
+  const composer = page.getByRole("dialog", { name: "Añadir descarga" });
+  const input = composer.getByLabel("Enlaces magnet o HTTPS · uno por línea");
   await expect(input).toBeVisible();
   await input.fill("https://host.example/example");
   await page.getByRole("radio", { name: /BitTorrent integrado/ }).check();
@@ -888,7 +899,12 @@ test("download hierarchy filters history, preserves files and isolates task fail
     page.getByRole("button", { name: "Abrir .torrent", exact: true }),
   ).toBeFocused();
   await page.screenshot({ path: testInfo.outputPath("downloads-composer.png") });
-  await page.getByRole("button", { name: "Añadir descarga", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await expect(composer).toHaveCount(0);
+  await expect(add).toBeFocused();
+  await expect(first.getByRole("button", { name: "Añadir a biblioteca" })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Limpiar completadas", exact: true }).click();
   await expect(page.getByRole("article")).toHaveCount(0);
   await expect(
@@ -964,53 +980,6 @@ test("global pause preserves individual pauses, priority chooses the next task a
   expect(persisted.downloadLimitBytesPerSecond).toBe(64 * 1024);
   expect(new Set(persisted.bulkPausedIds)).toEqual(new Set(ids.slice(0, 2)));
   expect(persisted.jobs.find((job) => job.id === ids[2])?.status).toBe("paused");
-});
-
-test("completed downloads open a prefilled local-game flow without executing the file", async ({
-  desktop,
-}) => {
-  const { page, app, directory } = desktop;
-  await setupRealDebrid(app, path.join(directory, "downloads"));
-  await connect(page);
-  const added = await page.evaluate(() =>
-    window.launcher.startDownload({
-      title: "Downloaded Adventure",
-      uri: "https://host.example/adventure",
-      method: "real-debrid",
-    }),
-  );
-  const jobId = added.jobs[0].id;
-  await expect
-    .poll(async () => (await state(page)).jobs.find((job) => job.id === jobId)?.status)
-    .toBe("completed");
-  const job = (await state(page)).jobs.find((job) => job.id === jobId)!;
-  const executable = path.join(
-    job.directory,
-    process.platform === "win32" ? "Game.exe" : "game.sh",
-  );
-  await fs.writeFile(executable, "fixture executable", { mode: 0o700 });
-  await app.evaluate(({ dialog }, executable) => {
-    dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [executable] });
-  }, executable);
-  await page.getByRole("button", { name: "Descargas", exact: true }).click();
-  await page.getByRole("button", { name: "Añadir a biblioteca", exact: true }).click();
-  const modal = page.getByRole("dialog");
-  await expect(modal.getByLabel("Nombre del juego")).toHaveValue(
-    "Downloaded Adventure",
-  );
-  await expect(modal.locator("input[readonly]")).toHaveValue(executable);
-  await modal
-    .getByRole("button", { name: "Añadir a la biblioteca", exact: true })
-    .click();
-  await expect(modal).not.toBeVisible();
-  const library = await page.evaluate(() => window.launcher.listGames());
-  expect(
-    library.games.some(
-      (game) =>
-        game.title === "Downloaded Adventure" && game.installPath === executable,
-    ),
-  ).toBe(true);
-  expect(library.sessions).toHaveLength(0);
 });
 
 test("Real-Debrid bundle resumes without ETag or Last-Modified after an application restart", async ({

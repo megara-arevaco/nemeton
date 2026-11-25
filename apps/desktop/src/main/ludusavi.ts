@@ -6,8 +6,10 @@ const MANIFEST_URL =
   "https://raw.githubusercontent.com/mtkennerly/ludusavi-manifest/master/data/manifest.yaml";
 
 const MAX_CACHE_AGE = 24 * 60 * 60 * 1_000;
+const CACHE_VERSION = 2;
 
 interface CacheFile {
+  version?: number;
   updatedAt: string;
   games: LudusaviGame[];
 }
@@ -17,6 +19,19 @@ export interface LudusaviGame {
   steamAppId: string | null;
   files: Array<{ path: string; tags: string[] }>;
 }
+
+export const hookshotGame: LudusaviGame = {
+  name: "The Legend of Zelda: Ocarina of Time (Hookshot)",
+  steamAppId: null,
+  files: [
+    { path: "<base>/user/save/*/account.sav", tags: ["save"] },
+    { path: "<xdgData>/hookshot/save/*/account.sav", tags: ["save"] },
+  ],
+};
+
+export const isOcarinaOfTimeAlias = (name: string | null | undefined) =>
+  name === "The Legend of Zelda: Ocarina of Time" ||
+  Boolean(name?.startsWith("The Legend of Zelda: Ocarina of Time (Ship of Harkinian"));
 
 const normalize = (value: string) =>
   value
@@ -69,6 +84,12 @@ export class LudusaviCatalog {
         await new Promise<void>((resolve) => setImmediate(resolve));
       }
     }
+    if (!byName.has(hookshotGame.name)) {
+      byName.set(hookshotGame.name, hookshotGame);
+      const normalizedName = normalize(hookshotGame.name);
+      byNormalizedName.set(normalizedName, hookshotGame);
+      searchIndex.push({ game: hookshotGame, normalizedName });
+    }
     this.byName = byName;
     this.byNormalizedName = byNormalizedName;
     this.byAppId = byAppId;
@@ -101,6 +122,7 @@ export class LudusaviCatalog {
       this.refreshing = (async () => {
         const games = await this.parseManifest(await this.fetchText(MANIFEST_URL));
         await writeJsonAtomically(this.cachePath, {
+          version: CACHE_VERSION,
           updatedAt: new Date().toISOString(),
           games,
         });
@@ -123,6 +145,15 @@ export class LudusaviCatalog {
       const cached = await this.readCache();
 
       if (cached) {
+        if (cached.version !== CACHE_VERSION) {
+          try {
+            return await this.refresh();
+          } catch (error) {
+            console.warn("[ludusavi:refresh]", error);
+            return this.setGames(cached.games);
+          }
+        }
+
         const games = await this.setGames(cached.games);
 
         if (Date.now() - new Date(cached.updatedAt).getTime() >= MAX_CACHE_AGE) {
@@ -193,15 +224,21 @@ export class LudusaviCatalog {
   }
 
   async find(name: string) {
+    if (name === hookshotGame.name) {
+      return hookshotGame;
+    }
+
     await this.load();
     return this.byName.get(name) ?? null;
   }
 
   async match(title: string, steamAppId?: string | null) {
     await this.load();
+    const normalizedTitle = normalize(title);
     return (
       (steamAppId ? this.byAppId.get(steamAppId) : null) ??
-      this.byNormalizedName.get(normalize(title)) ??
+      this.byNormalizedName.get(normalizedTitle) ??
+      this.byNormalizedName.get(`the ${normalizedTitle}`) ??
       null
     );
   }

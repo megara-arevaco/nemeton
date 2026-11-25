@@ -3,7 +3,6 @@ export const downloadTranslations = {
     "downloads.pasteLink": "Pegar enlace",
     "downloads.bulkScope":
       "Controla la cola de Real-Debrid y BitTorrent. Las transferencias de tiendas tienen sus propios controles.",
-    "downloads.addToLibrary": "Añadir a biblioteca",
     "downloads.pauseAll": "Pausar todas",
     "downloads.resumeAll": "Reanudar grupo",
     "downloads.resumeAllHelp":
@@ -20,25 +19,20 @@ export const downloadTranslations = {
     "downloads.saveSettings": "Guardar ajustes",
     "downloads.sidebarActivity": "{{count}} descargas activas · {{progress}} %",
 
-    "downloads.customName": "Personalizar nombre (opcional)",
     "downloads.clearCompleted": "Limpiar completadas",
     "downloads.historyCleared":
       "Completadas retiradas del historial. Tus archivos se conservan.",
     "downloads.torrentLinksOnly":
       "BitTorrent admite enlaces magnet y archivos .torrent. Para enlaces HTTPS, elige Real-Debrid.",
-    "downloads.overview": "Resumen de descargas",
     "downloads.activity": "En curso",
     "downloads.history": "Historial",
     "downloads.all": "Todas",
     "downloads.speed": "Velocidad total",
-    "downloads.completedCount": "Completadas",
     "downloads.filter": "Filtrar descargas",
     "downloads.noMatches": "No hay descargas en esta sección.",
     "downloads.remaining": "Aprox. {{minutes}} min restantes",
 
     "downloads.title": "Descargas",
-    "downloads.description":
-      "Gestiona tus transferencias y encuentra los archivos descargados.",
     "downloads.queue": "Cola de descargas",
     "downloads.configuration": "Configuración",
     "downloads.addDownload": "Añadir descarga",
@@ -48,12 +42,11 @@ export const downloadTranslations = {
     "downloads.invalidLinks":
       "Introduce entre 1 y 50 enlaces magnet o HTTPS válidos, uno por línea.",
     "downloads.name": "Nombre de la descarga",
-    "downloads.optional": "Opcional · se obtiene del enlace",
+    "downloads.optional": "Opcional",
     "downloads.realDebridHelp":
       "Envía el magnet a Real-Debrid y descarga desde sus servidores con tu cuenta premium.",
     "downloads.directTorrentHelp":
       "Descarga directamente de otros usuarios, sin Real-Debrid.",
-    "downloads.connectRealDebrid": "Conectar Real-Debrid",
     "downloads.failure.invalid-file-links":
       "Real-Debrid no ha devuelto enlaces válidos. Reanuda para volver a intentarlo.",
     "downloads.method": "Descargar con",
@@ -61,7 +54,6 @@ export const downloadTranslations = {
     "downloads.addQueue": "Añadir a la cola",
     "downloads.openTorrent": "Abrir .torrent",
     "downloads.change": "Cambiar",
-    "downloads.parallel": "Hasta {{count}} tareas simultáneas",
     "downloads.connectHint":
       "Para usar Real-Debrid, conecta tu cuenta en Configuración.",
     "downloads.token": "Clave API de Real-Debrid",
@@ -82,7 +74,7 @@ export const downloadTranslations = {
       "Pausa o reanuda el juego completo. Al cerrar Nemeton, las descargas quedan pausadas. Cancelar conserva los datos guardados para reintentarlo. La pausa de Real-Debrid detiene la transferencia al equipo; la preparación en su nube puede continuar.",
     "downloads.emptyQueue": "Todavía no hay descargas",
     "downloads.emptyQueueHelp":
-      "Pega un magnet o abre un .torrent. Todos sus archivos se descargan automáticamente.",
+      "Añade enlaces magnet o HTTPS, o abre un archivo .torrent.",
     "downloads.selectFiles": "Elige los archivos que quieres descargar",
     "downloads.selectAll": "Seleccionar todos",
     "downloads.downloadSelected": "Descargar seleccionados ({{count}})",
@@ -157,7 +149,6 @@ export const downloadTranslations = {
     "downloads.pasteLink": "Paste link",
     "downloads.bulkScope":
       "Controls the Real-Debrid and BitTorrent queue. Store transfers have their own controls.",
-    "downloads.addToLibrary": "Add to library",
     "downloads.pauseAll": "Pause all",
     "downloads.resumeAll": "Resume group",
     "downloads.resumeAllHelp":
@@ -174,24 +165,20 @@ export const downloadTranslations = {
     "downloads.saveSettings": "Save settings",
     "downloads.sidebarActivity": "{{count}} active downloads · {{progress}} %",
 
-    "downloads.customName": "Customize name (optional)",
     "downloads.clearCompleted": "Clear completed",
     "downloads.historyCleared":
       "Completed downloads removed from history. Your files are kept.",
     "downloads.torrentLinksOnly":
       "BitTorrent supports magnet links and .torrent files. Choose Real-Debrid for HTTPS links.",
-    "downloads.overview": "Download overview",
     "downloads.activity": "In progress",
     "downloads.history": "History",
     "downloads.all": "All",
     "downloads.speed": "Total speed",
-    "downloads.completedCount": "Completed",
     "downloads.filter": "Filter downloads",
     "downloads.noMatches": "No downloads in this section.",
     "downloads.remaining": "Approx. {{minutes}} min remaining",
 
     "downloads.title": "Downloads",
-    "downloads.description": "Manage your transfers and find downloaded files.",
     "downloads.queue": "Download queue",
     "downloads.configuration": "Configuration",
     "downloads.addDownload": "Add download",
@@ -201,11 +188,10 @@ export const downloadTranslations = {
     "downloads.invalidLinks":
       "Enter between 1 and 50 valid magnet or HTTPS links, one per line.",
     "downloads.name": "Download name",
-    "downloads.optional": "Optional · derived from the link",
+    "downloads.optional": "Optional",
     "downloads.realDebridHelp":
       "Send the magnet to Real-Debrid and download from its servers with your premium account.",
     "downloads.directTorrentHelp": "Download directly from peers, without Real-Debrid.",
-    "downloads.connectRealDebrid": "Connect Real-Debrid",
     "downloads.failure.invalid-file-links":
       "Real-Debrid returned no valid links. Resume to try again.",
     "downloads.method": "Download with",
@@ -213,7 +199,6 @@ export const downloadTranslations = {
     "downloads.addQueue": "Add to queue",
     "downloads.openTorrent": "Open .torrent",
     "downloads.change": "Change",
-    "downloads.parallel": "Up to {{count}} simultaneous tasks",
     "downloads.connectHint":
       "Connect your account in Configuration to use Real-Debrid.",
     "downloads.token": "Real-Debrid API key",
@@ -233,8 +218,7 @@ export const downloadTranslations = {
     "downloads.pauseHelp":
       "Pause or resume the entire game. Downloads stay paused when Nemeton closes. Cancelling keeps saved data for retrying. Pausing Real-Debrid stops transfers to your computer; cloud preparation may continue.",
     "downloads.emptyQueue": "No downloads yet",
-    "downloads.emptyQueueHelp":
-      "Paste a magnet or open a .torrent file. All files download automatically.",
+    "downloads.emptyQueueHelp": "Add magnet or HTTPS links, or open a .torrent file.",
     "downloads.selectFiles": "Choose the files to download",
     "downloads.selectAll": "Select all",
     "downloads.downloadSelected": "Download selected ({{count}})",

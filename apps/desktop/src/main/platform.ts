@@ -1,6 +1,8 @@
 import { defaultSteamRoots } from "@launcher/core";
 import { canonicalizeContext, findSteamUserdata } from "./savegames/destinations.js";
 import { toWindowsPath, toLocalPath } from "../shared/system-paths.js";
+import { constants } from "node:fs";
+import fs from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -35,14 +37,77 @@ export async function openExternal(target: string) {
   ]);
 }
 
-export function spawnLocalGame(executablePath: string) {
+export async function findHookshotInstallation(executablePath: string) {
+  const directory = path.dirname(executablePath);
+  const filename = path.basename(executablePath);
+  const inBin = path.basename(directory).toLowerCase() === "bin";
+
+  if (!/^hookshot(?:\.exe)?$/i.test(filename)) {
+    return null;
+  }
+
+  const gameDirectory = inBin ? path.dirname(directory) : directory;
+  const binary = inBin ? executablePath : path.join(gameDirectory, "bin", filename);
+  const [image, executable] = await Promise.all([
+    fs.stat(path.join(gameDirectory, "image.bin")).catch(() => null),
+    fs.stat(binary).catch(() => null),
+  ]);
+
+  if (!image?.isFile() || !executable?.isFile()) {
+    return null;
+  }
+
+  return { binary, gameDirectory };
+}
+
+export async function resolveLocalGameLaunch(executablePath: string) {
+  const fallback = {
+    executablePath,
+    workingDirectory: path.dirname(executablePath),
+    env: process.env,
+  };
+  const installation = await findHookshotInstallation(executablePath);
+
+  if (!installation) {
+    return fallback;
+  }
+
+  const { binary, gameDirectory } = installation;
+  const windowsFromWsl = Boolean(
+    process.env.WSL_DISTRO_NAME && binary.startsWith("/mnt/"),
+  );
+  const accessMode = windowsFromWsl ? constants.F_OK : constants.X_OK;
+  const executableIsAccessible = await fs.access(binary, accessMode).then(
+    () => true,
+    () => false,
+  );
+
+  if (!executableIsAccessible) {
+    return fallback;
+  }
+
+  const env: NodeJS.ProcessEnv = { ...process.env, HOOKSHOT_NO_UPDATE_CHECK: "1" };
+
+  if (windowsFromWsl) {
+    env.WSLENV = [process.env.WSLENV, "HOOKSHOT_NO_UPDATE_CHECK/w"]
+      .filter(Boolean)
+      .join(":");
+  }
+  return { executablePath: binary, workingDirectory: gameDirectory, env };
+}
+
+export function spawnLocalGame(
+  executablePath: string,
+  workingDirectory = path.dirname(executablePath),
+  env = process.env,
+) {
   if (
     process.platform === "win32" ||
     (process.env.WSL_DISTRO_NAME && executablePath.startsWith("/mnt/"))
   ) {
     const target = toWindowsPath(executablePath);
-    const workingDirectory = toWindowsPath(path.dirname(executablePath));
-    const script = `$process=Start-Process -FilePath ${quotePowerShell(target)} -WorkingDirectory ${quotePowerShell(workingDirectory)} -PassThru -ErrorAction Stop;$process.WaitForExit();exit $process.ExitCode`;
+    const targetDirectory = toWindowsPath(workingDirectory);
+    const script = `$process=Start-Process -FilePath ${quotePowerShell(target)} -WorkingDirectory ${quotePowerShell(targetDirectory)} -PassThru -ErrorAction Stop;$process.WaitForExit();exit $process.ExitCode`;
     const powershell = process.platform === "win32" ? "powershell.exe" : powershellPath;
 
     return spawn(
@@ -53,12 +118,13 @@ export function spawnLocalGame(executablePath: string) {
         "-EncodedCommand",
         encodePowerShellCommand(script),
       ],
-      { detached: false, stdio: "ignore" },
+      { detached: false, stdio: "ignore", env },
     );
   }
 
   return spawn(executablePath, [], {
-    cwd: path.dirname(executablePath),
+    cwd: workingDirectory,
+    env,
     detached: false,
     stdio: "ignore",
   });

@@ -1,3 +1,4 @@
+import { stat } from "node:fs/promises";
 import type { LibrarySnapshot } from "@launcher/core";
 import {
   libraryChange,
@@ -10,7 +11,25 @@ export class LibraryPublisher {
   private current: PublishedLibrary | null = null;
   constructor(private readonly send: (change: LibraryChange) => void) {}
 
-  snapshot(snapshot: LibrarySnapshot, storageRevision?: number): PublishedLibrary {
+  async snapshot(
+    snapshot: LibrarySnapshot,
+    storageRevision?: number,
+  ): Promise<PublishedLibrary> {
+    const visibleGames = await Promise.all(
+      snapshot.games.map(async (game) => {
+        if (game.source !== "local" || !game.installPath) {
+          return game;
+        }
+        try {
+          return (await stat(game.installPath)).isFile() ? game : null;
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          return code === "ENOENT" || code === "ENOTDIR" ? null : game;
+        }
+      }),
+    );
+    snapshot = { ...snapshot, games: visibleGames.filter((game) => game !== null) };
+
     if (
       "revision" in snapshot &&
       typeof snapshot.revision === "number" &&
@@ -26,36 +45,21 @@ export class LibraryPublisher {
     ) {
       return structuredClone(this.current);
     }
-    this.publish(snapshot, storageRevision);
-    return { ...snapshot, revision: this.current!.revision };
-  }
-
-  publish(snapshot: LibrarySnapshot, storageRevision?: number) {
-    if (
-      "revision" in snapshot &&
-      typeof snapshot.revision === "number" &&
-      this.current &&
-      snapshot.revision < this.current.revision
-    ) {
-      return;
-    }
     if (storageRevision !== undefined) {
-      if (storageRevision < this.storageRevision) {
-        return;
-      }
       this.storageRevision = storageRevision;
     }
+
     if (!this.current) {
       this.current = { ...structuredClone(snapshot), revision: 0 };
-      return;
+      return { ...snapshot, revision: this.current.revision };
     }
 
     const change = libraryChange(this.current, snapshot);
 
-    if (!change) {
-      return;
+    if (change) {
+      this.current = { ...structuredClone(snapshot), revision: change.revision };
+      this.send(change);
     }
-    this.current = { ...structuredClone(snapshot), revision: change.revision };
-    this.send(change);
+    return { ...snapshot, revision: this.current.revision };
   }
 }

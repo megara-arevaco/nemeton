@@ -1,4 +1,4 @@
-import { resolveLocalGameAssets } from "../local-game-assets.js";
+import { findNintendoArtwork, resolveLocalGameAssets } from "../local-game-assets.js";
 import { LocalFolderImportService } from "../local-folder-import.js";
 import { savegameStorageKey } from "../../shared/game-identity.js";
 import fs from "node:fs";
@@ -7,12 +7,12 @@ import { BrowserWindow, dialog } from "electron";
 import type { MainContext } from "../context.js";
 import { handle } from "./handle.js";
 import { fetchSteamGameMetadata } from "@launcher/core";
-import { openExternal } from "../platform.js";
+import { findHookshotInstallation, openExternal } from "../platform.js";
+import { hookshotGame, isOcarinaOfTimeAlias } from "../ludusavi.js";
 export function registerLibraryHandlers({
   awaitStartupReady,
   store,
   broadcastLibrary,
-  publishLibrarySnapshot,
   achievementService,
   coversDirectory,
   ludusaviCatalog,
@@ -20,9 +20,16 @@ export function registerLibraryHandlers({
   settingsStore,
   scheduleAutoSync,
 }: MainContext) {
-  const localFolderImport = new LocalFolderImportService(store, (input) =>
-    resolveLocalGameAssets(input.title, ludusaviCatalog, input.steamAppId),
-  );
+  const localFolderImport = new LocalFolderImportService(store, async (input) => {
+    const hookshot = await findHookshotInstallation(input.executablePath);
+    const assets = await resolveLocalGameAssets(
+      input.title,
+      ludusaviCatalog,
+      input.steamAppId,
+      hookshot ? hookshotGame.name : undefined,
+    );
+    return hookshot ? { ...assets, ludusaviGameName: hookshotGame.name } : assets;
+  });
   handle("library:scan-local-folder", async () => {
     const result = await dialog.showOpenDialog({
       title: "Selecciona la carpeta de juegos",
@@ -52,7 +59,7 @@ export function registerLibraryHandlers({
   });
   handle("library:list", async () => {
     await awaitStartupReady();
-    return publishLibrarySnapshot(await store.read());
+    return store.read();
   });
   handle("library:metadata", async (_event, gameId: string) => {
     const game = await store.getGame(gameId);
@@ -160,13 +167,22 @@ export function registerLibraryHandlers({
         throw new Error("El ejecutable seleccionado no existe");
       }
 
+      const useHookshot =
+        (!input.ludusaviGameName || isOcarinaOfTimeAlias(input.ludusaviGameName)) &&
+        (await findHookshotInstallation(executablePath));
+
+      const linkedGameName = useHookshot ? hookshotGame.name : input.ludusaviGameName;
+      const nintendoArtwork = input.steamAppId
+        ? null
+        : findNintendoArtwork(title, linkedGameName);
+
       let snapshot = await store.addLocal({
         title,
         executablePath,
-        coverUrl: input.coverUrl,
-        heroUrl: input.heroUrl,
+        coverUrl: input.coverUrl ?? nintendoArtwork?.coverUrl,
+        heroUrl: input.heroUrl ?? nintendoArtwork?.heroUrl,
         steamAppId: input.steamAppId,
-        ludusaviGameName: input.ludusaviGameName,
+        ludusaviGameName: linkedGameName,
       });
       const game = [...snapshot.games]
         .reverse()

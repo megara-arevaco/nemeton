@@ -6,6 +6,8 @@ import {
   discoverLocalFolder,
   LocalFolderImportService,
 } from "../apps/desktop/src/main/local-folder-import";
+import { LibraryPublisher } from "../apps/desktop/src/main/library-publisher";
+import type { LibraryChange } from "../apps/desktop/src/shared/library-updates";
 import { LibraryStore } from "../packages/core/src/library/store";
 
 async function executable(filename: string) {
@@ -95,6 +97,47 @@ test("folder imports validate every selection before writing and are idempotent"
         (candidate) => candidate.alreadyAdded,
       ),
     ).toBe(true);
+  } finally {
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("deleted local games disappear from published libraries and reappear when restored", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "nemeton-missing-game-"));
+
+  try {
+    const root = path.join(directory, "games");
+    const gamePath = path.join(root, "Alpha", "Alpha.exe");
+    await executable(gamePath);
+    const store = new LibraryStore(path.join(directory, "library.json"));
+    const service = new LocalFolderImportService(store);
+    const scan = await service.scan(root);
+    await service.import(scan.scanId, [
+      {
+        candidateId: scan.candidates[0]!.id,
+        title: "Alpha",
+        executablePath: gamePath,
+      },
+    ]);
+    await store.addLocal({ title: "Manual entry", executablePath: "" });
+
+    const changes: LibraryChange[] = [];
+    const publisher = new LibraryPublisher((change) => changes.push(change));
+    const stored = await store.read();
+    const revision = store.getSnapshotRevision(stored);
+    const initial = await publisher.snapshot(stored, revision);
+    const alpha = initial.games.find((game) => game.title === "Alpha")!;
+
+    await fs.rm(path.dirname(gamePath), { recursive: true });
+    const afterDeletion = await publisher.snapshot(stored, revision);
+    expect(afterDeletion.games.map((game) => game.title)).toEqual(["Manual entry"]);
+    expect(changes[0]?.removedGameIds).toEqual([alpha.id]);
+    expect((await store.read()).games).toHaveLength(2);
+
+    await executable(gamePath);
+    const restored = await publisher.snapshot(stored, revision);
+    expect(restored.games).toEqual(initial.games);
+    expect(changes[1]?.games).toEqual([alpha]);
   } finally {
     await fs.rm(directory, { recursive: true, force: true });
   }

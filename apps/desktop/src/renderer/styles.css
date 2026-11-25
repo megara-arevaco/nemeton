@@ -1606,3 +1606,23 @@ h1 {
 .hero-copy h1 {
   text-shadow: 0 2px 20px #0008;
 }
+
+.big-picture-entry {
+  -webkit-app-region: no-drag;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  flex-shrink: 0;
+  margin-left: 12px;
+  padding: 8px 12px;
+  background: #ffffff0d;
+  border: 1px solid #ffffff25;
+  border-radius: 10px;
+  color: var(--accent-a, #a9fb76);
+  cursor: pointer;
+}
+.big-picture-entry:focus-visible {
+  outline: 2px solid var(--accent-a, #a9fb76);
+  outline-offset: 3px;
+}

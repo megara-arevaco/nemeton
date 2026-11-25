@@ -9,6 +9,7 @@ export function parseManifest(text: string): LudusaviGame[] {
   const document = load(text, { schema: JSON_SCHEMA }) as Record<
     string,
     {
+      alias?: string;
       steam?: { id?: number | string };
       files?: Record<string, { tags?: string[] }>;
     }
@@ -23,14 +24,29 @@ export function parseManifest(text: string): LudusaviGame[] {
   if (entries.length > 100_000) {
     throw new Error("El catálogo contiene demasiados juegos");
   }
-  return entries.map(([name, game]) => ({
-    name,
-    steamAppId: game?.steam?.id == null ? null : String(game.steam.id),
-    files: Object.entries(game?.files ?? {}).map(([path, metadata]) => ({
-      path,
-      tags: Array.isArray(metadata?.tags)
-        ? metadata.tags.filter((tag) => typeof tag === "string")
-        : [],
-    })),
-  }));
+  return entries.flatMap(([name, entry]) => {
+    let game = entry;
+    const visited = new Set<string>();
+
+    while (typeof game?.alias === "string") {
+      if (visited.has(game.alias) || !Object.hasOwn(document, game.alias)) {
+        return [];
+      }
+      visited.add(game.alias);
+      game = document[game.alias]!;
+    }
+
+    return [
+      {
+        name,
+        steamAppId: game?.steam?.id == null ? null : String(game.steam.id),
+        files: Object.entries(game?.files ?? {}).map(([path, metadata]) => ({
+          path,
+          tags: Array.isArray(metadata?.tags)
+            ? metadata.tags.filter((tag) => typeof tag === "string")
+            : [],
+        })),
+      },
+    ];
+  });
 }

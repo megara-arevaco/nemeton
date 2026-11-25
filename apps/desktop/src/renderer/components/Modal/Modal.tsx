@@ -6,7 +6,7 @@ import { useModal } from "./Modal.hook";
 
 interface ModalProps {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   icon: ReactNode;
   children: ReactNode;
   actions: ReactNode;
@@ -51,9 +51,11 @@ export function Modal({
             {icon}
           </span>
           <div className="[min-width:0]">
-            <small className="[display:block] [margin:0_0_3px] [color:var(--text-muted)] [font-size:9px] [font-weight:700] [letter-spacing:1.3px]">
-              {subtitle}
-            </small>
+            {subtitle && (
+              <small className="[display:block] [margin:0_0_3px] [color:var(--text-muted)] [font-size:9px] [font-weight:700] [letter-spacing:1.3px]">
+                {subtitle}
+              </small>
+            )}
             <h2
               id={titleId}
               className="[margin:0] [font-size:18px] [overflow-wrap:anywhere]"

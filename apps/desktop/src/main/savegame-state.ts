@@ -1,5 +1,6 @@
 import { savegameStorageKey } from "../shared/game-identity.js";
 import fs from "node:fs/promises";
+import { hookshotGame, isOcarinaOfTimeAlias } from "./ludusavi.js";
 import type { MainContext } from "./context.js";
 import type { SavegameState } from "../shared/savegames.js";
 
@@ -57,14 +58,25 @@ export async function readSavegameState(
     throw new Error("No se encontró el juego");
   }
 
-  const { getSavegamePathContext } = await import("./platform.js");
-  savegameManager.setPathContext(gameId, await getSavegamePathContext(game));
+  const { findHookshotInstallation, getSavegamePathContext } = await import(
+    "./platform.js"
+  );
+  const pathContext = await getSavegamePathContext(game);
+  savegameManager.setPathContext(gameId, pathContext);
   const settings = await settingsStore.read();
   let paths = discover
     ? await savegameManager.removeInstallRoot(gameId, game.installPath)
     : await savegameManager.getPaths(gameId);
-  const ludusavi =
-    discover && game.ludusaviGameName
+  const hookshot =
+    discover &&
+    (!game.ludusaviGameName ||
+      game.ludusaviGameName === hookshotGame.name ||
+      isOcarinaOfTimeAlias(game.ludusaviGameName))
+      ? await findHookshotInstallation(game.installPath)
+      : null;
+  const ludusavi = hookshot
+    ? hookshotGame
+    : discover && game.ludusaviGameName
       ? await ludusaviCatalog.find(game.ludusaviGameName)
       : null;
   const policy = await savegameManager.getPolicy(gameId);
@@ -77,6 +89,8 @@ export async function readSavegameState(
         ludusavi,
         policy.includeConfig,
         false,
+        pathContext.platform === "linux" ? pathContext.anchors.local : undefined,
+        hookshot?.gameDirectory,
       )
     : [];
 

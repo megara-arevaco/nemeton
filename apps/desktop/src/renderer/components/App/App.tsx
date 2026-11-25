@@ -1,3 +1,5 @@
+import { BigPicture } from "../BigPicture/BigPicture";
+import { GameController } from "@phosphor-icons/react/GameController";
 import { GameHeroImage } from "../GameHeroImage/GameHeroImage";
 import { LibraryFilters } from "../LibraryFilters/LibraryFilters";
 import { GameSessions } from "../GameSessions/GameSessions";
@@ -5,7 +7,7 @@ import { ProviderActions } from "../GameCopies/ProviderActions";
 import { GameCopies } from "../GameCopies/GameCopies";
 import { LoadingState } from "../LoadingState";
 import { useTranslation } from "react-i18next";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { DotsThree } from "@phosphor-icons/react/DotsThree";
 import { Gear } from "@phosphor-icons/react/Gear";
@@ -90,7 +92,6 @@ export function App() {
     metadata,
     view,
     showAddGame,
-    downloadedGame,
     artworkGame,
     editGame,
     deleteGame,
@@ -128,6 +129,7 @@ export function App() {
     stopPropagation,
     onLocalGameCreated,
     launchSelected,
+    launchGame,
     chooseCover,
     removeGame,
     requestDeleteGame,
@@ -135,6 +137,17 @@ export function App() {
     deletingGame,
     deleteGameError,
   } = useApp();
+  const [bigPicture, setBigPicture] = useState(false);
+  const exitBigPicture = useCallback(() => {
+    setBigPicture(false);
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
+    }
+  }, []);
+  const enterBigPicture = () => {
+    setBigPicture(true);
+    void document.documentElement.requestFullscreen().catch(() => undefined);
+  };
   const [focusSteamSettings, setFocusSteamSettings] = useState(false);
   const openSteamSettings = () => {
     setFocusSteamSettings(true);
@@ -179,6 +192,24 @@ export function App() {
           item.achieved === (achievementFilter === "unlocked"),
       )
     : [];
+
+  if (bigPicture) {
+    return (
+      <BigPicture
+        games={libraryGames}
+        recentGames={recentGames}
+        runningGameIds={runningGameIds}
+        loading={libraryLoading}
+        message={message}
+        onLaunch={launchGame}
+        onExit={exitBigPicture}
+        onDetails={(id) => {
+          selectGame(id);
+          exitBigPicture();
+        }}
+      />
+    );
+  }
 
   return (
     <main
@@ -249,6 +280,14 @@ export function App() {
               )}
             </span>
           )}
+          <button
+            className="big-picture-entry"
+            onClick={enterBigPicture}
+            aria-label={t("bp.enter")}
+            title={t("bp.enter")}
+          >
+            <GameController aria-hidden="true" /> Big Picture
+          </button>
           <div
             className={
               "window-controls [position:absolute] [top:0] [right:0] [display:flex] [height:44px] [-webkit-app-region:no-drag] [&_button]:[display:grid] [&_button]:[place-items:center] [&_button]:[width:46px] [&_button]:[border:0] [&_button]:[background:transparent] [&_button]:[color:#8c8f99] [&_button]:[cursor:pointer] [&_button:hover]:[background:#ffffff0b] [&_button:hover]:[color:white] [&_button.window-close:hover]:[background:#d94b55] [&_button.window-close:hover]:[color:white] [&_svg]:[width:15px] [&_svg]:[height:15px]"
@@ -699,8 +738,6 @@ export function App() {
               updateLibrary(snapshot);
               openLibrary();
             }}
-            initialTitle={downloadedGame?.title}
-            initialExecutablePath={downloadedGame?.executablePath}
           />
         </Suspense>
       )}

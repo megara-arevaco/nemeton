@@ -15,11 +15,7 @@ export function AddGameModal({
   onClose,
   onCreated,
   onBatchCreated,
-  initialTitle,
-  initialExecutablePath,
 }: Readonly<{
-  initialTitle?: string;
-  initialExecutablePath?: string;
   onClose: () => void;
   onCreated: (snapshot: LibrarySnapshot) => void;
   onBatchCreated?: (snapshot: LibrarySnapshot) => void;
@@ -40,7 +36,7 @@ export function AddGameModal({
     clearLudusavi,
     updateTitle,
     createGame,
-  } = useAddGameModal({ onClose, onCreated, initialTitle, initialExecutablePath });
+  } = useAddGameModal({ onClose, onCreated });
 
   if (folderMode) {
     return (

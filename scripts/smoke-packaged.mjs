@@ -11,7 +11,7 @@ await fs.mkdir(data, { recursive: true });
 await fs.mkdir(path.join(directory, "steam/steamapps"), { recursive: true });
 await fs.writeFile(
   path.join(data, "ludusavi-catalog.json"),
-  JSON.stringify({ updatedAt: new Date().toISOString(), games: [] }),
+  JSON.stringify({ version: 2, updatedAt: new Date().toISOString(), games: [] }),
 );
 let desktop;
 const launch = async () => {

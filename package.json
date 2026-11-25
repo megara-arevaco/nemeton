@@ -1,7 +1,7 @@
 {
   "name": "nemeton",
   "private": true,
-  "version": "0.1.16",
+  "version": "0.1.17",
   "packageManager": "pnpm@10.15.0",
   "pnpm": {
     "onlyBuiltDependencies": [

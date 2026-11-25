@@ -90,14 +90,14 @@ export function DownloadsView() {
 
   if (status.isPending) {
     return (
-      <div className="downloads-view" role="status">
+      <div className="downloads-view downloads-state" role="status">
         {t("downloads.loading")}
       </div>
     );
   }
   if (!snapshot) {
     return (
-      <div className="downloads-view" role="alert">
+      <div className="downloads-view downloads-state" role="alert">
         <p>{t("downloads.loadFailed")}</p>
         <Button onClick={() => void status.refetch()}>{t("downloads.retry")}</Button>
       </div>
@@ -137,161 +137,163 @@ export function DownloadsView() {
           {t("downloads.addDownload")}
         </Button>
       </header>
-      <nav className="downloads-tabs" aria-label={t("downloads.title")}>
-        {(["queue", "configuration"] as const).map((item) => (
-          <button
-            type="button"
-            key={item}
-            aria-current={tab === item ? "page" : undefined}
-            onClick={() => {
-              setTab(item);
-              setError("");
-              setNotice("");
-            }}
-          >
-            {t(`downloads.${item}`)}
-          </button>
-        ))}
-      </nav>
-      {!adding && error && (
-        <p className="downloads-error" role="alert">
-          {error}
-        </p>
-      )}
-      {notice && (
-        <p className="downloads-notice" role="status">
-          {notice}
-        </p>
-      )}
-      {tab === "configuration" && (
-        <DownloadConfiguration snapshot={snapshot} run={run} busy={busy} />
-      )}
-      {adding && (
-        <AddDownload
-          snapshot={snapshot}
-          run={run}
-          busy={busy}
-          error={error}
-          onClose={() => {
-            setAdding(false);
-            setError("");
-          }}
-          onAdded={() => {
-            setAdding(false);
-            setTab("queue");
-            setFilter("all");
-          }}
-        />
-      )}
-      <div hidden={tab !== "queue"}>
-        <div className="downloads-queue-heading">
-          <div className="downloads-filters" aria-label={t("downloads.filter")}>
-            {(["all", "activity", "history"] as const).map((item) => (
-              <Button
-                key={item}
-                size="small"
-                variant={filter === item ? "setup" : "ghost"}
-                aria-pressed={filter === item}
-                onClick={() => setFilter(item)}
-              >
-                {t(`downloads.${item}`)}{" "}
-                <span>
-                  {item === "all"
-                    ? snapshot.jobs.length + externalTransfers
-                    : item === "activity"
-                      ? activity.length + externalTransfers
-                      : history.length}
-                </span>
-              </Button>
-            ))}
-          </div>
-          <div className="downloads-queue-tools">
-            {filter !== "history" && snapshot.jobs.length > 0 && (
-              <>
-                <Button
-                  size="small"
-                  variant="secondary"
-                  title={t("downloads.bulkScope")}
-                  disabled={
-                    busy ||
-                    !snapshot.jobs.some((job) => activeStatuses.includes(job.status))
-                  }
-                  onClick={() =>
-                    void run(() => window.launcher.controlAllDownloads("pause"))
-                  }
-                >
-                  <Pause aria-hidden="true" />
-                  {t("downloads.pauseAll")}
-                </Button>
-                <Button
-                  size="small"
-                  variant="secondary"
-                  title={t("downloads.resumeAllHelp")}
-                  disabled={busy || !snapshot.bulkPausedIds?.length}
-                  onClick={() =>
-                    void run(() => window.launcher.controlAllDownloads("resume"))
-                  }
-                >
-                  <Play aria-hidden="true" />
-                  {t("downloads.resumeAll")}
-                </Button>
-                {speed > 0 && (
-                  <span>
-                    {t("downloads.speed")} · {formatDownloadBytes(speed)}/s
-                  </span>
-                )}
-              </>
-            )}
-            {filter !== "activity" &&
-              history.some((job) => job.status === "completed") && (
-                <Button
-                  size="small"
-                  variant="ghost"
-                  loading={busy}
-                  title={t("downloads.removeHelp")}
-                  onClick={() =>
-                    void run(async () => {
-                      for (const job of history.filter(
-                        (item) => item.status === "completed",
-                      )) {
-                        await window.launcher.controlDownload(job.id, "remove");
-                      }
-                    }, t("downloads.historyCleared"))
-                  }
-                >
-                  {t("downloads.clearCompleted")}
-                </Button>
-              )}
-          </div>
-        </div>
-        {!snapshot.jobs.length && !externalTransfers && (
-          <div className="downloads-empty">
-            <DownloadSimple size={32} aria-hidden="true" />
-            <h2>{t("downloads.emptyQueue")}</h2>
-            <p>{t("downloads.emptyQueueHelp")}</p>
-          </div>
+      <div className="downloads-scroll">
+        <nav className="downloads-tabs" aria-label={t("downloads.title")}>
+          {(["queue", "configuration"] as const).map((item) => (
+            <button
+              type="button"
+              key={item}
+              aria-current={tab === item ? "page" : undefined}
+              onClick={() => {
+                setTab(item);
+                setError("");
+                setNotice("");
+              }}
+            >
+              {t(`downloads.${item}`)}
+            </button>
+          ))}
+        </nav>
+        {!adding && error && (
+          <p className="downloads-error" role="alert">
+            {error}
+          </p>
         )}
-        <ProviderTransfers hidden={filter === "history"} />
-        {groups.map(([name, jobs]) => (
-          <section
-            className="downloads-group"
-            key={name}
-            aria-label={t(`downloads.${name}`)}
-          >
-            {filter === "all" && jobs.length > 0 && (
-              <h2 className="downloads-group-title">{t(`downloads.${name}`)}</h2>
-            )}
-            {jobs.map((job) => (
-              <DownloadTask key={job.id} job={job} hasToken={snapshot.hasToken} />
-            ))}
-            {!jobs.length &&
-              filter !== "all" &&
-              snapshot.jobs.length > 0 &&
-              !(name === "activity" && externalTransfers > 0) && (
-                <p className="downloads-empty-filter">{t("downloads.noMatches")}</p>
+        {notice && (
+          <p className="downloads-notice" role="status">
+            {notice}
+          </p>
+        )}
+        {tab === "configuration" && (
+          <DownloadConfiguration snapshot={snapshot} run={run} busy={busy} />
+        )}
+        {adding && (
+          <AddDownload
+            snapshot={snapshot}
+            run={run}
+            busy={busy}
+            error={error}
+            onClose={() => {
+              setAdding(false);
+              setError("");
+            }}
+            onAdded={() => {
+              setAdding(false);
+              setTab("queue");
+              setFilter("all");
+            }}
+          />
+        )}
+        <div hidden={tab !== "queue"}>
+          <div className="downloads-queue-heading">
+            <div className="downloads-filters" aria-label={t("downloads.filter")}>
+              {(["all", "activity", "history"] as const).map((item) => (
+                <Button
+                  key={item}
+                  size="small"
+                  variant={filter === item ? "setup" : "ghost"}
+                  aria-pressed={filter === item}
+                  onClick={() => setFilter(item)}
+                >
+                  {t(`downloads.${item}`)}{" "}
+                  <span>
+                    {item === "all"
+                      ? snapshot.jobs.length + externalTransfers
+                      : item === "activity"
+                        ? activity.length + externalTransfers
+                        : history.length}
+                  </span>
+                </Button>
+              ))}
+            </div>
+            <div className="downloads-queue-tools">
+              {filter !== "history" && snapshot.jobs.length > 0 && (
+                <>
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    title={t("downloads.bulkScope")}
+                    disabled={
+                      busy ||
+                      !snapshot.jobs.some((job) => activeStatuses.includes(job.status))
+                    }
+                    onClick={() =>
+                      void run(() => window.launcher.controlAllDownloads("pause"))
+                    }
+                  >
+                    <Pause aria-hidden="true" />
+                    {t("downloads.pauseAll")}
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    title={t("downloads.resumeAllHelp")}
+                    disabled={busy || !snapshot.bulkPausedIds?.length}
+                    onClick={() =>
+                      void run(() => window.launcher.controlAllDownloads("resume"))
+                    }
+                  >
+                    <Play aria-hidden="true" />
+                    {t("downloads.resumeAll")}
+                  </Button>
+                  {speed > 0 && (
+                    <span>
+                      {t("downloads.speed")} · {formatDownloadBytes(speed)}/s
+                    </span>
+                  )}
+                </>
               )}
-          </section>
-        ))}
+              {filter !== "activity" &&
+                history.some((job) => job.status === "completed") && (
+                  <Button
+                    size="small"
+                    variant="ghost"
+                    loading={busy}
+                    title={t("downloads.removeHelp")}
+                    onClick={() =>
+                      void run(async () => {
+                        for (const job of history.filter(
+                          (item) => item.status === "completed",
+                        )) {
+                          await window.launcher.controlDownload(job.id, "remove");
+                        }
+                      }, t("downloads.historyCleared"))
+                    }
+                  >
+                    {t("downloads.clearCompleted")}
+                  </Button>
+                )}
+            </div>
+          </div>
+          {!snapshot.jobs.length && !externalTransfers && (
+            <div className="downloads-empty">
+              <DownloadSimple size={32} aria-hidden="true" />
+              <h2>{t("downloads.emptyQueue")}</h2>
+              <p>{t("downloads.emptyQueueHelp")}</p>
+            </div>
+          )}
+          <ProviderTransfers hidden={filter === "history"} />
+          {groups.map(([name, jobs]) => (
+            <section
+              className="downloads-group"
+              key={name}
+              aria-label={t(`downloads.${name}`)}
+            >
+              {filter === "all" && jobs.length > 0 && (
+                <h2 className="downloads-group-title">{t(`downloads.${name}`)}</h2>
+              )}
+              {jobs.map((job) => (
+                <DownloadTask key={job.id} job={job} hasToken={snapshot.hasToken} />
+              ))}
+              {!jobs.length &&
+                filter !== "all" &&
+                snapshot.jobs.length > 0 &&
+                !(name === "activity" && externalTransfers > 0) && (
+                  <p className="downloads-empty-filter">{t("downloads.noMatches")}</p>
+                )}
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

@@ -34,7 +34,7 @@ export function StatisticsView({
   return (
     <div
       className={
-        "statistics-view [min-height:0] [overflow-y:auto] [padding:20px_34px_40px]"
+        "statistics-view [min-height:0] [overflow-y:auto] [padding:20px_var(--page-gutter)_40px] [scrollbar-gutter:stable]"
       }
     >
       <div

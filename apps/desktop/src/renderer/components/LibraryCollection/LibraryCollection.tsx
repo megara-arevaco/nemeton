@@ -39,7 +39,7 @@ export const LibraryCollection = memo(function LibraryCollection({
   return (
     <div
       ref={scrollRef}
-      className="library-collection-view [min-height:0] [overflow-y:auto] [padding:0_34px_34px]"
+      className="library-collection-view [min-height:0] [overflow-y:auto] [padding:0_var(--page-gutter)_34px] [scrollbar-gutter:stable]"
     >
       {intro}
       <section

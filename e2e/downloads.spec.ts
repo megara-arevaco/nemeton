@@ -253,6 +253,15 @@ test("link-only UI saves configuration, downloads and shows one progress bar per
   ).not.toContain("fixture_token");
   await page.screenshot({ path: testInfo.outputPath("downloads-desktop.png") });
   await page.setViewportSize({ width: 980, height: 640 });
+  await page.locator(".downloads-scroll").evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  await expect(
+    page.getByRole("heading", { name: "Descargas", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
+  await expect(
+    page.getByRole("button", { name: "Añadir descarga", exact: true }),
+  ).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: testInfo.outputPath("downloads-compact.png") });
   const restarted = await desktop.restart();
   expect((await state(restarted)).jobs.every((job) => job.status === "completed")).toBe(
@@ -865,7 +874,7 @@ test("download hierarchy filters history, preserves files and isolates task fail
     await expect
       .poll(() =>
         page
-          .locator(".downloads-view")
+          .locator(".downloads-scroll")
           .evaluate((element) => element.scrollWidth <= element.clientWidth),
       )
       .toBe(true);

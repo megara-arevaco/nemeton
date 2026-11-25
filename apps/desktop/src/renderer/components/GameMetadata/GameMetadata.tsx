@@ -23,11 +23,7 @@ export function GameMetadata({ metadata }: GameMetadataProps) {
   }
 
   return (
-    <aside
-      className={
-        "game-metadata [position:absolute] [z-index:1] [right:34px] [bottom:34px] [width:clamp(220px,_31%,_390px)] [padding:18px] [border:1px_solid_#ffffff0c] [border-radius:16px] [background:linear-gradient(160deg,_#191b2852,_#0b0d1466)] [box-shadow:0_12px_30px_#0000001a] [backdrop-filter:blur(10px)]"
-      }
-    >
+    <aside className={"game-metadata"}>
       <span
         className={
           "[margin-bottom:9px] [color:var(--accent-a)] [font-size:9px] [font-weight:800] [letter-spacing:1.6px]"

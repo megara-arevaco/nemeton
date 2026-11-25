@@ -73,10 +73,14 @@ protocol.registerSchemesAsPrivileged([
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 }
-app.on("second-instance", () => {
+
+let startInBigPicture = process.argv.includes("--big-picture");
+app.on("second-instance", (_event, args) => {
+  const bigPictureRequested = args.includes("--big-picture");
   const existingWindow = BrowserWindow.getAllWindows()[0];
 
   if (!existingWindow) {
+    startInBigPicture ||= bigPictureRequested;
     return;
   }
   if (existingWindow.isMinimized()) {
@@ -84,6 +88,14 @@ app.on("second-instance", () => {
   }
   existingWindow.show();
   existingWindow.focus();
+  if (bigPictureRequested && !existingWindow.webContents.isLoadingMainFrame()) {
+    existingWindow.webContents.send("window:open-big-picture");
+  }
+  if (bigPictureRequested && existingWindow.webContents.isLoadingMainFrame()) {
+    existingWindow.webContents.once("did-finish-load", () => {
+      existingWindow.webContents.send("window:open-big-picture");
+    });
+  }
 });
 
 const publisher = new LibraryPublisher((change) => {
@@ -178,8 +190,11 @@ const createWindow = () => {
   // E2E keeps the real Electron/IPC stack without showing desktop windows.
   const hiddenTestWindow =
     Boolean(process.env.NEMETON_E2E_DATA) && process.env.NEMETON_E2E_HEADED !== "1";
+  const startupHash = startInBigPicture ? "big-picture" : "";
+  startInBigPicture = false;
   const window = new BrowserWindow({
     show: !hiddenTestWindow,
+    fullscreen: Boolean(startupHash) && !hiddenTestWindow,
     width: 1380,
     height: 860,
     minWidth: 980,
@@ -219,10 +234,14 @@ const createWindow = () => {
     console.error("[preload:error]", { preloadPath, error });
   });
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
-    runBackground(window.loadURL(process.env.ELECTRON_RENDERER_URL), "[renderer:load]");
+    const url = new URL(documentUrl);
+    url.hash = startupHash;
+    runBackground(window.loadURL(url.href), "[renderer:load]");
   } else {
     runBackground(
-      window.loadFile(path.join(directory, "../renderer/index.html")),
+      window.loadFile(path.join(directory, "../renderer/index.html"), {
+        hash: startupHash,
+      }),
       "[renderer:load]",
     );
   }

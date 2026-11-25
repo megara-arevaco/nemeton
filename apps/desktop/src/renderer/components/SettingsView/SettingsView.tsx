@@ -90,7 +90,7 @@ export function SettingsView({
   return (
     <div
       className={
-        "settings-view [min-height:0] [overflow-y:auto] [padding:20px_34px_40px]"
+        "settings-view [min-height:0] [overflow-y:auto] [padding:20px_var(--page-gutter)_40px] [scrollbar-gutter:stable]"
       }
     >
       <div

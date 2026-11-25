@@ -1,7 +1,27 @@
 .downloads-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
   min-height: 0;
+}
+.downloads-view > .downloads-heading,
+.downloads-scroll,
+.downloads-state {
+  padding-inline: var(--page-gutter);
+}
+.downloads-view > .downloads-heading {
+  padding-block: var(--card-padding) var(--space-2);
+  overflow: hidden;
+  scrollbar-gutter: stable;
+}
+.downloads-state {
+  display: block;
+  padding-block: var(--card-padding);
+}
+.downloads-scroll {
   overflow: auto;
-  padding: 12px var(--page-gutter) 36px;
+  padding-bottom: 36px;
+  scroll-padding-block: var(--space-4);
   scrollbar-gutter: stable;
 }
 .downloads-heading h1 {
@@ -14,7 +34,7 @@
   display: flex;
   gap: 24px;
   border-bottom: 1px solid var(--border-default);
-  margin: 20px 0;
+  margin: var(--space-4) 0 var(--space-6);
 }
 .downloads-tabs button {
   min-height: 44px;

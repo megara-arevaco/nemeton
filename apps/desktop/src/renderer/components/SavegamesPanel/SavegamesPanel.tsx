@@ -43,7 +43,7 @@ export function SavegamesPanel({ game }: Readonly<{ game: LibraryGame }>) {
   }
 
   return (
-    <section className="savegames-section [margin:24px_34px_0] [padding:22px] [border:1px_solid_#ffffff0d] [border-radius:18px] [background:#101119]">
+    <section className="savegames-section [margin:24px_var(--page-gutter)_0] [padding:22px] [border:1px_solid_#ffffff0d] [border-radius:18px] [background:#101119]">
       <div className="savegames-heading [display:flex] [align-items:center] [justify-content:space-between] [gap:16px]">
         <div className="[display:flex] [align-items:center] [gap:12px]">
           <span className="[display:grid] [place-items:center] [width:38px] [height:38px] [border-radius:11px] [background:color-mix(in_srgb,_var(--accent-a)_12%,_transparent)] [color:var(--accent-a)]">

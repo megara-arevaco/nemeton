@@ -470,30 +470,25 @@ export function useApp() {
     library.setMessage(t("status.localGameAdded"));
   };
 
-  const launchGame = async (selected: LibraryGame | null) => {
-    if (!selected) {
-      return;
-    }
-
+  const launchGame = async (game: LibraryGame) => {
     try {
-      library.setMessage(t("status.startingGame", { title: selected.title }));
-      if (
-        (selected.source === "epic" || selected.source === "gog") &&
-        !selected.installed
-      ) {
-        await window.launcher.operateProviderGame(selected.id, "install");
+      library.setMessage(t("status.startingGame", { title: game.title }));
+      if ((game.source === "epic" || game.source === "gog") && !game.installed) {
+        await window.launcher.operateProviderGame(game.id, "install");
       } else {
-        await launchGameMutation.mutateAsync(selected.id);
+        await launchGameMutation.mutateAsync(game.id);
       }
-      library.setMessage(t("status.gameStarted", { title: selected.title }));
+      library.setMessage(t("status.gameStarted", { title: game.title }));
     } catch (error) {
       library.setMessage(
         error instanceof Error
           ? error.message
-          : t("status.launchFailed", { title: selected.title }),
+          : t("status.launchFailed", { title: game.title }),
       );
     }
   };
+
+  const launchSelected = () => selected && launchGame(selected);
 
   const chooseCover = () => {
     if (selected) {
@@ -648,8 +643,9 @@ export function useApp() {
     closeGameMenuFromContext,
     stopPropagation,
     onLocalGameCreated,
-    launchSelected: () => launchGame(selected),
+    launchSelected,
     launchGame,
+    launchingGame: launchGameMutation.isPending,
     chooseCover,
     removeGame,
     requestDeleteGame,

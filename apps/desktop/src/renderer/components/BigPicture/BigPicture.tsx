@@ -1,226 +1,246 @@
-import { useEffect, useRef, useState } from "react";
-import type { LibraryGame } from "@launcher/core";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { GameGroup, LibraryGame } from "@launcher/core";
 import { useTranslation } from "react-i18next";
+import { ArrowUUpLeft } from "@phosphor-icons/react/ArrowUUpLeft";
 import { GameController } from "@phosphor-icons/react/GameController";
+import { Play } from "@phosphor-icons/react/Play";
 import { GameHeroImage } from "../GameHeroImage/GameHeroImage";
-import { GameLaunchButton } from "../GameLaunchButton";
-import { formatPlaytime } from "../../shared/presentation";
 import "./BigPicture.css";
 
 interface Props {
-  games: LibraryGame[];
-  recentGames: LibraryGame[];
-  runningGameIds: Set<string>;
+  groups: GameGroup[];
   loading: boolean;
+  launching: boolean;
+  runningGameIds: Set<string>;
   message: string;
   onLaunch: (game: LibraryGame) => Promise<void>;
-  onDetails: (id: string) => void;
   onExit: () => void;
 }
 
-export function BigPicture(props: Props) {
+const directions: Record<string, [number, number]> = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
+
+function moveFocus(root: HTMLElement, key: string) {
+  const [x, y] = directions[key];
+  const buttons = Array.from(
+    root.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+  );
+  const current = buttons.find((button) => button === document.activeElement);
+
+  if (!current) {
+    (root.querySelector<HTMLButtonElement>("[data-game]") ?? buttons[0])?.focus();
+    return;
+  }
+
+  const center = (button: Element) => {
+    const rect = button.getBoundingClientRect();
+    return [rect.left + rect.width / 2, rect.top + rect.height / 2];
+  };
+  const [left, top] = center(current);
+  let best: Element | undefined;
+  let closest = Infinity;
+
+  for (const button of buttons) {
+    const [candidateLeft, candidateTop] = center(button);
+    const dx = candidateLeft - left;
+    const dy = candidateTop - top;
+    const forward = dx * x + dy * y;
+    const sideways = Math.abs(dx * y - dy * x);
+
+    if (forward <= 1 || sideways > forward * 2) {
+      continue;
+    }
+
+    const distance = forward + 2 * sideways;
+
+    if (distance < closest) {
+      best = button;
+      closest = distance;
+    }
+  }
+  if (best instanceof HTMLButtonElement) {
+    best.focus();
+  }
+}
+
+function gamepadDirection(pad: Gamepad) {
+  const [x = 0, y = 0] = pad.axes;
+  const buttons = pad.buttons;
+
+  if (buttons[14]?.pressed || x < -0.55) {
+    return "ArrowLeft";
+  }
+  if (buttons[15]?.pressed || x > 0.55) {
+    return "ArrowRight";
+  }
+  if (buttons[12]?.pressed || y < -0.55) {
+    return "ArrowUp";
+  }
+  if (buttons[13]?.pressed || y > 0.55) {
+    return "ArrowDown";
+  }
+  return "";
+}
+
+export function BigPicture({
+  groups,
+  loading,
+  launching,
+  runningGameIds,
+  message,
+  onLaunch,
+  onExit,
+}: Props) {
   const { t } = useTranslation();
   const root = useRef<HTMLElement>(null);
-  const [filter, setFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [launching, setLaunching] = useState(false);
-  const games =
-    filter === "recent"
-      ? props.recentGames
-      : props.games.filter((game) => filter !== "installed" || game.installed);
-  const selected = games.find((game) => game.id === selectedId) ?? games[0];
-  const launch = async () => {
-    if (!selected || launching) {
-      return;
+  const exit = useRef<HTMLButtonElement>(null);
+  const firstGame = useRef<HTMLButtonElement>(null);
+  const [selectedId, setSelectedId] = useState<string>();
+  const installed = groups.filter(({ game }) => game.installed);
+  const selected = installed.find(({ id }) => id === selectedId) ?? installed[0];
+  const copy = selected?.copies.find(({ installed }) => installed);
+  const running = Boolean(selected && runningGameIds.has(selected.game.id));
+  const canLaunch = copy && !running && !launching;
+
+  useLayoutEffect(() => {
+    if (!loading) {
+      (firstGame.current ?? exit.current)?.focus();
     }
-    setLaunching(true);
-    try {
-      await props.onLaunch(selected);
-    } finally {
-      setLaunching(false);
-    }
-  };
+  }, [loading]);
 
   useEffect(() => {
-    root.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    let frame = 0;
-    let nextRepeat = 0;
-    let previous = new Set<number>();
-    const move = (direction: string) => {
-      const buttons = Array.from(
-        root.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ??
-          [],
-      );
-      const active = document.activeElement as HTMLButtonElement;
-      const rect = active?.getBoundingClientRect();
+    const container = root.current;
 
-      if (!rect || !buttons.includes(active)) {
-        buttons[0]?.focus();
-        return;
-      }
+    if (!container) {
+      return;
+    }
 
-      const x = rect.x + rect.width / 2,
-        y = rect.y + rect.height / 2;
-      const candidates = buttons
-        .filter((button) => button !== active)
-        .map((button) => {
-          const b = button.getBoundingClientRect();
-          const dx = b.x + b.width / 2 - x,
-            dy = b.y + b.height / 2 - y;
-          const horizontal = direction === "ArrowLeft" || direction === "ArrowRight";
-          const along = horizontal ? dx : dy,
-            across = horizontal ? dy : dx;
-          const sign = direction === "ArrowLeft" || direction === "ArrowUp" ? -1 : 1;
-          return {
-            button,
-            valid: along * sign > 1,
-            score: Math.abs(along) + Math.abs(across) * 3,
-          };
-        })
-        .filter((item) => item.valid)
-        .sort((a, b) => a.score - b.score);
-      candidates[0]?.button.focus();
-      candidates[0]?.button.scrollIntoView({ block: "nearest", inline: "nearest" });
-    };
-    const keydown = (event: KeyboardEvent) => {
-      if (event.key.startsWith("Arrow")) {
-        event.preventDefault();
-        move(event.key);
-      }
-      if (event.key === "Escape") {
-        event.preventDefault();
-        props.onExit();
-      }
-    };
-    const poll = (now: number) => {
+    let frame: number;
+    let lastDirection = "";
+    let repeatAt = 0;
+    let confirmHeld = true;
+    let backHeld = true;
+
+    const poll = (time: number) => {
       const pad = navigator
         .getGamepads?.()
-        .find((pad) => pad?.connected && pad.mapping === "standard");
-      const pressed = new Set<number>();
-      pad?.buttons.forEach((button, index) => {
-        if (button.pressed) {
-          pressed.add(index);
-        }
-      });
-      if (pad) {
-        const direction =
-          pressed.has(14) || pad.axes[0] < -0.55
-            ? "ArrowLeft"
-            : pressed.has(15) || pad.axes[0] > 0.55
-              ? "ArrowRight"
-              : pressed.has(12) || pad.axes[1] < -0.55
-                ? "ArrowUp"
-                : pressed.has(13) || pad.axes[1] > 0.55
-                  ? "ArrowDown"
-                  : null;
+        .find((candidate) => candidate?.mapping === "standard");
 
-        if (direction && now >= nextRepeat) {
-          move(direction);
-          nextRepeat = now + 180;
+      if (document.hasFocus() && pad) {
+        const direction = gamepadDirection(pad);
+
+        if (direction && (direction !== lastDirection || time >= repeatAt)) {
+          moveFocus(container, direction);
+          repeatAt = time + (direction === lastDirection ? 110 : 300);
         }
-        if (!direction) {
-          nextRepeat = 0;
+        lastDirection = direction;
+
+        const confirm = Boolean(pad.buttons[0]?.pressed);
+        const back = Boolean(pad.buttons[1]?.pressed);
+
+        if (back && !backHeld) {
+          exit.current?.click();
+        } else if (confirm && !confirmHeld) {
+          const target = document.activeElement;
+
+          if (target instanceof HTMLButtonElement && container.contains(target)) {
+            target.click();
+          } else {
+            (firstGame.current ?? exit.current)?.focus();
+          }
         }
-        if (pressed.has(0) && !previous.has(0)) {
-          (document.activeElement as HTMLElement)?.click();
-        }
-        if (pressed.has(1) && !previous.has(1)) {
-          props.onExit();
-        }
+        confirmHeld = confirm;
+        backHeld = back;
+      } else {
+        lastDirection = "";
+        confirmHeld = true;
+        backHeld = true;
       }
-      previous = pressed;
       frame = requestAnimationFrame(poll);
     };
-    window.addEventListener("keydown", keydown);
+
     frame = requestAnimationFrame(poll);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("keydown", keydown);
-    };
-  }, [props.onExit]);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
-    <main className="big-picture" ref={root} aria-label="Big Picture">
-      {selected && (
-        <GameHeroImage
-          key={selected.id}
-          game={selected}
-          className="bp-backdrop"
-          alt=""
-        />
-      )}
-      <header className="bp-header">
-        <div className="bp-brand">
-          <GameController aria-hidden="true" weight="fill" />
-          <strong>
-            NEMETON <small>BIG PICTURE</small>
-          </strong>
-        </div>
-        <button onClick={props.onExit}>{t("bp.exit")}</button>
+    <main
+      ref={root}
+      className="big-picture"
+      aria-label="Big Picture"
+      onKeyDown={(event) => {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          onExit();
+        } else if (Object.hasOwn(directions, event.key)) {
+          event.preventDefault();
+          moveFocus(event.currentTarget, event.key);
+        }
+      }}
+    >
+      <header className="big-picture-header">
+        <strong>Nemeton</strong>
+        <button ref={exit} type="button" onClick={onExit}>
+          <ArrowUUpLeft aria-hidden /> {t("bigPicture.exit")}
+        </button>
       </header>
-      <nav className="bp-tabs" aria-label={t("bp.library")}>
-        {["all", "recent", "installed"].map((value) => (
-          <button
-            key={value}
-            aria-pressed={filter === value}
-            onClick={() => setFilter(value)}
-          >
-            {t(`bp.${value}`)}
-          </button>
-        ))}
-      </nav>
-      <section className="bp-hero">
-        <p className="bp-eyebrow">
-          {t("bp.library")} · {games.length}
-        </p>
-        <h1>
-          {props.loading ? t("app.loadingLibrary") : (selected?.title ?? t("bp.empty"))}
-        </h1>
-        {selected && (
-          <>
-            <p className="bp-meta">
-              {t(`stores.${selected.source}`)} ·{" "}
-              {formatPlaytime(selected.playtimeMinutes)} ·{" "}
-              {t(selected.installed ? "app.installed" : "app.inYourAccount")}
-            </p>
-            <div className="bp-actions" aria-busy={launching}>
-              {!launching && (
-                <GameLaunchButton
-                  game={selected}
-                  isRunning={props.runningGameIds.has(selected.id)}
-                  onLaunch={() => void launch()}
-                  onConfigureExecutable={() => props.onDetails(selected.id)}
-                />
-              )}
-              {launching && <p role="status">{t("bp.launching")}</p>}
-              <button onClick={() => props.onDetails(selected.id)}>
-                {t("bp.details")}
-              </button>
-            </div>
-          </>
-        )}
+      {selected && (
+        <section className="big-picture-feature" aria-label={selected.game.title}>
+          <GameHeroImage key={selected.id} game={selected.game} alt="" />
+          <div>
+            <h1>{selected.game.title}</h1>
+            <button
+              type="button"
+              aria-disabled={!canLaunch}
+              onClick={() => {
+                if (canLaunch) {
+                  void onLaunch(copy);
+                }
+              }}
+            >
+              <Play weight="fill" aria-hidden />{" "}
+              {t(running ? "bigPicture.running" : "bigPicture.play")}
+            </button>
+          </div>
+        </section>
+      )}
+      <section className="big-picture-library">
+        <h2>{t("bigPicture.installed")}</h2>
+        {!loading && !installed.length && <p>{t("bigPicture.empty")}</p>}
+        <div className="big-picture-games">
+          {installed.map(({ game, id, copies }, index) => (
+            <button
+              key={id}
+              ref={index === 0 ? firstGame : undefined}
+              type="button"
+              data-game
+              aria-pressed={id === selected?.id}
+              onFocus={() => setSelectedId(id)}
+              onClick={() => {
+                setSelectedId(id);
+                const installedCopy = copies.find((candidate) => candidate.installed);
+
+                if (installedCopy && !launching && !runningGameIds.has(game.id)) {
+                  void onLaunch(installedCopy);
+                }
+              }}
+            >
+              <div>
+                <GameController aria-hidden />
+                <GameHeroImage game={game} alt="" loading="lazy" />
+              </div>
+              <span>{game.title}</span>
+            </button>
+          ))}
+        </div>
       </section>
-      <section className="bp-library" aria-label={t("bp.library")}>
-        {games.map((game) => (
-          <button
-            className="bp-card"
-            key={game.id}
-            aria-pressed={selected?.id === game.id}
-            onFocus={() => setSelectedId(game.id)}
-            onClick={() => setSelectedId(game.id)}
-          >
-            <GameHeroImage game={game} alt="" loading="lazy" />
-            <span>{game.title}</span>
-            {props.runningGameIds.has(game.id) && <small>{t("launch.playing")}</small>}
-          </button>
-        ))}
-      </section>
-      <footer className="bp-footer">
-        <span>
-          <kbd>A</kbd> {t("bp.select")} <kbd>B</kbd> {t("bp.exit")} ·{" "}
-          {t("bp.navigation")}
-        </span>
-        <span role="status">{props.message}</span>
+      <footer className="big-picture-footer">
+        <span aria-live="polite">{message}</span>
+        <span>{t("bigPicture.controls")}</span>
       </footer>
     </main>
   );

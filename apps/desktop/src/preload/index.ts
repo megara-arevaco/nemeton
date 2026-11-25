@@ -124,6 +124,15 @@ const api = {
   ): Promise<void> => invoke("performance:record", name, elapsedMs),
   minimizeWindow: (): Promise<void> => invoke("window:minimize"),
   toggleMaximizeWindow: (): Promise<void> => invoke("window:toggle-maximize"),
+  setFullScreen: (enabled: boolean): Promise<void> =>
+    invoke("window:set-full-screen", enabled),
+  onOpenBigPicture: (callback: () => void) => {
+    const listener = () => callback();
+    ipcRenderer.on("window:open-big-picture", listener);
+    return () => {
+      ipcRenderer.removeListener("window:open-big-picture", listener);
+    };
+  },
   closeWindow: (): Promise<void> => invoke("window:close"),
   getAppUpdateState: (): Promise<AppUpdateState> => invoke("updates:status"),
   checkAppUpdates: (): Promise<AppUpdateState> => invoke("updates:check"),

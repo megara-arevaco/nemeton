@@ -209,6 +209,11 @@ export function App() {
         runningGameIds={runningGameIds}
         message={message}
         onLaunch={launchGame}
+        statistics={
+          <Suspense fallback={<LoadingState />}>
+            <StatisticsView games={games} sessions={sessions} />
+          </Suspense>
+        }
         onExit={() => void changeBigPicture(false)}
       />
     );

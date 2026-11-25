@@ -7,6 +7,7 @@ import { FolderOpen } from "@phosphor-icons/react/FolderOpen";
 import { ClipboardText } from "@phosphor-icons/react/ClipboardText";
 import { Pause } from "@phosphor-icons/react/Pause";
 import { Play } from "@phosphor-icons/react/Play";
+import { Trash } from "@phosphor-icons/react/Trash";
 import { X } from "@phosphor-icons/react/X";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
@@ -714,6 +715,7 @@ function DownloadTask({ job, hasToken }: { job: DownloadJob; hasToken: boolean }
             title={t("downloads.removeHelp")}
             onClick={() => control("remove")}
           >
+            <Trash aria-hidden="true" />
             {t("downloads.remove")}
           </Button>
         )}

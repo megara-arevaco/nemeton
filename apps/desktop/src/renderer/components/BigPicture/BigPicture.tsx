@@ -1,7 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { GameGroup, LibraryGame } from "@launcher/core";
 import { useTranslation } from "react-i18next";
 import { ArrowUUpLeft } from "@phosphor-icons/react/ArrowUUpLeft";
+import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
+import { SpeakerHigh } from "@phosphor-icons/react/SpeakerHigh";
+import { SpeakerSlash } from "@phosphor-icons/react/SpeakerSlash";
+import { NemetonMark } from "../NemetonMark";
+import { useAmbientSound } from "./useAmbientSound";
 import { GameController } from "@phosphor-icons/react/GameController";
 import { Play } from "@phosphor-icons/react/Play";
 import { GameHeroImage } from "../GameHeroImage/GameHeroImage";
@@ -15,6 +21,7 @@ interface Props {
   message: string;
   onLaunch: (game: LibraryGame) => Promise<void>;
   onExit: () => void;
+  statistics: ReactNode;
 }
 
 const directions: Record<string, [number, number]> = {
@@ -94,11 +101,27 @@ export function BigPicture({
   message,
   onLaunch,
   onExit,
+  statistics,
 }: Props) {
   const { t } = useTranslation();
   const root = useRef<HTMLElement>(null);
   const exit = useRef<HTMLButtonElement>(null);
   const firstGame = useRef<HTMLButtonElement>(null);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const { sound, toggleSound } = useAmbientSound();
+  const libraryButton = useRef<HTMLButtonElement>(null);
+  const back = () => {
+    if (showStatistics) {
+      setShowStatistics(false);
+      libraryButton.current?.focus();
+    } else {
+      onExit();
+    }
+  };
+  const backAction = useRef(back);
+  useLayoutEffect(() => {
+    backAction.current = back;
+  });
   const [selectedId, setSelectedId] = useState<string>();
   const installed = groups.filter(({ game }) => game.installed);
   const selected = installed.find(({ id }) => id === selectedId) ?? installed[0];
@@ -143,7 +166,7 @@ export function BigPicture({
         const back = Boolean(pad.buttons[1]?.pressed);
 
         if (back && !backHeld) {
-          exit.current?.click();
+          backAction.current();
         } else if (confirm && !confirmHeld) {
           const target = document.activeElement;
 
@@ -170,12 +193,12 @@ export function BigPicture({
   return (
     <main
       ref={root}
-      className="big-picture"
+      className={showStatistics ? "big-picture big-picture--statistics" : "big-picture"}
       aria-label="Big Picture"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
-          onExit();
+          back();
         } else if (Object.hasOwn(directions, event.key)) {
           event.preventDefault();
           moveFocus(event.currentTarget, event.key);
@@ -183,61 +206,114 @@ export function BigPicture({
       }}
     >
       <header className="big-picture-header">
-        <strong>Nemeton</strong>
-        <button ref={exit} type="button" onClick={onExit}>
-          <ArrowUUpLeft aria-hidden /> {t("bigPicture.exit")}
-        </button>
+        <strong>
+          <NemetonMark />
+          Nemeton
+        </strong>
+        <nav aria-label="Big Picture">
+          <button
+            ref={libraryButton}
+            type="button"
+            aria-pressed={!showStatistics}
+            aria-label={t("bigPicture.installed")}
+            title={t("bigPicture.installed")}
+            onClick={() => setShowStatistics(false)}
+          >
+            <GameController aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-pressed={showStatistics}
+            aria-label={t("bigPicture.statistics")}
+            title={t("bigPicture.statistics")}
+            onClick={() => setShowStatistics(true)}
+          >
+            <ChartDonut aria-hidden />
+          </button>
+          <button
+            type="button"
+            aria-pressed={sound}
+            aria-label={t("bigPicture.sound")}
+            title={t("bigPicture.sound")}
+            onClick={toggleSound}
+          >
+            {sound ? <SpeakerHigh aria-hidden /> : <SpeakerSlash aria-hidden />}
+          </button>
+          <button
+            ref={exit}
+            type="button"
+            aria-label={t("bigPicture.exit")}
+            title={t("bigPicture.exit")}
+            onClick={onExit}
+          >
+            <ArrowUUpLeft aria-hidden />
+          </button>
+        </nav>
       </header>
-      {selected && (
-        <section className="big-picture-feature" aria-label={selected.game.title}>
-          <GameHeroImage key={selected.id} game={selected.game} alt="" />
-          <div>
-            <h1>{selected.game.title}</h1>
-            <button
-              type="button"
-              aria-disabled={!canLaunch}
-              onClick={() => {
-                if (canLaunch) {
-                  void onLaunch(copy);
-                }
-              }}
-            >
-              <Play weight="fill" aria-hidden />{" "}
-              {t(running ? "bigPicture.running" : "bigPicture.play")}
-            </button>
-          </div>
-        </section>
-      )}
-      <section className="big-picture-library">
-        <h2>{t("bigPicture.installed")}</h2>
-        {!loading && !installed.length && <p>{t("bigPicture.empty")}</p>}
-        <div className="big-picture-games">
-          {installed.map(({ game, id, copies }, index) => (
-            <button
-              key={id}
-              ref={index === 0 ? firstGame : undefined}
-              type="button"
-              data-game
-              aria-pressed={id === selected?.id}
-              onFocus={() => setSelectedId(id)}
-              onClick={() => {
-                setSelectedId(id);
-                const installedCopy = copies.find((candidate) => candidate.installed);
-
-                if (installedCopy && !launching && !runningGameIds.has(game.id)) {
-                  void onLaunch(installedCopy);
-                }
-              }}
-            >
+      {showStatistics ? (
+        statistics
+      ) : (
+        <>
+          {selected && (
+            <section className="big-picture-feature" aria-label={selected.game.title}>
+              <GameHeroImage key={selected.id} game={selected.game} alt="" />
               <div>
-                <GameController aria-hidden />
-                <GameHeroImage game={game} alt="" loading="lazy" />
+                <h1>{selected.game.title}</h1>
+                <button
+                  type="button"
+                  aria-disabled={!canLaunch}
+                  onClick={() => {
+                    if (canLaunch) {
+                      void onLaunch(copy);
+                    }
+                  }}
+                >
+                  <Play weight="fill" aria-hidden />{" "}
+                  {t(running ? "bigPicture.running" : "bigPicture.play")}
+                </button>
               </div>
-              <span>{game.title}</span>
-            </button>
-          ))}
-        </div>
-      </section>
+            </section>
+          )}
+          <section
+            className={
+              selected
+                ? "big-picture-library"
+                : "big-picture-library big-picture-library--empty"
+            }
+          >
+            <h2>{t("bigPicture.installed")}</h2>
+            {!loading && !installed.length && <p>{t("bigPicture.empty")}</p>}
+            <div className="big-picture-games">
+              {installed.map(({ game, id, copies }, index) => (
+                <button
+                  key={id}
+                  ref={index === 0 ? firstGame : undefined}
+                  type="button"
+                  data-game
+                  aria-pressed={id === selected?.id}
+                  onFocus={() => setSelectedId(id)}
+                  onClick={() => {
+                    setSelectedId(id);
+                    const installedCopy = copies.find(
+                      (candidate) => candidate.installed,
+                    );
+
+                    if (installedCopy && !launching && !runningGameIds.has(game.id)) {
+                      void onLaunch(installedCopy);
+                    }
+                  }}
+                >
+                  <div>
+                    <GameController aria-hidden />
+                    <GameHeroImage game={game} alt="" loading="lazy" />
+                  </div>
+                  <span>{game.title}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
       <footer className="big-picture-footer">
         <span aria-live="polite">{message}</span>
         <span>{t("bigPicture.controls")}</span>

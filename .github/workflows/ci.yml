@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - "windows-validation/**"
 
 permissions:
   contents: read
@@ -12,7 +13,7 @@ permissions:
 jobs:
   validate:
     name: Validate
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Check out repository
@@ -41,11 +42,29 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
-      - name: Install Electron display dependencies
-        run: sudo apt-get update && sudo apt-get install -y xvfb libgtk-3-0 libnss3 libasound2t64
-
       - name: Test
-        run: xvfb-run --auto-servernum pnpm test
+        run: pnpm test
 
-      - name: Build
-        run: pnpm build
+      - name: Build Windows installer
+        if: startsWith(github.ref, 'refs/heads/windows-validation/')
+        run: pnpm dist:win:installer
+
+      - name: Smoke test the installed Windows application
+        if: startsWith(github.ref, 'refs/heads/windows-validation/')
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $destination = Join-Path $env:RUNNER_TEMP "Nemeton-installed-smoke"
+          $installer = Resolve-Path "apps/desktop/release/Nemeton-Setup-$version.exe"
+          $installation = Start-Process -FilePath $installer -ArgumentList @('/S', "/D=$destination") -Wait -PassThru
+          if ($installation.ExitCode -ne 0) { throw "Installer failed." }
+          node scripts/smoke-packaged.mjs "$destination/Nemeton.exe"
+          if ($LASTEXITCODE -ne 0) { throw "Installed application smoke test failed." }
+
+      - name: Upload Windows installer
+        if: startsWith(github.ref, 'refs/heads/windows-validation/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nemeton-Windows-installer
+          path: apps/desktop/release/Nemeton-Setup-*.exe
+          if-no-files-found: error

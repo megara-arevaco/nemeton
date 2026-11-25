@@ -1,3 +1,4 @@
+import { watchHdmiBigPicture } from "./hdmi-big-picture.js";
 import {
   completeMissingLocalAssets,
   resolveLocalGameAssets,
@@ -232,6 +233,19 @@ const createWindow = () => {
   });
   window.webContents.on("preload-error", (_event, preloadPath, error) => {
     console.error("[preload:error]", { preloadPath, error });
+  });
+  window.webContents.once("did-finish-load", () => {
+    watchHdmiBigPicture(window, () => {
+      if (window.isDestroyed() || window.isFullScreen()) {
+        return;
+      }
+      if (window.isMinimized()) {
+        window.restore();
+      }
+      window.show();
+      window.focus();
+      window.webContents.send("window:open-big-picture");
+    });
   });
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
     const url = new URL(documentUrl);

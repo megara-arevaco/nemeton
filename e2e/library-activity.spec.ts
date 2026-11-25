@@ -6,7 +6,7 @@ test.use({ gameCount: 8 });
 
 test("recent activity shows five distinct games ordered by latest play, including uninstalled copies and sessions", async ({
   desktop,
-}) => {
+}, testInfo) => {
   const filename = path.join(desktop.directory, "data/library.json");
   const snapshot = JSON.parse(await fs.readFile(filename, "utf8"));
   const dates = [
@@ -50,6 +50,19 @@ test("recent activity shows five distinct games ordered by latest play, includin
     "Fixture 0003",
     "Fixture 0004",
   ]);
+  for (const width of [980, 1050, 1440]) {
+    await page.setViewportSize({ width, height: width === 980 ? 640 : 860 });
+    const geometry = await recent.evaluate((element) => ({
+      overflow: element.scrollWidth - element.clientWidth,
+      rows: new Set(
+        Array.from(element.children, (card) => card.getBoundingClientRect().top),
+      ).size,
+    }));
+    expect(geometry.overflow).toBe(0);
+    expect(geometry.rows).toBe(width === 1440 ? 1 : 2);
+    await page.screenshot({ path: testInfo.outputPath(`library-${width}.png`) });
+  }
+
   const recentBox = await page
     .getByRole("region", { name: "Actividad reciente", exact: true })
     .boundingBox();
@@ -76,6 +89,17 @@ test("recent activity shows five distinct games ordered by latest play, includin
   await expect(
     page.getByRole("heading", { name: "Fixture 0005", exact: true }),
   ).toBeVisible();
+  for (const width of [980, 1050, 1440]) {
+    await page.setViewportSize({ width, height: width === 980 ? 640 : 860 });
+    const hero = (await page.locator(".game-hero").boundingBox())!;
+    const actions = (await page.locator(".game-action-bar").boundingBox())!;
+    expect(actions.x).toBe(hero.x);
+    expect(actions.y - (hero.y + hero.height)).toBeGreaterThanOrEqual(16);
+    await expect(
+      page.locator(".game-action-bar").getByRole("button", { name: "Más acciones" }),
+    ).toBeInViewport();
+    await page.screenshot({ path: testInfo.outputPath(`game-${width}.png`) });
+  }
 });
 
 test("collection folds with the keyboard, remembers its state and keeps the installed filter inside", async ({

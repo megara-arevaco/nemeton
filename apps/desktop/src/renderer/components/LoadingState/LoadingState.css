@@ -84,7 +84,7 @@
 }
 .nemeton-loading--panel {
   min-height: 156px;
-  margin: 24px 34px 0;
+  margin: 24px var(--page-gutter) 0;
   border: 1px solid #ffffff0d;
   border-radius: 20px;
   background: #101119;

@@ -90,6 +90,9 @@ export const registerSystemHandlers = ({
       target?.maximize();
     }
   });
+  handle("window:set-full-screen", (event, enabled) =>
+    BrowserWindow.fromWebContents(event.sender)?.setFullScreen(enabled),
+  );
   handle("window:close", (event) =>
     BrowserWindow.fromWebContents(event.sender)?.close(),
   );

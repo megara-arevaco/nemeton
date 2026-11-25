@@ -1,3 +1,4 @@
+import { BigPicture } from "../BigPicture/BigPicture";
 import { GameHeroImage } from "../GameHeroImage/GameHeroImage";
 import { LibraryFilters } from "../LibraryFilters/LibraryFilters";
 import { GameSessions } from "../GameSessions/GameSessions";
@@ -8,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { ChartDonut } from "@phosphor-icons/react/ChartDonut";
 import { DotsThree } from "@phosphor-icons/react/DotsThree";
+import { GameController } from "@phosphor-icons/react/GameController";
 import { Gear } from "@phosphor-icons/react/Gear";
 import { DownloadSimple } from "@phosphor-icons/react/DownloadSimple";
 import { Image } from "@phosphor-icons/react/Image";
@@ -66,6 +68,9 @@ export function App() {
   const { t, i18n } = useTranslation();
   const {
     games,
+    gameGroups,
+    launchGame,
+    launchingGame,
     rawGames,
     selectedGroup,
     storeFilter,
@@ -135,6 +140,22 @@ export function App() {
     deletingGame,
     deleteGameError,
   } = useApp();
+  const [bigPicture, setBigPicture] = useState(
+    () => window.location.hash === "#big-picture",
+  );
+  const changeBigPicture = async (enabled: boolean) => {
+    await window.launcher.setFullScreen(enabled);
+    setBigPicture(enabled);
+  };
+
+  useEffect(
+    () =>
+      window.launcher.onOpenBigPicture(() => {
+        void window.launcher.setFullScreen(true).then(() => setBigPicture(true));
+      }),
+    [],
+  );
+
   const [focusSteamSettings, setFocusSteamSettings] = useState(false);
   const openSteamSettings = () => {
     setFocusSteamSettings(true);
@@ -180,6 +201,20 @@ export function App() {
       )
     : [];
 
+  if (bigPicture) {
+    return (
+      <BigPicture
+        groups={gameGroups}
+        loading={libraryLoading}
+        launching={launchingGame}
+        runningGameIds={runningGameIds}
+        message={message}
+        onLaunch={launchGame}
+        onExit={() => void changeBigPicture(false)}
+      />
+    );
+  }
+
   return (
     <main
       className={
@@ -210,7 +245,7 @@ export function App() {
       >
         <header
           className={
-            "topbar [position:relative] [display:flex] [justify-content:space-between] [align-items:center] [padding:20px_150px_12px_34px] [-webkit-app-region:drag]"
+            "topbar [position:relative] [display:flex] [justify-content:space-between] [align-items:center] [padding:20px_150px_12px_var(--page-gutter)] [-webkit-app-region:drag]"
           }
         >
           {view === "library" ? (
@@ -227,6 +262,15 @@ export function App() {
                   placeholder={t("app.search")}
                 />
               </label>
+              <Button
+                size="small"
+                className="[position:absolute] [top:44px] [right:4px] [width:38px] [-webkit-app-region:no-drag]"
+                aria-label={t("bigPicture.open")}
+                title={t("bigPicture.open")}
+                onClick={() => void changeBigPicture(true)}
+              >
+                <GameController size={20} aria-hidden="true" />
+              </Button>
             </div>
           ) : (
             <span
@@ -301,7 +345,7 @@ export function App() {
           >
             <section
               className={
-                'game-hero [position:relative] [overflow:hidden] [height:min(430px,_55vh)] [min-height:320px] [margin:0_34px] [border:1px_solid_#ffffff10] [border-radius:20px] [background:linear-gradient(120deg,_#11131c_8%,_#171a27_55%,_#20253a)] [&:not(:has(.hero-art))_.ambient::after]:[content:""] [&:not(:has(.hero-art))_.ambient::after]:[position:absolute] [&:not(:has(.hero-art))_.ambient::after]:[width:380px] [&:not(:has(.hero-art))_.ambient::after]:[height:380px] [&:not(:has(.hero-art))_.ambient::after]:[right:10%] [&:not(:has(.hero-art))_.ambient::after]:[top:13%] [&:not(:has(.hero-art))_.ambient::after]:[border:1px_solid_#adff8f28] [&:not(:has(.hero-art))_.ambient::after]:[border-radius:42%_58%_67%_33%] [&:not(:has(.hero-art))_.ambient::after]:[transform:rotate(18deg)] [&:not(:has(.hero-art))_.ambient::after]:[box-shadow:0_0_90px_#7eff6815,_inset_0_0_80px_#6caaff0d]'
+                'game-hero [position:relative] [overflow:hidden] [min-height:clamp(240px,_40vh,_360px)] [margin:0_var(--page-gutter)] [border:1px_solid_#ffffff10] [border-radius:20px] [background:linear-gradient(120deg,_#11131c_8%,_#171a27_55%,_#20253a)] [&:not(:has(.hero-art))_.ambient::after]:[content:""] [&:not(:has(.hero-art))_.ambient::after]:[position:absolute] [&:not(:has(.hero-art))_.ambient::after]:[width:380px] [&:not(:has(.hero-art))_.ambient::after]:[height:380px] [&:not(:has(.hero-art))_.ambient::after]:[right:10%] [&:not(:has(.hero-art))_.ambient::after]:[top:13%] [&:not(:has(.hero-art))_.ambient::after]:[border:1px_solid_#adff8f28] [&:not(:has(.hero-art))_.ambient::after]:[border-radius:42%_58%_67%_33%] [&:not(:has(.hero-art))_.ambient::after]:[transform:rotate(18deg)] [&:not(:has(.hero-art))_.ambient::after]:[box-shadow:0_0_90px_#7eff6815,_inset_0_0_80px_#6caaff0d]'
               }
             >
               <div
@@ -320,7 +364,7 @@ export function App() {
               <div className="hero-shade" aria-hidden="true" />
               <div
                 className={
-                  "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [width:64%] [height:100%] [padding:clamp(24px,_4vw,_48px)] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
+                  "hero-copy [position:relative] [z-index:1] [display:flex] [flex-direction:column] [justify-content:center] [min-height:inherit] [padding:clamp(24px,_4vw,_48px)] [&_>_p]:[color:#7e818e] [&_>_p]:[overflow:hidden] [&_>_p]:[text-overflow:ellipsis] [&_>_p]:[white-space:nowrap]"
                 }
               >
                 <span
@@ -338,7 +382,7 @@ export function App() {
                 <p>{selected.installPath}</p>
                 <div
                   className={
-                    "stats [display:flex] [gap:28px] [margin:16px_0_20px] [color:#90939e] [font-size:12px] [&_b]:[display:block] [&_b]:[color:white] [&_b]:[font-size:17px] [&_b]:[margin-bottom:4px]"
+                    "stats [display:flex] [gap:28px] [margin:16px_0_0] [color:#90939e] [font-size:12px] [&_b]:[display:block] [&_b]:[color:white] [&_b]:[font-size:17px] [&_b]:[margin-bottom:4px]"
                   }
                 >
                   <span>
@@ -361,37 +405,37 @@ export function App() {
                     {t("app.lastPlayed")}
                   </span>
                 </div>
-                <div
-                  className={"hero-actions [display:flex] [flex-wrap:wrap] [gap:8px]"}
-                >
-                  <GameLaunchButton
-                    game={selected}
-                    isRunning={runningGameIds.has(selected.id)}
-                    onLaunch={launchSelected}
-                    onConfigureExecutable={openEditor}
-                  />
-                  {selected.source === "local" && (
-                    <Button onClick={openEditor} variant="secondary">
-                      <PencilSimple /> {t("app.edit")}
-                    </Button>
-                  )}
-                  <Button onClick={chooseCover} variant="secondary">
-                    <Image /> {t("app.cover")}
-                  </Button>
-                  <Button
-                    aria-label={t("app.moreActions")}
-                    onClick={(event) => {
-                      const bounds = event.currentTarget.getBoundingClientRect();
-                      openGameMenu(selected, bounds.right, bounds.bottom);
-                    }}
-                    variant="secondary"
-                  >
-                    <DotsThree /> {t("app.moreActions")}
-                  </Button>
-                </div>
               </div>
-              {metadata && <GameMetadata metadata={metadata} />}
             </section>
+            <div className="game-action-bar">
+              <GameLaunchButton
+                game={selected}
+                isRunning={runningGameIds.has(selected.id)}
+                onLaunch={launchSelected}
+                onConfigureExecutable={openEditor}
+              />
+              <div className="game-secondary-actions">
+                {selected.source === "local" && (
+                  <Button onClick={openEditor} variant="secondary">
+                    <PencilSimple /> {t("app.edit")}
+                  </Button>
+                )}
+                <Button onClick={chooseCover} variant="secondary">
+                  <Image /> {t("app.cover")}
+                </Button>
+                <Button
+                  aria-label={t("app.moreActions")}
+                  onClick={(event) => {
+                    const bounds = event.currentTarget.getBoundingClientRect();
+                    openGameMenu(selected, bounds.right, bounds.bottom);
+                  }}
+                  variant="secondary"
+                >
+                  <DotsThree /> {t("app.moreActions")}
+                </Button>
+              </div>
+            </div>
+            {metadata && <GameMetadata metadata={metadata} />}
             {(selected.source === "epic" || selected.source === "gog") && (
               <ProviderActions key={`provider-${selected.id}`} game={selected} />
             )}
@@ -419,7 +463,7 @@ export function App() {
               achievements.total === 0 && (
                 <section
                   className={
-                    "achievements-section [margin:24px_34px_0] [padding:24px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119] achievement-diagnostic [&_p]:[margin:15px_0_0] [&_p]:[color:#747884] [&_p]:[font-size:11px] [&_p]:[line-height:1.55]"
+                    "achievements-section [margin:24px_var(--page-gutter)_0] [padding:24px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119] achievement-diagnostic [&_p]:[margin:15px_0_0] [&_p]:[color:#747884] [&_p]:[font-size:11px] [&_p]:[line-height:1.55]"
                   }
                 >
                   <div
@@ -459,7 +503,7 @@ export function App() {
             {achievements && achievements.total > 0 && (
               <section
                 className={
-                  "achievements-section [margin:24px_34px_0] [padding:24px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119]"
+                  "achievements-section [margin:24px_var(--page-gutter)_0] [padding:24px] [border:1px_solid_#ffffff0d] [border-radius:20px] [background:#101119]"
                 }
               >
                 <div
@@ -641,7 +685,7 @@ export function App() {
         ) : (
           <section
             className={
-              "empty-state [display:grid] [place-items:center] [align-content:center] [gap:12px] [margin:0_34px] [padding:28px] [border:1px_dashed_#ffffff17] [border-radius:20px] [background:#ffffff04] [text-align:center] [&_h1]:[margin:0] [&_h1]:[font-size:30px] [&_h1]:[letter-spacing:-.8px] [&_p]:[max-width:480px] [&_p]:[margin:0_0_8px] [&_p]:[color:#9699a4] [&_p]:[font-size:13px] [&_p]:[line-height:1.6]"
+              "empty-state [display:grid] [place-items:center] [align-content:center] [gap:12px] [margin:0_var(--page-gutter)] [padding:28px] [border:1px_dashed_#ffffff17] [border-radius:20px] [background:#ffffff04] [text-align:center] [&_h1]:[margin:0] [&_h1]:[font-size:30px] [&_h1]:[letter-spacing:-.8px] [&_p]:[max-width:480px] [&_p]:[margin:0_0_8px] [&_p]:[color:#9699a4] [&_p]:[font-size:13px] [&_p]:[line-height:1.6]"
             }
           >
             <span

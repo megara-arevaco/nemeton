@@ -111,6 +111,7 @@ export const ipcContracts = {
   ]),
   "window:minimize": z.tuple([]),
   "window:toggle-maximize": z.tuple([]),
+  "window:set-full-screen": z.tuple([z.boolean()]),
   "window:close": z.tuple([]),
   "workspace:status": z.tuple([]),
   "updates:status": z.tuple([]),

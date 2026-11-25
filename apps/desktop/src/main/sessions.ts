@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog } from "electron";
+import { app, BrowserWindow, dialog } from "electron";
 import { restoreSavegameWithReview } from "./savegame-restore-flow.js";
 import { savegameStorageKey } from "../shared/game-identity.js";
 import type { MainContext } from "./context.js";
@@ -88,6 +88,12 @@ export function createSteamSessionWatcher({
   };
 
   return watchSteamSession;
+}
+
+const activeLocalSessions = new Set<string>();
+
+export function hasActiveLocalSessions() {
+  return activeLocalSessions.size > 0;
 }
 
 export function registerLaunchHandlers({
@@ -219,12 +225,28 @@ export function registerLaunchHandlers({
       return JSON.stringify(result);
     };
 
-    const launch = await resolveLocalGameLaunch(game.installPath);
-    const startedAt = Date.now();
+    const launch = await resolveLocalGameLaunch(game.installPath, game.title);
+
+    if (activeLocalSessions.has(game.id)) {
+      return;
+    }
+    activeLocalSessions.add(game.id);
+    const finish = () => {
+      activeLocalSessions.delete(game.id);
+      if (
+        process.platform !== "darwin" &&
+        !hasActiveLocalSessions() &&
+        !BrowserWindow.getAllWindows().length
+      ) {
+        app.quit();
+      }
+    };
+    let startedAt: number | undefined;
     const child = spawnLocalGame(
       launch.executablePath,
       launch.workingDirectory,
       launch.env,
+      launch.args,
     );
     let stopped = false;
     let pollDelay = 5_000;
@@ -252,49 +274,55 @@ export function registerLaunchHandlers({
         clearTimeout(achievementTimer);
       }
     };
-    let reportedRunning = false;
     child.once("spawn", () => {
-      reportedRunning = true;
+      startedAt = Date.now();
       broadcastGameRunning(game.id, true);
     });
     child.once("error", (error) => {
       stopPolling();
-      if (reportedRunning) {
-        broadcastGameRunning(game.id, false);
-      }
       console.error("[launch:local]", error);
     });
-    child.once("close", async () => {
+    child.once("close", () => {
       const endedAt = Date.now();
       stopPolling();
-      await pendingAchievements?.catch(() => undefined);
-      await refreshAchievements().catch((error) =>
-        console.error("[achievements:final]", error),
+      runBackground(
+        (async () => {
+          if (startedAt === undefined) {
+            return;
+          }
+
+          const durationSeconds = Math.round((endedAt - startedAt) / 1_000);
+
+          if (durationSeconds >= 5) {
+            await broadcastLibrary(await store.addPlaytime(game.id, durationSeconds));
+          }
+          await pendingAchievements?.catch(() => undefined);
+          await refreshAchievements().catch((error) =>
+            console.error("[achievements:final]", error),
+          );
+          const syncSettings = await settingsStore.read();
+
+          if (savePolicy.autoBackup && syncSettings.syncFolderPath) {
+            await savegameManager
+              .backupWithOutcome(
+                game.id,
+                savegameStorageKey(game),
+                syncSettings.syncFolderPath,
+              )
+              .catch((error) => console.error("[savegames:auto]", error))
+              .finally(() => broadcastSavegameChanged(game.id));
+          }
+          if (durationSeconds >= 5) {
+            await autoSync().catch((error) => console.error("[sync:auto]", error));
+          }
+        })().finally(() => {
+          if (startedAt !== undefined) {
+            broadcastGameRunning(game.id, false);
+          }
+          finish();
+        }),
+        "[launch:local-session]",
       );
-      if (reportedRunning) {
-        broadcastGameRunning(game.id, false);
-      }
-
-      const syncSettings = await settingsStore.read();
-
-      if (savePolicy.autoBackup && syncSettings.syncFolderPath) {
-        await savegameManager
-          .backupWithOutcome(
-            game.id,
-            savegameStorageKey(game),
-            syncSettings.syncFolderPath,
-          )
-          .catch((error) => console.error("[savegames:auto]", error))
-          .finally(() => broadcastSavegameChanged(game.id));
-      }
-
-      const durationSeconds = Math.round((endedAt - startedAt) / 1_000);
-
-      if (durationSeconds < 5) {
-        return;
-      }
-      await broadcastLibrary(await store.addPlaytime(game.id, durationSeconds));
-      await autoSync().catch((error) => console.error("[sync:auto]", error));
     });
   });
 }

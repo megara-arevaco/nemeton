@@ -146,8 +146,9 @@ export function BigPicture({
   );
   const progress = achievements.data;
   const unlocked = progress?.items
-    .filter(({ achieved, imageUrl }) => achieved && imageUrl)
-    .slice(0, 3);
+    .filter(({ achieved }) => achieved)
+    .sort((a, b) => (b.unlockedAt ?? "").localeCompare(a.unlockedAt ?? ""))
+    .slice(0, 2);
   const progressKnown = progress && (progress.total > 0 || progress.unlocked > 0);
 
   useLayoutEffect(() => {
@@ -297,7 +298,7 @@ export function BigPicture({
           {selected && (
             <section className="big-picture-feature" aria-label={selected.game.title}>
               <GameHeroImage key={selected.id} game={selected.game} alt="" />
-              <div>
+              <div className="big-picture-feature-title">
                 <h1>{selected.game.title}</h1>
                 <div className="big-picture-game-details">
                   <span>
@@ -311,34 +312,6 @@ export function BigPicture({
                       },
                     )}
                   </span>
-                  <span>
-                    <Trophy aria-hidden />
-                    {progressKnown
-                      ? progress.totalKnown === false
-                        ? t("app.unlockedPending", { count: progress.unlocked })
-                        : t("bigPicture.achievementProgress", {
-                            unlocked: progress.unlocked,
-                            total: progress.total,
-                          })
-                      : t(
-                          achievements.isFetching ||
-                            settledAchievementGameId !== achievementGameId
-                            ? "bigPicture.loadingAchievements"
-                            : "bigPicture.noAchievements",
-                        )}
-                  </span>
-                  {Boolean(unlocked?.length) && (
-                    <ul aria-label={t("bigPicture.unlockedAchievements")}>
-                      {unlocked?.map((achievement) => (
-                        <li key={achievement.id} title={achievement.name}>
-                          <img
-                            src={achievement.imageUrl ?? undefined}
-                            alt={achievement.name}
-                          />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
                 </div>
                 <button
                   type="button"
@@ -353,6 +326,51 @@ export function BigPicture({
                   {t(running ? "bigPicture.running" : "bigPicture.play")}
                 </button>
               </div>
+              <aside
+                className="big-picture-achievements"
+                aria-label={t("bigPicture.achievements")}
+              >
+                <h2>
+                  <Trophy aria-hidden /> {t("bigPicture.achievements")}
+                </h2>
+                <p>
+                  {progressKnown
+                    ? progress.totalKnown === false
+                      ? t("app.unlockedPending", { count: progress.unlocked })
+                      : t("bigPicture.achievementProgress", {
+                          unlocked: progress.unlocked,
+                          total: progress.total,
+                        })
+                    : t(
+                        achievements.isFetching ||
+                          settledAchievementGameId !== achievementGameId
+                          ? "bigPicture.loadingAchievements"
+                          : "bigPicture.noAchievements",
+                      )}
+                </p>
+                {progressKnown && progress.totalKnown !== false && (
+                  <progress
+                    aria-label={t("bigPicture.achievements")}
+                    max={progress.total}
+                    value={Math.min(progress.unlocked, progress.total)}
+                  />
+                )}
+                {Boolean(unlocked?.length) && (
+                  <ul aria-label={t("bigPicture.unlockedAchievements")}>
+                    {unlocked?.map((achievement) => (
+                      <li key={achievement.id}>
+                        <span className="big-picture-achievement-icon" aria-hidden>
+                          <Trophy />
+                          {achievement.imageUrl && (
+                            <img src={achievement.imageUrl} alt="" />
+                          )}
+                        </span>
+                        <span>{achievement.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </aside>
             </section>
           )}
           <section

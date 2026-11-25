@@ -102,3 +102,45 @@ test("Big Picture updates playtime and achievement status when the highlight mov
   await expect(mode.getByRole("heading", { name: "Beta" })).toBeVisible();
   await expect(mode.getByText(/45 min/)).toBeVisible();
 });
+
+test("Windows records a local game's session and includes it in Big Picture statistics", async ({
+  desktop,
+}) => {
+  test.skip(process.platform !== "win32", "Uses a Windows local game fixture");
+  const { page, directory } = desktop;
+  const executablePath = path.join(directory, "session-fixture.cmd");
+  await fs.writeFile(
+    executablePath,
+    '@echo off\r\n"%SystemRoot%\\System32\\ping.exe" -n 8 127.0.0.1 >nul\r\n',
+  );
+  const gameId = await page.evaluate(async (executablePath) => {
+    const snapshot = await window.launcher.addLocalGame({
+      title: "Session Fixture",
+      executablePath,
+    });
+
+    return snapshot.games.find((game) => game.title === "Session Fixture")!.id;
+  }, executablePath);
+  await page.evaluate((id) => window.launcher.launchGame(id), gameId);
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(async (id) => {
+          const { sessions } = await window.launcher.listGames();
+
+          return (
+            sessions.find((session) => session.gameId === id)?.durationSeconds ?? 0
+          );
+        }, gameId),
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThanOrEqual(5);
+
+  await page.getByRole("button", { name: "Entrar en Big Picture" }).click();
+  await page.keyboard.press("Tab");
+  const mode = page.getByRole("main", { name: "Big Picture" });
+  await expect(mode.getByRole("heading", { name: "Estadísticas" })).toBeVisible();
+  await expect(
+    mode.getByRole("listitem").filter({ hasText: "Session Fixture" }),
+  ).toBeVisible();
+});

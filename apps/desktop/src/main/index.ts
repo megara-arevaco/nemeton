@@ -13,7 +13,11 @@ import { LibraryPublisher } from "./library-publisher.js";
 import { startPerformanceLog } from "./performance.js";
 import { registerLibraryHandlers } from "./ipc/library.js";
 import { registerSavegameHandlers } from "./ipc/savegames.js";
-import { registerLaunchHandlers, createSteamSessionWatcher } from "./sessions.js";
+import {
+  registerLaunchHandlers,
+  createSteamSessionWatcher,
+  hasActiveLocalSessions,
+} from "./sessions.js";
 import { trustWindow, setSnapshotDecorator } from "./ipc/handle.js";
 import { fetchLimitedText } from "./network.js";
 import fs from "node:fs";
@@ -82,6 +86,7 @@ app.on("second-instance", (_event, args) => {
 
   if (!existingWindow) {
     startInBigPicture ||= bigPictureRequested;
+    app.emit("activate");
     return;
   }
   if (existingWindow.isMinimized()) {
@@ -487,7 +492,7 @@ app
     app.quit();
   });
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" && !hasActiveLocalSessions()) {
     app.quit();
   }
 });

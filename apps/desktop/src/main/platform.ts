@@ -60,12 +60,41 @@ export async function findHookshotInstallation(executablePath: string) {
   return { binary, gameDirectory };
 }
 
-export async function resolveLocalGameLaunch(executablePath: string) {
+export async function resolveLocalGameLaunch(executablePath: string, title: string) {
   const fallback = {
     executablePath,
+    args: [] as string[],
     workingDirectory: path.dirname(executablePath),
     env: process.env,
   };
+
+  if (
+    /^cemu(?:\.exe)?$/i.test(path.basename(executablePath)) &&
+    /\bbreath of the wild\b/i.test(title)
+  ) {
+    const gamesDirectory = path.join(fallback.workingDirectory, "games");
+    const directories = await fs
+      .readdir(gamesDirectory, { withFileTypes: true })
+      .catch(() => []);
+    const games = await Promise.all(
+      directories
+        .filter((entry) => entry.isDirectory())
+        .map(async ({ name }) => {
+          const file = path.join(gamesDirectory, name, "code", "U-King.rpx");
+          const stat = await fs.stat(file).catch(() => null);
+          return stat?.isFile() ? file : null;
+        }),
+    );
+    const matches = games.filter((file) => file !== null);
+
+    if (matches.length === 1) {
+      return { ...fallback, args: ["-f", "-g", matches[0]!] };
+    }
+    throw new Error(
+      "Cemu necesita una instalación única de Breath of the Wild en games para arrancar y contar su sesión.",
+    );
+  }
+
   const installation = await findHookshotInstallation(executablePath);
 
   if (!installation) {
@@ -93,21 +122,25 @@ export async function resolveLocalGameLaunch(executablePath: string) {
       .filter(Boolean)
       .join(":");
   }
-  return { executablePath: binary, workingDirectory: gameDirectory, env };
+  return { executablePath: binary, workingDirectory: gameDirectory, env, args: [] };
 }
 
 export function spawnLocalGame(
   executablePath: string,
   workingDirectory = path.dirname(executablePath),
   env = process.env,
+  args: string[] = [],
 ) {
   if (
-    process.platform === "win32" ||
+    (process.platform === "win32" && /\.(bat|cmd)$/i.test(executablePath)) ||
     (process.env.WSL_DISTRO_NAME && executablePath.startsWith("/mnt/"))
   ) {
     const target = toWindowsPath(executablePath);
     const targetDirectory = toWindowsPath(workingDirectory);
-    const script = `$process=Start-Process -FilePath ${quotePowerShell(target)} -WorkingDirectory ${quotePowerShell(targetDirectory)} -PassThru -ErrorAction Stop;$process.WaitForExit();exit $process.ExitCode`;
+    const argumentsOption = args.length
+      ? ` -ArgumentList ${quotePowerShell(args.map((argument) => `"${argument}"`).join(" "))}`
+      : "";
+    const script = `$process=Start-Process -FilePath ${quotePowerShell(target)} -WorkingDirectory ${quotePowerShell(targetDirectory)}${argumentsOption} -PassThru -ErrorAction Stop;$process.WaitForExit();exit $process.ExitCode`;
     const powershell = process.platform === "win32" ? "powershell.exe" : powershellPath;
 
     return spawn(
@@ -122,7 +155,7 @@ export function spawnLocalGame(
     );
   }
 
-  return spawn(executablePath, [], {
+  return spawn(executablePath, args, {
     cwd: workingDirectory,
     env,
     detached: false,

@@ -56,6 +56,12 @@ const DownloadsView = lazy(() =>
   })),
 );
 
+const BigPictureStatistics = lazy(() =>
+  import("../BigPicture/BigPictureStatistics").then((module) => ({
+    default: module.BigPictureStatistics,
+  })),
+);
+
 const StatisticsView = lazy(() =>
   import("../StatisticsView").then((module) => ({ default: module.StatisticsView })),
 );
@@ -211,7 +217,7 @@ export function App() {
         onLaunch={launchGame}
         statistics={
           <Suspense fallback={<LoadingState />}>
-            <StatisticsView games={games} sessions={sessions} />
+            <BigPictureStatistics games={games} sessions={sessions} />
           </Suspense>
         }
         onExit={() => void changeBigPicture(false)}

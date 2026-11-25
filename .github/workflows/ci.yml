@@ -43,7 +43,12 @@ jobs:
         run: pnpm typecheck
 
       - name: Test
+        if: startsWith(github.ref, 'refs/heads/windows-validation/') == false
         run: pnpm test
+
+      - name: Test Big Picture on Windows
+        if: startsWith(github.ref, 'refs/heads/windows-validation/')
+        run: pnpm test:e2e e2e/big-picture.spec.ts
 
       - name: Build Windows installer
         if: startsWith(github.ref, 'refs/heads/windows-validation/')

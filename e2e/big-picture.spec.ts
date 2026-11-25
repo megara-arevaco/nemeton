@@ -26,6 +26,9 @@ test("Big Picture shows statistics and returns to its library before exiting", a
   const { page } = desktop;
   await page.getByRole("button", { name: "Entrar en Big Picture" }).click();
   const mode = page.getByRole("main", { name: "Big Picture" });
+  await expect(
+    mode.getByRole("button", { name: "Volver al escritorio" }),
+  ).toBeFocused();
   await page.keyboard.press("ArrowLeft");
   const sound = mode.getByRole("button", { name: "Música ambiental" });
   await expect(sound).toBeFocused();
@@ -53,6 +56,9 @@ test("Tab cycles between Big Picture sections and keeps focus on the active sect
   const library = mode.getByRole("button", { name: "Juegos instalados" });
   const statistics = mode.getByRole("button", { name: "Estadísticas", exact: true });
 
+  await expect(
+    mode.getByRole("button", { name: "Volver al escritorio" }),
+  ).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(statistics).toBeFocused();
   await expect(statistics).toHaveAttribute("aria-pressed", "true");
@@ -101,6 +107,10 @@ test("Big Picture updates playtime and achievement status when the highlight mov
   await mode.getByRole("button", { name: "Beta", exact: true }).focus();
   await expect(mode.getByRole("heading", { name: "Beta" })).toBeVisible();
   await expect(mode.getByText(/45 min/)).toBeVisible();
+  await mode.getByRole("button", { name: "Estadísticas", exact: true }).click();
+  await expect(mode.getByText("2.8 h", { exact: true })).toBeVisible();
+  await expect(mode.getByRole("listitem").filter({ hasText: "Alpha" })).toBeVisible();
+  await expect(mode.getByRole("listitem").filter({ hasText: "Beta" })).toBeVisible();
 });
 
 test("Windows records a local game's session and includes it in Big Picture statistics", async ({
@@ -137,8 +147,8 @@ test("Windows records a local game's session and includes it in Big Picture stat
     .toBeGreaterThanOrEqual(5);
 
   await page.getByRole("button", { name: "Entrar en Big Picture" }).click();
-  await page.keyboard.press("Tab");
   const mode = page.getByRole("main", { name: "Big Picture" });
+  await mode.getByRole("button", { name: "Estadísticas", exact: true }).click();
   await expect(mode.getByRole("heading", { name: "Estadísticas" })).toBeVisible();
   await expect(
     mode.getByRole("listitem").filter({ hasText: "Session Fixture" }),
